@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: collective-brain
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: CB_LLM_PROVIDER
+        value: mistral
+      - key: CB_MISTRAL_API_KEY
+        sync: false  # manually set in Render dashboard
+      - key: CB_JWT_SECRET
+        generateValue: true
+      - key: CB_DATABASE_URL
+        value: sqlite:///./data/collective_brain.db
+      - key: CB_AGENT_MODE
+        value: rag
+      - key: CB_CHROMA_PERSIST_DIR
+        value: /app/data/chroma_db
+    disk:
+      name: cb-data
+      mountPath: /app/data
+      sizeGB: 1

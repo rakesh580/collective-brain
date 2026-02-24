@@ -1,7 +1,11 @@
 from contextlib import asynccontextmanager
+import os
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.config import get_settings
 from app.db.database import init_db
@@ -79,9 +83,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Collective Brain", version="0.3.0", lifespan=lifespan)
 
+_cors_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+# Allow Render deploy URL via env var
+_extra_origin = os.environ.get("CB_CORS_ORIGIN")
+if _extra_origin:
+    _cors_origins.append(_extra_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -126,3 +139,17 @@ app.include_router(search.router, prefix="/search", tags=["search"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(discussions.router, prefix="/discussions", tags=["discussions"])
 app.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
+
+# ── Serve frontend static files in production ──
+_static_dir = Path(__file__).resolve().parent.parent / "static"
+if _static_dir.is_dir():
+    # Serve asset files (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=_static_dir / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """SPA fallback — serve index.html for all non-API routes."""
+        file_path = _static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(_static_dir / "index.html")
