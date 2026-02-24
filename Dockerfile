@@ -31,9 +31,10 @@ COPY backend/ .
 # Copy built frontend into static/ directory (served by FastAPI)
 COPY --from=frontend-build /app/dist ./static
 
-RUN mkdir -p /app/data/chroma_db
+# Create data directory (writable by HF Spaces user)
+RUN mkdir -p /app/data/chroma_db && chmod -R 777 /app/data
 
-EXPOSE 8000
+# HF Spaces uses port 7860, Render uses 8000
+EXPOSE 7860 8000
 
-# Single worker for memory-constrained environments (Render free tier = 512MB)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "2"]
