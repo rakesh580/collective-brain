@@ -1,0 +1,6 @@
+title,assignee,status,due_date,tags,notes
+Set up CI/CD pipeline,Bob,done,2025-01-20,"devops,infrastructure",Used GitHub Actions
+Fix authentication bug,Alice,done,2025-01-15,"auth,security",Token refresh was broken
+Design database schema,Alice,done,2025-01-10,"database,backend",Used SQLAlchemy ORM
+Build dashboard UI,Charlie,in_progress,2025-02-01,"frontend,react",Working on charts
+Write API tests,Bob,pending,2025-02-05,"testing,backend",Need pytest setup

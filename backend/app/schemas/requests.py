@@ -1,0 +1,102 @@
+from pydantic import BaseModel, Field
+
+
+class QueryRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    conversation_id: str | None = None
+    filters: dict | None = None
+
+
+class GitIngestRequest(BaseModel):
+    repo_path: str = Field(..., min_length=1, max_length=500)
+    branch: str = "main"
+    since_days: int = Field(90, ge=1, le=365)
+
+
+class MarkdownIngestRequest(BaseModel):
+    directory_path: str = Field(..., min_length=1, max_length=500)
+
+
+class MemberAliasUpdate(BaseModel):
+    aliases: list[str] = Field(..., max_length=50)
+
+
+class MemberCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    email: str | None = Field(None, max_length=200)
+    expertise_tags: list[str] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+
+
+class MemberUpdateRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=200)
+    email: str | None = None
+    expertise_tags: list[str] | None = None
+    strengths: list[str] | None = None
+    weaknesses: list[str] | None = None
+
+
+# Auth
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9@._-]+$")
+    email: str = Field(..., min_length=5, max_length=200)
+    password: str = Field(..., min_length=8, max_length=100)
+    display_name: str | None = Field(None, max_length=100)
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+class ProfileUpdateRequest(BaseModel):
+    display_name: str | None = Field(None, max_length=100)
+    avatar_url: str | None = Field(None, max_length=500)
+    linked_member_id: str | None = None
+
+
+# Conversations
+class ShareConversationRequest(BaseModel):
+    user_ids: list[str] = Field(..., min_length=1)
+
+
+# Discussions
+class CreateThreadRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    context_type: str | None = Field(None, pattern=r"^(member|insight)$")
+    context_id: str | None = None
+
+
+class CreateDiscussionMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+    parent_message_id: str | None = None
+
+
+class EditDiscussionMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
+# Rooms
+class CreateRoomRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    member_user_ids: list[str] = Field(default_factory=list)
+
+
+class UpdateRoomRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = None
+
+
+class AddRoomMembersRequest(BaseModel):
+    user_ids: list[str] = Field(..., min_length=1)
+
+
+class RoomMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+    parent_message_id: str | None = None
+
+
+class RoomAIQueryRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)

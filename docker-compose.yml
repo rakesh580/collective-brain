@@ -1,0 +1,100 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: collective_brain
+      POSTGRES_USER: cb_user
+      POSTGRES_PASSWORD: ${CB_POSTGRES_PASSWORD:-cb_pass_change_me}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cb_user -d collective_brain"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend API ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      CB_DATABASE_URL: postgresql://cb_user:${CB_POSTGRES_PASSWORD:-cb_pass_change_me}@postgres:5432/collective_brain
+      CB_REDIS_URL: redis://redis:6379/0
+      CB_CHROMA_PERSIST_DIR: /app/data/chroma_db
+      CB_JWT_SECRET: ${CB_JWT_SECRET:-change-this-in-production}
+      CB_LLM_PROVIDER: ${CB_LLM_PROVIDER:-ollama}
+      CB_OLLAMA_BASE_URL: ${CB_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      CB_CLAUDE_API_KEY: ${CB_CLAUDE_API_KEY:-}
+      CB_MISTRAL_API_KEY: ${CB_MISTRAL_API_KEY:-}
+      CB_AGENT_MODE: ${CB_AGENT_MODE:-rag}
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Frontend ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # ─── Celery Worker (background tasks) ───────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A app.worker worker --loglevel=info --concurrency=2
+    environment:
+      CB_DATABASE_URL: postgresql://cb_user:${CB_POSTGRES_PASSWORD:-cb_pass_change_me}@postgres:5432/collective_brain
+      CB_REDIS_URL: redis://redis:6379/0
+      CB_CHROMA_PERSIST_DIR: /app/data/chroma_db
+      CB_LLM_PROVIDER: ${CB_LLM_PROVIDER:-ollama}
+      CB_OLLAMA_BASE_URL: ${CB_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      CB_CLAUDE_API_KEY: ${CB_CLAUDE_API_KEY:-}
+      CB_MISTRAL_API_KEY: ${CB_MISTRAL_API_KEY:-}
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  backend_data:

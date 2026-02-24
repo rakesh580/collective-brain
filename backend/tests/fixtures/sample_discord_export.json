@@ -1,0 +1,32 @@
+{
+  "channel": {
+    "id": "123456",
+    "name": "dev-general"
+  },
+  "messages": [
+    {
+      "id": "msg001",
+      "author": {"id": "user1", "name": "Alice", "nickname": "alice_dev"},
+      "content": "I'm working on the API refactor today. Going to restructure the endpoints.",
+      "timestamp": "2025-01-15T10:30:00Z"
+    },
+    {
+      "id": "msg002",
+      "author": {"id": "user1", "name": "Alice", "nickname": "alice_dev"},
+      "content": "Main changes: splitting the monolith router into domain-specific modules.",
+      "timestamp": "2025-01-15T10:31:00Z"
+    },
+    {
+      "id": "msg003",
+      "author": {"id": "user2", "name": "Bob", "nickname": "bob_ops"},
+      "content": "Sounds good. I can help with the deployment config once you're done.",
+      "timestamp": "2025-01-15T10:45:00Z"
+    },
+    {
+      "id": "msg004",
+      "author": {"id": "user3", "name": "Charlie", "nickname": "charlie_ui"},
+      "content": "The frontend will need updated API types once the endpoints change. Let me know.",
+      "timestamp": "2025-01-15T11:00:00Z"
+    }
+  ]
+}

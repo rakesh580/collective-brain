@@ -1,0 +1,27 @@
+[
+  {
+    "user": "U001",
+    "text": "Hey team, I just pushed the auth fix to main",
+    "ts": "1705330200.000100"
+  },
+  {
+    "user": "U001",
+    "text": "The token refresh was broken because we weren't checking expiry correctly",
+    "ts": "1705330260.000200"
+  },
+  {
+    "user": "U002",
+    "text": "Nice! I'll review the PR after lunch",
+    "ts": "1705330800.000300"
+  },
+  {
+    "user": "U002",
+    "text": "Also, the CI pipeline is now green on all branches",
+    "ts": "1705330860.000400"
+  },
+  {
+    "user": "U003",
+    "text": "The dashboard charts are looking good, check out the staging deployment",
+    "ts": "1705334400.000500"
+  }
+]
