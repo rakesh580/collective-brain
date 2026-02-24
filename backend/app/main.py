@@ -58,8 +58,10 @@ async def lifespan(app: FastAPI):
     )
 
     # ── Initialize Redis references in routers ──
-    from app.routers.rooms import init_redis_from_app
-    init_redis_from_app(app)
+    from app.routers.rooms import init_redis_from_app as rooms_init_redis
+    from app.routers.discussions import init_redis_from_app as discussions_init_redis
+    rooms_init_redis(app)
+    discussions_init_redis(app)
 
     redis_ok = await redis.ping()
     db_type = "PostgreSQL" if settings.is_postgres else "SQLite"

@@ -113,6 +113,40 @@ def _run_migrations(engine):
                 conn.execute(text("ALTER TABLE messages ADD COLUMN sender_name TEXT"))
                 logger.info("Migration: added messages.sender_name")
 
+        # Backfill owner_user_id for legacy conversations (assign from first message sender)
+        if "conversations" in tables and "messages" in tables:
+            migrated = conn.execute(text(
+                "UPDATE conversations SET owner_user_id = ("
+                "  SELECT m.sender_user_id FROM messages m"
+                "  WHERE m.conversation_id = conversations.id"
+                "  AND m.sender_user_id IS NOT NULL"
+                "  ORDER BY m.created_at ASC LIMIT 1"
+                ") WHERE owner_user_id IS NULL"
+            ))
+            if migrated.rowcount > 0:
+                logger.info("Migration: backfilled owner_user_id for %d legacy conversations", migrated.rowcount)
+
+        # Add unique constraint on conversation_participants(conversation_id, user_id)
+        if "conversation_participants" in tables:
+            is_pg = engine.url.get_backend_name() == "postgresql"
+            existing_constraints = inspector.get_unique_constraints("conversation_participants")
+            constraint_names = [c["name"] for c in existing_constraints]
+            if "uq_participant_conv_user" not in constraint_names:
+                try:
+                    if is_pg:
+                        conn.execute(text(
+                            "ALTER TABLE conversation_participants "
+                            "ADD CONSTRAINT uq_participant_conv_user UNIQUE (conversation_id, user_id)"
+                        ))
+                    else:
+                        conn.execute(text(
+                            "CREATE UNIQUE INDEX IF NOT EXISTS uq_participant_conv_user "
+                            "ON conversation_participants (conversation_id, user_id)"
+                        ))
+                    logger.info("Migration: added unique constraint on conversation_participants(conversation_id, user_id)")
+                except Exception as e:
+                    logger.warning("Migration: unique constraint already exists or failed: %s", e)
+
         conn.commit()
 
 

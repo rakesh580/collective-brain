@@ -19,8 +19,18 @@ logger = logging.getLogger("collective_brain.discussions")
 
 router = APIRouter()
 
-# In-memory WebSocket connection manager
+# Local WebSocket connections: thread_id -> list of WebSocket
+# Each server process tracks its own connections.
 _ws_connections: dict[str, list[WebSocket]] = defaultdict(list)
+
+# Reference to Redis service (set during startup via app.state)
+_redis_service = None
+
+
+def init_redis_from_app(app):
+    """Called at startup to set the Redis reference without needing a request."""
+    global _redis_service
+    _redis_service = getattr(app.state, "redis", None)
 
 
 def _get_db():
@@ -49,7 +59,8 @@ def _msg_to_dict(msg: DiscussionMessage, db) -> dict:
     }
 
 
-async def _broadcast(thread_id: str, event: dict):
+async def _broadcast_local(thread_id: str, event: dict):
+    """Send event to all WebSocket connections in THIS process."""
     connections = _ws_connections.get(thread_id, [])
     dead = []
     for ws in list(connections):  # iterate a copy to avoid mutation during iteration
@@ -62,6 +73,23 @@ async def _broadcast(thread_id: str, event: dict):
             connections.remove(ws)
         except ValueError:
             pass  # already removed by another coroutine
+
+
+async def _broadcast(thread_id: str, event: dict):
+    """Broadcast event via Redis pub/sub (multi-process) or locally.
+
+    When Redis is available:
+      Publish to Redis channel "discussion:{thread_id}".
+      Each process's subscriber delivers to its local WebSocket connections.
+
+    When Redis is unavailable:
+      Deliver directly to local connections (single-process mode).
+    """
+    redis = _redis_service
+    if redis and redis.is_connected:
+        await redis.publish(f"discussion:{thread_id}", event)
+    else:
+        await _broadcast_local(thread_id, event)
 
 
 @router.post("")
@@ -333,9 +361,36 @@ async def discussion_websocket(websocket: WebSocket, thread_id: str):
         await websocket.close(code=4001, reason="Auth failed")
         return
 
+    # Verify thread exists before allowing connection
+    db = _get_db()
+    try:
+        thread = (
+            db.query(DiscussionThread)
+            .filter(DiscussionThread.id == thread_id)
+            .first()
+        )
+        if not thread:
+            await websocket.close(code=4004, reason="Thread not found")
+            return
+    finally:
+        db.close()
+
     # Register connection
     _ws_connections[thread_id].append(websocket)
     logger.info("WS connected: user=%s thread=%s", user_id, thread_id)
+
+    # Subscribe to Redis channel for this thread (multi-process delivery)
+    redis = _redis_service
+    channel = f"discussion:{thread_id}"
+    is_first_in_thread = len(_ws_connections[thread_id]) == 1
+
+    if redis and redis.is_connected and is_first_in_thread:
+        async def _on_redis_message(data: dict):
+            """Deliver Redis pub/sub messages to local WebSocket connections."""
+            await _broadcast_local(thread_id, data)
+
+        await redis.subscribe(channel, _on_redis_message)
+        logger.info("Subscribed to Redis channel: %s", channel)
 
     try:
         while True:
@@ -346,4 +401,13 @@ async def discussion_websocket(websocket: WebSocket, thread_id: str):
     finally:
         if websocket in _ws_connections.get(thread_id, []):
             _ws_connections[thread_id].remove(websocket)
+
+        # Unsubscribe from Redis and clean up if last connection in this thread
+        if not _ws_connections.get(thread_id):
+            if redis and redis.is_connected:
+                await redis.unsubscribe(channel)
+                logger.info("Unsubscribed from Redis channel: %s", channel)
+            # Clean up empty connection lists to prevent memory leak
+            _ws_connections.pop(thread_id, None)
+
         logger.info("WS disconnected: user=%s thread=%s", user_id, thread_id)

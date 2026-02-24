@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from uuid import uuid4
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -16,6 +18,14 @@ from app.schemas.responses import QueryResponse, SourceRef, RelatedMember
 from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.models.conversation import ConversationRecord, MessageRecord
+
+logger = logging.getLogger("collective_brain.rag")
+
+LLM_TIMEOUT_SECONDS = 90
+FALLBACK_RESPONSE = (
+    "I'm sorry, the AI service is temporarily unavailable or took too long to respond. "
+    "Please try again in a moment."
+)
 
 
 class RAGPipeline:
@@ -60,8 +70,15 @@ class RAGPipeline:
         self._ensure_conversation(conv_id, question, sender_user_id)
         messages = self._build_messages(conv_id, user_content)
 
-        # Step 5: Call LLM
-        response_text = await self.llm.generate(messages)
+        # Step 5: Call LLM with timeout
+        try:
+            response_text = await asyncio.wait_for(
+                self.llm.generate(messages),
+                timeout=LLM_TIMEOUT_SECONDS,
+            )
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.error("LLM call failed: %s", e)
+            response_text = FALLBACK_RESPONSE
 
         # Step 6: Persist messages to database
         self._save_messages(conv_id, user_content, response_text, results, sender_user_id, sender_name)

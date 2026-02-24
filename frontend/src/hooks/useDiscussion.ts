@@ -2,11 +2,17 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../api/client";
 import type { DiscussionThreadDetail } from "../types";
 
+const MAX_RECONNECT_DELAY = 30000;
+const BASE_RECONNECT_DELAY = 1000;
+
 export function useDiscussion(threadId: string | null) {
   const [thread, setThread] = useState<DiscussionThreadDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptRef = useRef<number>(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
 
   // Load thread data via REST
   const loadThread = useCallback(async () => {
@@ -26,66 +32,95 @@ export function useDiscussion(threadId: string | null) {
     }
   }, [threadId]);
 
-  // Connect WebSocket for real-time updates
+  // Connect WebSocket for real-time updates with auto-reconnect
   useEffect(() => {
     if (!threadId) return;
+    unmountedRef.current = false;
+    reconnectAttemptRef.current = 0;
 
     loadThread();
 
     const token = localStorage.getItem("cb_token");
     if (!token) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/discussions/ws/${threadId}`);
-    wsRef.current = ws;
+    function connect() {
+      if (unmountedRef.current) return;
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ token }));
-    };
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/discussions/ws/${threadId}`);
+      wsRef.current = ws;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "new_message") {
-          setThread((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              messages: [...prev.messages, data.message],
-              message_count: prev.message_count + 1,
-            };
-          });
-        } else if (data.type === "message_edited") {
-          setThread((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              messages: prev.messages.map((m) =>
-                m.id === data.message.id ? data.message : m
-              ),
-            };
-          });
-        } else if (data.type === "message_deleted") {
-          setThread((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              messages: prev.messages.filter((m) => m.id !== data.message_id),
-              message_count: prev.message_count - 1,
-            };
-          });
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ token }));
+        reconnectAttemptRef.current = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "new_message") {
+            setThread((prev) => {
+              if (!prev) return prev;
+              // Deduplicate
+              if (prev.messages.some((m) => m.id === data.message.id)) return prev;
+              return {
+                ...prev,
+                messages: [...prev.messages, data.message],
+                message_count: prev.message_count + 1,
+              };
+            });
+          } else if (data.type === "message_edited") {
+            setThread((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                messages: prev.messages.map((m) =>
+                  m.id === data.message.id ? data.message : m
+                ),
+              };
+            });
+          } else if (data.type === "message_deleted") {
+            setThread((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                messages: prev.messages.filter((m) => m.id !== data.message_id),
+                message_count: prev.message_count - 1,
+              };
+            });
+          }
+        } catch {
+          // Ignore parse errors
         }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+      };
 
-    ws.onerror = () => {
-      // WebSocket errors are non-fatal; REST still works
-    };
+      ws.onclose = (event) => {
+        wsRef.current = null;
+
+        // Don't reconnect if intentionally closed or component unmounted
+        if (unmountedRef.current || event.code === 4001 || event.code === 4004) return;
+
+        // Exponential backoff reconnect
+        const attempt = reconnectAttemptRef.current++;
+        const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, attempt), MAX_RECONNECT_DELAY);
+        reconnectTimerRef.current = setTimeout(connect, delay);
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after onerror, which handles reconnection
+      };
+    }
+
+    connect();
 
     return () => {
-      ws.close();
+      unmountedRef.current = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      const ws = wsRef.current;
+      if (ws) ws.close();
       wsRef.current = null;
     };
   }, [threadId, loadThread]);

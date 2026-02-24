@@ -28,12 +28,12 @@ class Settings(BaseSettings):
     # ChromaDB
     chroma_persist_dir: str = "./data/chroma_db"
 
-    # Database — supports both PostgreSQL and SQLite
+    # Database — PostgreSQL recommended for production, SQLite for local dev
     # PostgreSQL: postgresql://user:pass@host:5432/dbname
     # SQLite:     sqlite:///./data/collective_brain.db
-    database_url: str = "sqlite:///./data/collective_brain.db"
+    database_url: str = ""
 
-    # Keep legacy sqlite_url as alias for backward compat
+    # Legacy SQLite fallback (used only when database_url is empty)
     sqlite_url: str = "sqlite:///./data/collective_brain.db"
 
     # Connection pool settings (PostgreSQL only, ignored for SQLite)
@@ -59,8 +59,8 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        """Return database_url if set, else sqlite_url for backward compat."""
-        if self.database_url != "sqlite:///./data/collective_brain.db":
+        """Return database_url if explicitly set, else sqlite_url as fallback."""
+        if self.database_url:
             return self.database_url
         return self.sqlite_url
 

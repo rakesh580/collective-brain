@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 
 from app.models.conversation import ConversationRecord, MessageRecord, ConversationParticipant
 from app.models.user import UserRecord
@@ -31,7 +32,6 @@ async def list_conversations(request: Request, limit: int = 20, offset: int = 0)
             (ConversationRecord.owner_user_id == user.id)
             | (ConversationRecord.id.in_(participant_conv_ids))
             | (ConversationRecord.visibility == "team")
-            | (ConversationRecord.owner_user_id == None)  # noqa: E711 legacy
         )
         total = query.count()
         conversations = (
@@ -170,15 +170,7 @@ async def share_conversation(
             raise HTTPException(status_code=403, detail="Only the owner can share")
 
         for uid in body.user_ids:
-            existing = (
-                db.query(ConversationParticipant)
-                .filter(
-                    ConversationParticipant.conversation_id == conversation_id,
-                    ConversationParticipant.user_id == uid,
-                )
-                .first()
-            )
-            if not existing:
+            try:
                 db.add(
                     ConversationParticipant(
                         id=str(uuid4()),
@@ -187,6 +179,9 @@ async def share_conversation(
                         role="participant",
                     )
                 )
+                db.flush()
+            except IntegrityError:
+                db.rollback()  # Duplicate — already a participant, skip
         conv.visibility = "shared"
         db.commit()
         return {"status": "shared", "conversation_id": conversation_id}

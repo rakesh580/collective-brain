@@ -905,38 +905,57 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                     })
 
                 elif msg_type == "message":
-                    # Save and broadcast message via WebSocket
+                    # Save and broadcast message via WebSocket (with retry)
                     content = data.get("content", "").strip()
                     if not content:
                         continue
 
-                    db = _get_db()
-                    try:
-                        room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
-                        if not room:
-                            continue
+                    saved = False
+                    for attempt in range(2):
+                        db = _get_db()
+                        try:
+                            room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
+                            if not room:
+                                break
 
-                        msg = ChatRoomMessage(
-                            id=str(uuid4()),
-                            room_id=room_id,
-                            user_id=user_id,
-                            sender_name=username,
-                            message_type="user",
-                            content=content,
-                            parent_message_id=data.get("parent_message_id"),
-                            created_at=datetime.utcnow(),
-                        )
-                        db.add(msg)
-                        room.message_count = (room.message_count or 0) + 1
-                        room.last_message_at = datetime.utcnow()
-                        db.commit()
+                            msg = ChatRoomMessage(
+                                id=str(uuid4()),
+                                room_id=room_id,
+                                user_id=user_id,
+                                sender_name=username,
+                                message_type="user",
+                                content=content,
+                                parent_message_id=data.get("parent_message_id"),
+                                created_at=datetime.utcnow(),
+                            )
+                            db.add(msg)
+                            room.message_count = (room.message_count or 0) + 1
+                            room.last_message_at = datetime.utcnow()
+                            db.commit()
 
-                        await _broadcast(room_id, {
-                            "type": "new_message",
-                            "message": _msg_to_dict(msg),
-                        })
-                    finally:
-                        db.close()
+                            await _broadcast(room_id, {
+                                "type": "new_message",
+                                "message": _msg_to_dict(msg),
+                            })
+                            saved = True
+                            break
+                        except Exception as db_err:
+                            db.rollback()
+                            if attempt == 0:
+                                logger.warning("DB write failed (attempt 1), retrying: %s", db_err)
+                            else:
+                                logger.error("DB write failed after retry: %s", db_err)
+                        finally:
+                            db.close()
+
+                    if not saved:
+                        try:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Failed to save message. Please try again.",
+                            })
+                        except Exception:
+                            pass
 
                 elif msg_type == "ping":
                     await websocket.send_json({"type": "pong"})
@@ -957,11 +976,14 @@ async def room_websocket(websocket: WebSocket, room_id: str):
         if not still_connected:
             _online_users[room_id].discard(user_id)
 
-        # Unsubscribe from Redis if last connection in this room
+        # Unsubscribe from Redis and clean up if last connection in this room
         if not _ws_connections.get(room_id):
             if redis and redis.is_connected:
                 await redis.unsubscribe(channel)
                 logger.info("Unsubscribed from Redis channel: %s", channel)
+            # Clean up empty connection lists to prevent memory leak
+            _ws_connections.pop(room_id, None)
+            _online_users.pop(room_id, None)
 
         logger.info("Room WS disconnected: user=%s room=%s", user_id, room_id)
 

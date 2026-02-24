@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
 from app.db.database import Base
 
 
@@ -32,6 +32,9 @@ class MessageRecord(Base):
 
 class ConversationParticipant(Base):
     __tablename__ = "conversation_participants"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "user_id", name="uq_participant_conv_user"),
+    )
 
     id = Column(String, primary_key=True)
     conversation_id = Column(String, ForeignKey("conversations.id"), index=True)

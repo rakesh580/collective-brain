@@ -23,6 +23,9 @@ interface UseRoom {
   reload: () => Promise<void>;
 }
 
+const MAX_RECONNECT_DELAY = 30000;
+const BASE_RECONNECT_DELAY = 1000;
+
 export function useRoom(roomId: string | null): UseRoom {
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [messages, setMessages] = useState<RoomMessage[]>([]);
@@ -36,6 +39,9 @@ export function useRoom(roomId: string | null): UseRoom {
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
+  const reconnectAttemptRef = useRef<number>(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
 
   const typingUsers = Array.from(typingUsersMap.values()).map(({ user_id, username }) => ({
     user_id,
@@ -59,119 +65,147 @@ export function useRoom(roomId: string | null): UseRoom {
     }
   }, [roomId]);
 
-  // WebSocket connection
+  // WebSocket connection with auto-reconnect
   useEffect(() => {
     if (!roomId) return;
+    unmountedRef.current = false;
+    reconnectAttemptRef.current = 0;
 
     loadRoom();
 
     const token = localStorage.getItem("cb_token");
     if (!token) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/rooms/ws/${roomId}`);
-    wsRef.current = ws;
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ token }));
-    };
+    function connect() {
+      if (unmountedRef.current) return;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/rooms/ws/${roomId}`);
+      wsRef.current = ws;
 
-        switch (data.type) {
-          case "new_message":
-            setMessages((prev) => {
-              // Deduplicate
-              if (prev.some((m) => m.id === data.message.id)) return prev;
-              return [...prev, data.message];
-            });
-            // Clear typing for the sender
-            if (data.message.user_id) {
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ token }));
+        reconnectAttemptRef.current = 0; // Reset on successful connect
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          switch (data.type) {
+            case "new_message":
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === data.message.id)) return prev;
+                return [...prev, data.message];
+              });
+              if (data.message.user_id) {
+                setTypingUsersMap((prev) => {
+                  const next = new Map(prev);
+                  const existing = next.get(data.message.user_id);
+                  if (existing) clearTimeout(existing.timeout);
+                  next.delete(data.message.user_id);
+                  return next;
+                });
+              }
+              break;
+
+            case "typing": {
+              const uid = data.user_id as string;
               setTypingUsersMap((prev) => {
                 const next = new Map(prev);
-                const existing = next.get(data.message.user_id);
+                const existing = next.get(uid);
                 if (existing) clearTimeout(existing.timeout);
-                next.delete(data.message.user_id);
+                const timeout = setTimeout(() => {
+                  setTypingUsersMap((p) => {
+                    const n = new Map(p);
+                    n.delete(uid);
+                    return n;
+                  });
+                }, 3000);
+                next.set(uid, { user_id: uid, username: data.username, timeout });
                 return next;
               });
+              break;
             }
-            break;
 
-          case "typing": {
-            const uid = data.user_id as string;
-            setTypingUsersMap((prev) => {
-              const next = new Map(prev);
-              const existing = next.get(uid);
-              if (existing) clearTimeout(existing.timeout);
-              const timeout = setTimeout(() => {
-                setTypingUsersMap((p) => {
-                  const n = new Map(p);
-                  n.delete(uid);
-                  return n;
-                });
-              }, 3000);
-              next.set(uid, { user_id: uid, username: data.username, timeout });
-              return next;
-            });
-            break;
+            case "typing_stop": {
+              const uid2 = data.user_id as string;
+              setTypingUsersMap((prev) => {
+                const next = new Map(prev);
+                const existing = next.get(uid2);
+                if (existing) clearTimeout(existing.timeout);
+                next.delete(uid2);
+                return next;
+              });
+              break;
+            }
+
+            case "presence":
+              setOnlineUsers(data.online_users || []);
+              setMembers((prev) =>
+                prev.map((m) => ({
+                  ...m,
+                  is_online: (data.online_users || []).includes(m.user_id),
+                }))
+              );
+              break;
+
+            case "members_changed":
+              loadRoom();
+              break;
+
+            case "pong":
+              break;
           }
-
-          case "typing_stop": {
-            const uid2 = data.user_id as string;
-            setTypingUsersMap((prev) => {
-              const next = new Map(prev);
-              const existing = next.get(uid2);
-              if (existing) clearTimeout(existing.timeout);
-              next.delete(uid2);
-              return next;
-            });
-            break;
-          }
-
-          case "presence":
-            setOnlineUsers(data.online_users || []);
-            // Update members online status
-            setMembers((prev) =>
-              prev.map((m) => ({
-                ...m,
-                is_online: (data.online_users || []).includes(m.user_id),
-              }))
-            );
-            break;
-
-          case "members_changed":
-            // Reload room to get updated member list
-            loadRoom();
-            break;
-
-          case "pong":
-            break;
+        } catch {
+          // ignore parse errors
         }
-      } catch {
-        // ignore parse errors
-      }
-    };
+      };
 
-    ws.onclose = () => {
-      wsRef.current = null;
-    };
+      ws.onclose = (event) => {
+        wsRef.current = null;
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
 
-    // Ping to keep alive
-    const pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ping" }));
-      }
-    }, 30000);
+        // Don't reconnect if intentionally closed or component unmounted
+        if (unmountedRef.current || event.code === 4001 || event.code === 4003) return;
+
+        // Exponential backoff reconnect
+        const attempt = reconnectAttemptRef.current++;
+        const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, attempt), MAX_RECONNECT_DELAY);
+        reconnectTimerRef.current = setTimeout(connect, delay);
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after onerror, which handles reconnection
+      };
+
+      // Ping to keep alive
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 30000);
+    }
+
+    connect();
 
     return () => {
-      clearInterval(pingInterval);
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      unmountedRef.current = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (pingInterval) clearInterval(pingInterval);
+      const ws = wsRef.current;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         ws.close();
       }
       wsRef.current = null;
-      // Clear typing timeouts
       setTypingUsersMap((prev) => {
         prev.forEach((v) => clearTimeout(v.timeout));
         return new Map();
@@ -186,7 +220,6 @@ export function useRoom(roomId: string | null): UseRoom {
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "message", content: content.trim() }));
-        // Send typing stop
         ws.send(JSON.stringify({ type: "typing_stop" }));
       } else {
         // Fallback to REST
@@ -213,7 +246,6 @@ export function useRoom(roomId: string | null): UseRoom {
 
   const sendTyping = useCallback(() => {
     const now = Date.now();
-    // Throttle typing events to every 2 seconds
     if (now - lastTypingSentRef.current < 2000) return;
     lastTypingSentRef.current = now;
 
@@ -221,7 +253,6 @@ export function useRoom(roomId: string | null): UseRoom {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "typing" }));
 
-      // Auto-stop after 3 seconds of no typing
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
         if (ws.readyState === WebSocket.OPEN) {
