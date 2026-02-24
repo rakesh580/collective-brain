@@ -27,6 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setIsLoading(false);
     }
+
+    // Sync logout across browser tabs via storage events
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "cb_token" && e.newValue === null) {
+        setUser(null);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {

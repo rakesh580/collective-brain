@@ -140,6 +140,50 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str):
     )
 
 
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB per file
+
+
+async def _read_upload(uploaded: UploadFile, max_bytes: int = _MAX_UPLOAD_BYTES) -> bytes:
+    """Read an uploaded file with size enforcement."""
+    content = await uploaded.read()
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File '{uploaded.filename}' exceeds {max_bytes // (1024*1024)}MB limit.",
+        )
+    return content
+
+
+def _safe_extract_zip(zf, target_dir: str, allowed_extensions: tuple | None = None):
+    """Extract ZIP members safely, rejecting any that escape target_dir (ZipSlip)."""
+    target = os.path.realpath(target_dir)
+    for member in zf.namelist():
+        # Skip directories
+        if member.endswith("/"):
+            continue
+        # Filter by extension if specified
+        if allowed_extensions and not member.lower().endswith(allowed_extensions):
+            continue
+        # Resolve the final destination and ensure it stays within target_dir
+        dest = os.path.realpath(os.path.join(target, member))
+        if not dest.startswith(target + os.sep) and dest != target:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Zip entry attempts path traversal: {member}",
+            )
+        # Create parent directories safely
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        # Extract individual member
+        with zf.open(member) as src, open(dest, "wb") as dst:
+            dst.write(src.read())
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip directory components from an uploaded filename."""
+    # Handle both Unix and Windows path separators
+    return os.path.basename(name.replace("\\", "/"))
+
+
 def _validate_local_path(path: str) -> str:
     """Resolve and validate a local filesystem path to prevent traversal attacks."""
     resolved = os.path.realpath(path)
@@ -225,18 +269,16 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
         os.makedirs(doc_dir)
 
         for uploaded in files:
-            filename = uploaded.filename or "document.md"
-            content = await uploaded.read()
+            filename = _sanitize_filename(uploaded.filename or "document.md")
+            content = await _read_upload(uploaded)
             file_path = os.path.join(tmpdir, filename)
             with open(file_path, "wb") as f:
                 f.write(content)
 
-            # If ZIP, extract markdown files from it
+            # If ZIP, extract markdown files from it (safe extraction)
             if filename.lower().endswith(".zip") and zipfile.is_zipfile(file_path):
                 with zipfile.ZipFile(file_path, "r") as zf:
-                    for member in zf.namelist():
-                        if member.lower().endswith((".md", ".txt", ".markdown")):
-                            zf.extract(member, doc_dir)
+                    _safe_extract_zip(zf, doc_dir, allowed_extensions=(".md", ".txt", ".markdown"))
             elif filename.lower().endswith((".md", ".txt", ".markdown")):
                 dest = os.path.join(doc_dir, filename)
                 with open(dest, "wb") as f:
@@ -274,16 +316,17 @@ async def ingest_slack(request: Request, file: UploadFile = File(...)):
 
     # Save uploaded ZIP to temp dir
     with tempfile.TemporaryDirectory() as tmpdir:
-        zip_path = os.path.join(tmpdir, file.filename or "slack_export.zip")
-        content = await file.read()
+        zip_path = os.path.join(tmpdir, _sanitize_filename(file.filename or "slack_export.zip"))
+        content = await _read_upload(file)
         with open(zip_path, "wb") as f:
             f.write(content)
 
-        # Extract if ZIP
+        # Extract if ZIP (safe extraction — prevents path traversal)
         extract_dir = os.path.join(tmpdir, "extracted")
         if zipfile.is_zipfile(zip_path):
+            os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(zip_path, "r") as zf:
-                zf.extractall(extract_dir)
+                _safe_extract_zip(zf, extract_dir)
         else:
             extract_dir = zip_path
 
@@ -301,8 +344,8 @@ async def ingest_discord(request: Request, file: UploadFile = File(...)):
     settings = request.app.state.settings
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, file.filename or "discord_export.json")
-        content = await file.read()
+        file_path = os.path.join(tmpdir, _sanitize_filename(file.filename or "discord_export.json"))
+        content = await _read_upload(file)
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -320,8 +363,8 @@ async def ingest_tasks(request: Request, file: UploadFile = File(...)):
     settings = request.app.state.settings
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, file.filename or "tasks.json")
-        content = await file.read()
+        file_path = os.path.join(tmpdir, _sanitize_filename(file.filename or "tasks.json"))
+        content = await _read_upload(file)
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -343,7 +386,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
         saved_paths = []
 
         for uploaded in files:
-            filename = uploaded.filename or "document.txt"
+            filename = _sanitize_filename(uploaded.filename or "document.txt")
             ext = os.path.splitext(filename)[1].lower()
             if ext not in ALLOWED_EXTENSIONS:
                 raise HTTPException(
@@ -352,7 +395,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
                 )
 
             file_path = os.path.join(tmpdir, filename)
-            content = await uploaded.read()
+            content = await _read_upload(uploaded)
             with open(file_path, "wb") as f:
                 f.write(content)
             saved_paths.append(file_path)

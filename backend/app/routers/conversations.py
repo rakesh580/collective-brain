@@ -170,6 +170,7 @@ async def share_conversation(
             raise HTTPException(status_code=403, detail="Only the owner can share")
 
         for uid in body.user_ids:
+            savepoint = db.begin_nested()  # SAVEPOINT — only rolls back this one insert
             try:
                 db.add(
                     ConversationParticipant(
@@ -181,7 +182,7 @@ async def share_conversation(
                 )
                 db.flush()
             except IntegrityError:
-                db.rollback()  # Duplicate — already a participant, skip
+                savepoint.rollback()  # Only undoes this uid, not previous ones
         conv.visibility = "shared"
         db.commit()
         return {"status": "shared", "conversation_id": conversation_id}
@@ -193,9 +194,31 @@ async def share_conversation(
 async def list_participants(conversation_id: str, request: Request):
     from app.dependencies import get_current_user
 
-    get_current_user(request)
+    user = get_current_user(request)
     db = _get_db()
     try:
+        # Verify the conversation exists and user has access
+        conv = (
+            db.query(ConversationRecord)
+            .filter(ConversationRecord.id == conversation_id)
+            .first()
+        )
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        # Only owner, participants, or team-visible conversations can list participants
+        if conv.owner_user_id and conv.owner_user_id != user.id and conv.visibility != "team":
+            is_participant = (
+                db.query(ConversationParticipant)
+                .filter(
+                    ConversationParticipant.conversation_id == conversation_id,
+                    ConversationParticipant.user_id == user.id,
+                )
+                .first()
+            )
+            if not is_participant:
+                raise HTTPException(status_code=403, detail="Not authorized to view this conversation")
+
         participants = (
             db.query(ConversationParticipant)
             .filter(ConversationParticipant.conversation_id == conversation_id)

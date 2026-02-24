@@ -1,10 +1,26 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.schemas.requests import RegisterRequest, LoginRequest, ProfileUpdateRequest
 from app.schemas.responses import UserResponse, AuthResponse
 from app.services.auth_service import AuthService
 from app.models.user import UserRecord
 from app.db.database import get_session
+
+
+async def _rate_limit(request: Request, key: str, max_requests: int, window: int = 60):
+    """Check rate limit via Redis (or in-memory fallback). Raises 429 if exceeded."""
+    redis = getattr(request.app.state, "redis", None)
+    if not redis:
+        return
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = await redis.check_rate_limit(
+        f"{key}:{client_ip}", max_requests, window
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please try again later.",
+        )
 
 router = APIRouter()
 
@@ -15,6 +31,7 @@ def _get_db():
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
 async def register(body: RegisterRequest, request: Request):
+    await _rate_limit(request, "auth:register", max_requests=5, window=60)
     db = _get_db()
     try:
         auth_svc = AuthService(request.app.state.settings)
@@ -32,6 +49,7 @@ async def register(body: RegisterRequest, request: Request):
 
 @router.post("/login", response_model=AuthResponse)
 async def login(body: LoginRequest, request: Request):
+    await _rate_limit(request, "auth:login", max_requests=10, window=60)
     db = _get_db()
     try:
         auth_svc = AuthService(request.app.state.settings)

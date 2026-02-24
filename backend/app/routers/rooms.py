@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from collections import defaultdict
@@ -587,6 +588,14 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
     from app.dependencies import get_current_user
 
     user = get_current_user(request)
+
+    # Rate limit: 10 AI queries per minute per user
+    redis = getattr(request.app.state, "redis", None)
+    if redis:
+        allowed, _ = await redis.check_rate_limit(f"ai:room:{user.id}", 10, 60)
+        if not allowed:
+            raise HTTPException(status_code=429, detail="AI query rate limit exceeded. Please wait a moment.")
+
     db = _get_db()
     try:
         room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
@@ -883,9 +892,36 @@ async def room_websocket(websocket: WebSocket, room_id: str):
         "username": username,
     })
 
+    # Periodic membership re-check interval (seconds).
+    # If a user is removed from the room, their WS is closed within this window.
+    _MEMBERSHIP_CHECK_INTERVAL = 30
+
     try:
         while True:
-            raw = await websocket.receive_text()
+            try:
+                raw = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=_MEMBERSHIP_CHECK_INTERVAL,
+                )
+            except asyncio.TimeoutError:
+                # No message received — re-check membership
+                db = _get_db()
+                try:
+                    still_member = (
+                        db.query(ChatRoomMember)
+                        .filter(
+                            ChatRoomMember.room_id == room_id,
+                            ChatRoomMember.user_id == user_id,
+                        )
+                        .first()
+                    )
+                finally:
+                    db.close()
+                if not still_member:
+                    await websocket.close(code=4003, reason="Removed from room")
+                    break
+                continue
+
             try:
                 data = json.loads(raw)
                 msg_type = data.get("type")

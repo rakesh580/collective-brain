@@ -66,6 +66,13 @@ async def lifespan(app: FastAPI):
     redis_ok = await redis.ping()
     db_type = "PostgreSQL" if settings.is_postgres else "SQLite"
 
+    # Warn if using default JWT secret in a non-local environment
+    if settings.jwt_secret == "dev-secret-change-in-production":
+        logger.warning(
+            "JWT_SECRET is still the default dev value! "
+            "Set CB_JWT_SECRET to a strong random string before deploying to production."
+        )
+
     logger.info(
         "Collective Brain started (DB: %s, Redis: %s, LLM: %s/%s, Agent: %s)",
         db_type,

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class QueryRequest(BaseModel):
@@ -40,7 +40,7 @@ class MemberUpdateRequest(BaseModel):
 # Auth
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9@._-]+$")
-    email: str = Field(..., min_length=5, max_length=200)
+    email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
     display_name: str | None = Field(None, max_length=100)
 
