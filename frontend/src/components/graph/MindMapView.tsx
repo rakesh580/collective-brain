@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
-import type { GraphData, GraphNode, GraphEdge } from "../../types";
+import type { GraphData, GraphEdge } from "../../types";
 
 interface LayoutNode {
   id: string;

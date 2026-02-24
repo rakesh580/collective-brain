@@ -193,6 +193,8 @@ export interface ConversationDetail {
   created_at: string;
   updated_at: string;
   messages: ConversationMessage[];
+  visibility?: "private" | "shared" | "team";
+  owner_user_id?: string;
 }
 
 export interface ConversationListResponse {

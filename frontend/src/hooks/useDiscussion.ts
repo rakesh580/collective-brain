@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../api/client";
-import type { DiscussionThreadDetail, DiscussionMessage } from "../types";
+import type { DiscussionThreadDetail } from "../types";
 
 export function useDiscussion(threadId: string | null) {
   const [thread, setThread] = useState<DiscussionThreadDetail | null>(null);
