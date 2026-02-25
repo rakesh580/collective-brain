@@ -31,8 +31,17 @@ COPY backend/ .
 # Copy built frontend into static/ directory (served by FastAPI)
 COPY --from=frontend-build /app/dist ./static
 
-# Create data directory (writable by HF Spaces user)
-RUN mkdir -p /app/data/chroma_db && chmod -R 777 /app/data
+# Create data directories:
+# /data  — HuggingFace Spaces persistent volume (survives container restarts)
+# /app/data — fallback for local Docker runs
+RUN mkdir -p /data/chroma_db /app/data/chroma_db \
+    && chmod -R 777 /data /app/data
+
+# Point SQLite + ChromaDB to HF persistent volume by default.
+# These can be overridden via Space settings or .env for other platforms.
+ENV CB_SQLITE_URL="sqlite:////data/collective_brain.db"
+ENV CB_DATABASE_URL=""
+ENV CB_CHROMA_PERSIST_DIR="/data/chroma_db"
 
 # HF Spaces uses port 7860, Render uses 8000
 EXPOSE 7860 8000

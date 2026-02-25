@@ -1,4 +1,5 @@
 import logging
+import os
 
 from sqlalchemy import create_engine, inspect, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -60,6 +61,14 @@ def init_db(sqlite_url: str = "", settings=None):
         )
     else:
         logger.info("Using SQLite (development mode)")
+
+        # Ensure the directory for the SQLite file exists (important for
+        # HuggingFace Spaces persistent volume at /data).
+        if db_url.startswith("sqlite:///"):
+            db_path = db_url.replace("sqlite:///", "", 1)
+            db_dir = os.path.dirname(os.path.abspath(db_path))
+            os.makedirs(db_dir, exist_ok=True)
+
         # NullPool: each request gets its own connection — no sharing,
         # no "database is locked" under concurrency.  WAL mode allows
         # concurrent readers while a writer holds the lock.
