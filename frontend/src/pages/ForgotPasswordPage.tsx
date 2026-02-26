@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { useAuth } from "../hooks/useAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { Mail, KeyRound, ArrowLeft } from "lucide-react";
 
@@ -23,7 +22,6 @@ type Step = "email" | "code" | "done";
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
