@@ -1,9 +1,20 @@
+import time
+
 import chromadb
 
 
 class VectorStoreService:
     def __init__(self, persist_dir: str):
-        self.client = chromadb.PersistentClient(path=persist_dir)
+        # Retry to handle race condition when multiple Uvicorn workers
+        # start simultaneously and both try to create ChromaDB tables.
+        for attempt in range(3):
+            try:
+                self.client = chromadb.PersistentClient(path=persist_dir)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise
+                time.sleep(1)
         self.collection = self.client.get_or_create_collection(
             name="collective_brain",
             metadata={"hnsw:space": "cosine"},
