@@ -105,6 +105,7 @@ async def create_thread(body: CreateThreadRequest, request: Request):
             created_by_user_id=user.id,
             context_type=body.context_type,
             context_id=body.context_id,
+            room_id=body.room_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -134,6 +135,7 @@ async def list_threads(
     context_type: str | None = None,
     context_id: str | None = None,
     status: str | None = None,
+    room_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -143,6 +145,8 @@ async def list_threads(
     db = _get_db()
     try:
         query = db.query(DiscussionThread)
+        if room_id:
+            query = query.filter(DiscussionThread.room_id == room_id)
         if context_type:
             query = query.filter(DiscussionThread.context_type == context_type)
         if context_id:

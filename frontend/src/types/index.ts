@@ -305,6 +305,7 @@ export interface Room {
   created_by_user_id: string;
   created_by_username: string;
   avatar_color: string;
+  is_public?: boolean;
   member_count: number;
   message_count: number;
   last_message_at: string | null;
@@ -351,6 +352,12 @@ export interface SearchResults {
     members: { id: string; name: string; expertise_tags: string[]; total_contributions: number }[];
     artifacts: { id: string; title: string; source_type: string; source_path: string; ingested_at: string; chunk_count: number }[];
     insights: { id: string; insight_type: string; title: string; body: string; generated_at: string; confidence: number }[];
+    rooms?: { id: string; name: string; description: string | null; is_public: boolean; created_at: string }[];
   };
   counts: Record<string, number>;
+}
+
+export interface DiscoverRoomsResponse {
+  rooms: Room[];
+  total: number;
 }

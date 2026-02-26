@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, JSON
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey
 from app.db.database import Base
 
 
@@ -15,3 +15,4 @@ class ArtifactRecord(Base):
     member_ids = Column(JSON, default=list)
     metadata_json = Column(JSON, default=dict)
     status = Column(String, default="completed")
+    room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)

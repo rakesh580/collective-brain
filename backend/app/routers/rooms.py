@@ -141,6 +141,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
             description=body.description,
             created_by_user_id=user.id,
             avatar_color=avatar_color,
+            is_public=body.is_public if body.is_public is not None else False,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -274,6 +275,129 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
         db.close()
 
 
+@router.get("/discover")
+async def discover_rooms(request: Request, q: str | None = None, limit: int = 50, offset: int = 0):
+    """Discover public rooms that the user is not already a member of."""
+    from app.dependencies import get_current_user
+
+    user = get_current_user(request)
+    db = _get_db()
+    try:
+        # Get rooms user is already in
+        user_room_ids = [
+            rid for (rid,) in
+            db.query(ChatRoomMember.room_id)
+            .filter(ChatRoomMember.user_id == user.id)
+            .all()
+        ]
+
+        query = (
+            db.query(ChatRoom)
+            .filter(ChatRoom.is_public == True)  # noqa: E712
+            .filter(ChatRoom.is_archived == False)  # noqa: E712
+        )
+        if user_room_ids:
+            query = query.filter(~ChatRoom.id.in_(user_room_ids))
+        if q:
+            q_lower = f"%{q.lower()}%"
+            query = query.filter(
+                ChatRoom.name.ilike(q_lower) | ChatRoom.description.ilike(q_lower)
+            )
+
+        total = query.count()
+        rooms = (
+            query.order_by(ChatRoom.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        result = []
+        for room in rooms:
+            info = _get_user_info(db, room.created_by_user_id)
+            member_count = (
+                db.query(ChatRoomMember)
+                .filter(ChatRoomMember.room_id == room.id)
+                .count()
+            )
+            result.append({
+                "id": room.id,
+                "name": room.name,
+                "description": room.description,
+                "created_by_user_id": room.created_by_user_id,
+                "created_by_username": info["username"],
+                "avatar_color": room.avatar_color,
+                "is_public": room.is_public,
+                "member_count": member_count,
+                "created_at": room.created_at.isoformat() if room.created_at else None,
+            })
+
+        return {"rooms": result, "total": total}
+    finally:
+        db.close()
+
+
+@router.post("/{room_id}/join")
+async def join_room(room_id: str, request: Request):
+    """Join a public room (self-service)."""
+    from app.dependencies import get_current_user
+
+    user = get_current_user(request)
+    db = _get_db()
+    try:
+        room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found")
+        if not room.is_public:
+            raise HTTPException(status_code=403, detail="This room is not public. Ask an admin to invite you.")
+
+        # Check if already a member
+        existing = (
+            db.query(ChatRoomMember)
+            .filter(
+                ChatRoomMember.room_id == room_id,
+                ChatRoomMember.user_id == user.id,
+            )
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Already a member of this room")
+
+        member = ChatRoomMember(
+            id=str(uuid4()),
+            room_id=room_id,
+            user_id=user.id,
+            role="member",
+            joined_at=datetime.utcnow(),
+        )
+        db.add(member)
+
+        # System message
+        sys_msg = ChatRoomMessage(
+            id=str(uuid4()),
+            room_id=room_id,
+            user_id=None,
+            sender_name="System",
+            message_type="system",
+            content=f"{user.display_name or user.username} joined the room",
+            created_at=datetime.utcnow(),
+        )
+        db.add(sys_msg)
+        room.message_count = (room.message_count or 0) + 1
+        room.last_message_at = datetime.utcnow()
+        db.commit()
+
+        await _broadcast(room_id, {
+            "type": "new_message",
+            "message": _msg_to_dict(sys_msg),
+        })
+        await _broadcast(room_id, {"type": "members_changed"})
+
+        return {"status": "joined", "room_id": room_id}
+    finally:
+        db.close()
+
+
 @router.get("/{room_id}")
 async def get_room(room_id: str, request: Request):
     from app.dependencies import get_current_user
@@ -377,6 +501,8 @@ async def update_room(room_id: str, body: UpdateRoomRequest, request: Request):
             room.name = body.name
         if body.description is not None:
             room.description = body.description
+        if body.is_public is not None:
+            room.is_public = body.is_public
         room.updated_at = datetime.utcnow()
         db.commit()
 
@@ -690,6 +816,7 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             filters=None,
             sender_user_id=user.id,
             sender_name=user.display_name or user.username,
+            room_id=room_id,
         )
 
         # Save AI response as room message

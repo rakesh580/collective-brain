@@ -15,6 +15,7 @@ def _get_db():
 async def list_artifacts(
     request: Request,
     source_type: str | None = None,
+    room_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -24,6 +25,8 @@ async def list_artifacts(
     db = _get_db()
     try:
         query = db.query(ArtifactRecord)
+        if room_id:
+            query = query.filter(ArtifactRecord.room_id == room_id)
         if source_type:
             query = query.filter(ArtifactRecord.source_type == source_type)
         total = query.count()

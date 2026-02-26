@@ -12,6 +12,7 @@ class ChatRoom(Base):
     created_by_user_id = Column(String, ForeignKey("users.id"), nullable=False)
     avatar_color = Column(String, default="from-indigo-500 to-violet-500")
     is_archived = Column(Boolean, default=False)
+    is_public = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_message_at = Column(DateTime, nullable=True)

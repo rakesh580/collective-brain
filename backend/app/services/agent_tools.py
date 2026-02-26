@@ -20,7 +20,7 @@ from app.services.vector_store import VectorStoreService
 from app.services.memory_graph import MemoryGraph
 
 
-def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorStoreService):
+def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorStoreService, room_id: str | None = None):
     """Create all agent tools with the shared db/embedder/vector_store context."""
 
     @tool
@@ -29,7 +29,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         Use this to find relevant information from ingested documents, chat history,
         code commits, and task records. Returns the most relevant text chunks."""
         embedding = embedder.embed(query)
-        results = vector_store.query(query_embedding=embedding, n_results=top_k)
+        results = vector_store.query(query_embedding=embedding, n_results=top_k, room_id=room_id)
 
         if not results["documents"] or not results["documents"][0]:
             return "No relevant knowledge found for this query."
@@ -65,7 +65,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
             return f"No member found matching '{name_or_id}'."
 
         # Compute expertise scores
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         scores = graph.compute_expertise_scores(member.id)
 
         profile = {
@@ -102,12 +102,15 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         """Find team members who have expertise in a specific topic.
         Returns members connected to the topic in the knowledge graph with their
         contribution counts. Use this when recommending someone for a task."""
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         nodes, edges = graph.get_topic_subgraph(topic)
 
         if not nodes:
             # Try partial match
-            all_contribs = db.query(ContributionRecord).all()
+            q = db.query(ContributionRecord)
+            if room_id:
+                q = q.filter(ContributionRecord.room_id == room_id)
+            all_contribs = q.all()
             topic_lower = topic.lower()
             matching_members: dict[str, int] = {}
             for c in all_contribs:
@@ -154,16 +157,13 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
             return f"No member found matching '{member_name}'."
 
         since = datetime.utcnow() - timedelta(days=days)
-        contribs = (
-            db.query(ContributionRecord)
-            .filter(
-                ContributionRecord.member_id == member.id,
-                ContributionRecord.timestamp >= since,
-            )
-            .order_by(ContributionRecord.timestamp.desc())
-            .limit(30)
-            .all()
+        q = db.query(ContributionRecord).filter(
+            ContributionRecord.member_id == member.id,
+            ContributionRecord.timestamp >= since,
         )
+        if room_id:
+            q = q.filter(ContributionRecord.room_id == room_id)
+        contribs = q.order_by(ContributionRecord.timestamp.desc()).limit(30).all()
 
         if not contribs:
             return f"No contributions found for {member.name} in the last {days} days."
@@ -181,7 +181,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         """Analyze the team's collaboration patterns to identify risks and insights.
         Detects bus factor risks (single points of failure), siloed members,
         and strong collaboration pairs. Use this for team health assessment."""
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         patterns = graph.detect_patterns()
 
         if not patterns:
@@ -202,7 +202,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         """Get the knowledge graph network around a specific topic.
         Shows which team members are connected to this topic and how they collaborate.
         Use this to understand team structure around a knowledge area."""
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         nodes, edges = graph.get_topic_subgraph(topic)
 
         if not nodes:
@@ -224,12 +224,10 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         """Get the latest weekly team summary with accomplishments and recommendations.
         Returns a cached summary if available, otherwise indicates no summary exists.
         Use this to understand what the team has been doing this week."""
-        latest = (
-            db.query(InsightRecord)
-            .filter(InsightRecord.insight_type == "weekly_summary")
-            .order_by(InsightRecord.generated_at.desc())
-            .first()
-        )
+        q = db.query(InsightRecord).filter(InsightRecord.insight_type == "weekly_summary")
+        if room_id:
+            q = q.filter(InsightRecord.room_id == room_id)
+        latest = q.order_by(InsightRecord.generated_at.desc()).first()
 
         if not latest:
             return "No weekly summary available yet. The team may need to generate one first."
@@ -259,13 +257,10 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         Shows all contributions across the team, grouped by type.
         Use this for an overview of what the whole team has been doing."""
         since = datetime.utcnow() - timedelta(days=days)
-        contribs = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.timestamp >= since)
-            .order_by(ContributionRecord.timestamp.desc())
-            .limit(50)
-            .all()
-        )
+        q = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= since)
+        if room_id:
+            q = q.filter(ContributionRecord.room_id == room_id)
+        contribs = q.order_by(ContributionRecord.timestamp.desc()).limit(50).all()
 
         if not contribs:
             return f"No team activity found in the last {days} days."

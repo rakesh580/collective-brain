@@ -16,22 +16,24 @@ from app.services.prompts import WEEKLY_SUMMARY_PROMPT, INSIGHT_DETECTION_PROMPT
 
 
 class InsightEngine:
-    def __init__(self, db: Session, llm: LLMService):
+    def __init__(self, db: Session, llm: LLMService, room_id: str | None = None):
         self.db = db
         self.llm = llm
-        self.graph = MemoryGraph(db)
+        self.room_id = room_id
+        self.graph = MemoryGraph(db, room_id=room_id)
 
     async def generate_weekly_summary(self) -> InsightRecord:
         now = datetime.utcnow()
         week_ago = now - timedelta(days=7)
 
         # Gather last week's activity
-        contribs = (
+        query = (
             self.db.query(ContributionRecord)
             .filter(ContributionRecord.timestamp >= week_ago)
-            .order_by(ContributionRecord.timestamp.desc())
-            .all()
         )
+        if self.room_id:
+            query = query.filter(ContributionRecord.room_id == self.room_id)
+        contribs = query.order_by(ContributionRecord.timestamp.desc()).all()
 
         activity_data = self._format_contributions(contribs)
         prompt = WEEKLY_SUMMARY_PROMPT.format(activity_data=activity_data)
@@ -56,6 +58,7 @@ class InsightEngine:
             confidence=0.9,
             period_start=week_ago,
             period_end=now,
+            room_id=self.room_id,
             metadata_json={
                 "highlights": highlights,
                 "recommendations": recommendations,
@@ -85,8 +88,13 @@ class InsightEngine:
             insights.append(insight)
 
         # LLM-based deeper pattern analysis
-        contribs = (
+        contrib_query = (
             self.db.query(ContributionRecord)
+        )
+        if self.room_id:
+            contrib_query = contrib_query.filter(ContributionRecord.room_id == self.room_id)
+        contribs = (
+            contrib_query
             .order_by(ContributionRecord.timestamp.desc())
             .limit(50)
             .all()
@@ -123,6 +131,8 @@ class InsightEngine:
         self, insight_type: str | None = None, limit: int = 10
     ) -> list[InsightRecord]:
         query = self.db.query(InsightRecord).order_by(InsightRecord.generated_at.desc())
+        if self.room_id:
+            query = query.filter(InsightRecord.room_id == self.room_id)
         if insight_type:
             query = query.filter(InsightRecord.insight_type == insight_type)
         return query.limit(limit).all()

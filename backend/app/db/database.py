@@ -172,6 +172,48 @@ def _run_migrations(engine):
                 conn.execute(text("ALTER TABLE users ADD COLUMN reset_code_expires TIMESTAMP"))
                 logger.info("Migration: added users.reset_code_expires")
 
+        # ChatRooms: is_public
+        if "chat_rooms" in tables:
+            room_cols = [c["name"] for c in inspector.get_columns("chat_rooms")]
+            if "is_public" not in room_cols:
+                conn.execute(text("ALTER TABLE chat_rooms ADD COLUMN is_public BOOLEAN DEFAULT 0"))
+                logger.info("Migration: added chat_rooms.is_public")
+
+        # Artifacts: room_id
+        if "artifacts" in tables:
+            art_cols = [c["name"] for c in inspector.get_columns("artifacts")]
+            if "room_id" not in art_cols:
+                conn.execute(text("ALTER TABLE artifacts ADD COLUMN room_id TEXT"))
+                logger.info("Migration: added artifacts.room_id")
+
+        # Contributions: room_id
+        if "contributions" in tables:
+            contrib_cols = [c["name"] for c in inspector.get_columns("contributions")]
+            if "room_id" not in contrib_cols:
+                conn.execute(text("ALTER TABLE contributions ADD COLUMN room_id TEXT"))
+                logger.info("Migration: added contributions.room_id")
+
+        # Conversations: room_id
+        if "conversations" in tables:
+            conv_cols2 = [c["name"] for c in inspector.get_columns("conversations")]
+            if "room_id" not in conv_cols2:
+                conn.execute(text("ALTER TABLE conversations ADD COLUMN room_id TEXT"))
+                logger.info("Migration: added conversations.room_id")
+
+        # Discussion threads: room_id
+        if "discussion_threads" in tables:
+            disc_cols = [c["name"] for c in inspector.get_columns("discussion_threads")]
+            if "room_id" not in disc_cols:
+                conn.execute(text("ALTER TABLE discussion_threads ADD COLUMN room_id TEXT"))
+                logger.info("Migration: added discussion_threads.room_id")
+
+        # Insights: room_id
+        if "insights" in tables:
+            ins_cols = [c["name"] for c in inspector.get_columns("insights")]
+            if "room_id" not in ins_cols:
+                conn.execute(text("ALTER TABLE insights ADD COLUMN room_id TEXT"))
+                logger.info("Migration: added insights.room_id")
+
         conn.commit()
 
 

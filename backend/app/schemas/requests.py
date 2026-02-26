@@ -5,16 +5,19 @@ class QueryRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     conversation_id: str | None = None
     filters: dict | None = None
+    room_id: str | None = None
 
 
 class GitIngestRequest(BaseModel):
     repo_path: str = Field(..., min_length=1, max_length=500)
     branch: str = "main"
     since_days: int = Field(90, ge=1, le=365)
+    room_id: str | None = None
 
 
 class MarkdownIngestRequest(BaseModel):
     directory_path: str = Field(..., min_length=1, max_length=500)
+    room_id: str | None = None
 
 
 class MemberAliasUpdate(BaseModel):
@@ -80,6 +83,7 @@ class CreateThreadRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     context_type: str | None = Field(None, pattern=r"^(member|insight)$")
     context_id: str | None = None
+    room_id: str | None = None
 
 
 class CreateDiscussionMessageRequest(BaseModel):
@@ -96,11 +100,13 @@ class CreateRoomRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: str | None = Field(None, max_length=500)
     member_user_ids: list[str] = Field(default_factory=list)
+    is_public: bool = Field(default=False)
 
 
 class UpdateRoomRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     description: str | None = None
+    is_public: bool | None = None
 
 
 class AddRoomMembersRequest(BaseModel):

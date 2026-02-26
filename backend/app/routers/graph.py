@@ -16,13 +16,13 @@ def _get_db():
 
 
 @router.get("/full", response_model=GraphResponse)
-async def get_full_graph(request: Request):
+async def get_full_graph(request: Request, room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         nodes, edges = graph.build_full_graph()
         return GraphResponse(nodes=nodes, edges=edges)
     except Exception as e:
@@ -33,13 +33,13 @@ async def get_full_graph(request: Request):
 
 
 @router.get("/member/{member_id}", response_model=GraphResponse)
-async def get_member_graph(member_id: str, request: Request):
+async def get_member_graph(member_id: str, request: Request, room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         nodes, edges = graph.get_member_subgraph(member_id)
         return GraphResponse(nodes=nodes, edges=edges)
     except Exception as e:
@@ -50,13 +50,13 @@ async def get_member_graph(member_id: str, request: Request):
 
 
 @router.get("/topic/{topic}", response_model=GraphResponse)
-async def get_topic_graph(topic: str, request: Request):
+async def get_topic_graph(topic: str, request: Request, room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         nodes, edges = graph.get_topic_subgraph(topic)
         return GraphResponse(nodes=nodes, edges=edges)
     except Exception as e:
@@ -67,13 +67,13 @@ async def get_topic_graph(topic: str, request: Request):
 
 
 @router.get("/expertise-matrix")
-async def get_expertise_matrix(request: Request):
+async def get_expertise_matrix(request: Request, room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        graph = MemoryGraph(db)
+        graph = MemoryGraph(db, room_id=room_id)
         return graph.get_expertise_matrix()
     except Exception as e:
         logger.error("Expertise matrix failed: %s", e)

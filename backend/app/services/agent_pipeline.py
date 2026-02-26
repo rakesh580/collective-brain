@@ -63,10 +63,8 @@ class AgentPipeline:
             temperature=0.1,
         )
 
-        # Create tools with shared context
+        # Default tools (no room scope) — will be recreated per-query if room_id is provided
         self.tools = create_tools(db, embedder, vector_store)
-
-        # Create LangGraph ReAct agent
         self.agent = create_react_agent(
             model=self.llm,
             tools=self.tools,
@@ -80,8 +78,18 @@ class AgentPipeline:
         filters: dict | None = None,
         sender_user_id: str | None = None,
         sender_name: str | None = None,
+        room_id: str | None = None,
     ) -> QueryResponse:
         """Run the agent to answer a question."""
+        self._room_id = room_id
+        # Recreate tools with room scope if provided
+        if room_id:
+            self.tools = create_tools(self.db, self.embedder, self.vector_store, room_id=room_id)
+            self.agent = create_react_agent(
+                model=self.llm,
+                tools=self.tools,
+                prompt=AGENT_SYSTEM_PROMPT,
+            )
 
         # Ensure conversation exists
         conversation_id = self._ensure_conversation(question, conversation_id, sender_user_id)
@@ -156,6 +164,7 @@ class AgentPipeline:
             updated_at=datetime.utcnow(),
             message_count=0,
             owner_user_id=owner_user_id,
+            room_id=getattr(self, "_room_id", None),
         )
         self.db.add(conv)
         self.db.commit()

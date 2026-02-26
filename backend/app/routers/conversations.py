@@ -16,7 +16,7 @@ def _get_db():
 
 
 @router.get("")
-async def list_conversations(request: Request, limit: int = 20, offset: int = 0):
+async def list_conversations(request: Request, room_id: str | None = None, limit: int = 20, offset: int = 0):
     from app.dependencies import get_current_user
 
     user = get_current_user(request)
@@ -33,6 +33,8 @@ async def list_conversations(request: Request, limit: int = 20, offset: int = 0)
             | (ConversationRecord.id.in_(participant_conv_ids))
             | (ConversationRecord.visibility == "team")
         )
+        if room_id:
+            query = query.filter(ConversationRecord.room_id == room_id)
         total = query.count()
         conversations = (
             query.order_by(ConversationRecord.updated_at.desc())

@@ -48,7 +48,10 @@ class RAGPipeline:
         filters: dict | None = None,
         sender_user_id: str | None = None,
         sender_name: str | None = None,
+        room_id: str | None = None,
     ) -> QueryResponse:
+        self.room_id = room_id
+
         # Step 1: Classify intent
         intent = self._classify_intent(question)
 
@@ -59,6 +62,7 @@ class RAGPipeline:
             query_embedding=query_embedding,
             n_results=8,
             where=where_filter,
+            room_id=room_id,
         )
 
         # Step 3: Build context based on intent
@@ -107,6 +111,7 @@ class RAGPipeline:
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
                 owner_user_id=owner_user_id,
+                room_id=getattr(self, "room_id", None),
             )
             self.db.add(conv)
             self.db.commit()
@@ -293,7 +298,19 @@ class RAGPipeline:
         return mentioned
 
     def _get_member_expertise_summary(self) -> str:
-        members = self.db.query(MemberRecord).all()
+        room_id = getattr(self, "room_id", None)
+        if room_id:
+            # Get members who have contributions in this room
+            member_ids = (
+                self.db.query(ContributionRecord.member_id)
+                .filter(ContributionRecord.room_id == room_id)
+                .distinct()
+                .all()
+            )
+            member_id_list = [mid for (mid,) in member_ids]
+            members = self.db.query(MemberRecord).filter(MemberRecord.id.in_(member_id_list)).all() if member_id_list else []
+        else:
+            members = self.db.query(MemberRecord).all()
         if not members:
             return "(No members tracked yet)"
         parts = []
@@ -305,12 +322,11 @@ class RAGPipeline:
         return "\n".join(parts)
 
     def _get_recent_contributions_summary(self) -> str:
-        contribs = (
-            self.db.query(ContributionRecord)
-            .order_by(ContributionRecord.timestamp.desc())
-            .limit(20)
-            .all()
-        )
+        room_id = getattr(self, "room_id", None)
+        query = self.db.query(ContributionRecord)
+        if room_id:
+            query = query.filter(ContributionRecord.room_id == room_id)
+        contribs = query.order_by(ContributionRecord.timestamp.desc()).limit(20).all()
         if not contribs:
             return "(No contributions tracked yet)"
         parts = []

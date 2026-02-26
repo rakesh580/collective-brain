@@ -16,3 +16,4 @@ class ContributionRecord(Base):
     sentiment = Column(Float, nullable=True)
     impact_score = Column(Float, default=0.0)
     metadata_json = Column(JSON, default=dict)
+    room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)

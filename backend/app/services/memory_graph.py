@@ -46,9 +46,41 @@ def _temporal_decay(
 class MemoryGraph:
     """Build and query a three-layer knowledge graph from the DB."""
 
-    def __init__(self, db: Session, *, redis=None):
+    def __init__(self, db: Session, *, redis=None, room_id: str | None = None):
         self.db = db
         self._redis = redis  # optional RedisService for caching
+        self.room_id = room_id
+
+    def _query_members(self):
+        """Get members, optionally filtered by room contributions."""
+        if self.room_id:
+            member_ids = [
+                mid for (mid,) in
+                self.db.query(ContributionRecord.member_id)
+                .filter(ContributionRecord.room_id == self.room_id)
+                .distinct()
+                .all()
+            ]
+            return (
+                self.db.query(MemberRecord)
+                .filter(MemberRecord.id.in_(member_ids))
+                .all()
+            ) if member_ids else []
+        return self.db.query(MemberRecord).all()
+
+    def _query_artifacts(self):
+        """Get artifacts, optionally filtered by room."""
+        query = self.db.query(ArtifactRecord)
+        if self.room_id:
+            query = query.filter(ArtifactRecord.room_id == self.room_id)
+        return query.all()
+
+    def _query_contributions(self):
+        """Get contributions, optionally filtered by room."""
+        query = self.db.query(ContributionRecord)
+        if self.room_id:
+            query = query.filter(ContributionRecord.room_id == self.room_id)
+        return query.all()
 
     # ── Full Graph ────────────────────────────────────────────
 
@@ -58,9 +90,9 @@ class MemoryGraph:
         nodes: list[GraphNode] = []
         edges: list[GraphEdge] = []
 
-        members = self.db.query(MemberRecord).all()
-        artifacts = self.db.query(ArtifactRecord).all()
-        contribs = self.db.query(ContributionRecord).all()
+        members = self._query_members()
+        artifacts = self._query_artifacts()
+        contribs = self._query_contributions()
 
         member_map = {m.id: m for m in members}
         artifact_map = {a.id: a for a in artifacts}
@@ -218,7 +250,7 @@ class MemoryGraph:
 
     def get_expertise_matrix(self) -> dict:
         """Return a member × topic matrix for heatmap visualization."""
-        members = self.db.query(MemberRecord).all()
+        members = self._query_members()
         topic_members = self._get_topic_member_map()
 
         all_topics: set[str] = set(topic_members.keys())
@@ -306,11 +338,13 @@ class MemoryGraph:
     def compute_expertise_scores(self, member_id: str) -> dict[str, float]:
         """Compute temporally-weighted expertise score per topic."""
         now = datetime.utcnow()
-        contribs = (
+        query = (
             self.db.query(ContributionRecord)
             .filter(ContributionRecord.member_id == member_id)
-            .all()
         )
+        if self.room_id:
+            query = query.filter(ContributionRecord.room_id == self.room_id)
+        contribs = query.all()
 
         topic_scores: dict[str, float] = defaultdict(float)
         for c in contribs:
@@ -336,7 +370,7 @@ class MemoryGraph:
         patterns = []
 
         # Prefetch all members once to avoid N+1 queries
-        members = self.db.query(MemberRecord).all()
+        members = self._query_members()
         member_map = {m.id: m for m in members}
 
         # Bus factor: topics with only 1 contributor
@@ -396,7 +430,7 @@ class MemoryGraph:
 
         # Stale expertise: members inactive >90 days on a topic
         stale_threshold = now - timedelta(days=90)
-        contribs = self.db.query(ContributionRecord).all()
+        contribs = self._query_contributions()
         member_last_active: dict[str, datetime] = {}
         for c in contribs:
             if c.timestamp and c.member_id:
@@ -434,7 +468,7 @@ class MemoryGraph:
         return result
 
     def _get_topic_member_map(self) -> dict[str, dict[str, int]]:
-        contribs = self.db.query(ContributionRecord).all()
+        contribs = self._query_contributions()
         topic_members: dict[str, dict[str, int]] = defaultdict(
             lambda: defaultdict(int)
         )
@@ -444,7 +478,7 @@ class MemoryGraph:
         return dict(topic_members)
 
     def _get_collaboration_pairs(self) -> dict[tuple[str, str], int]:
-        artifacts = self.db.query(ArtifactRecord).all()
+        artifacts = self._query_artifacts()
         pairs: dict[tuple[str, str], int] = defaultdict(int)
         for a in artifacts:
             member_ids = a.member_ids or []

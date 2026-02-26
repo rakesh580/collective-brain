@@ -16,7 +16,7 @@ def _get_db():
 
 
 @router.get("/activity-timeline")
-async def get_activity_timeline(request: Request, days: int = 30):
+async def get_activity_timeline(request: Request, days: int = 30, room_id: str | None = None):
     """Daily contribution counts for the last N days."""
     from app.dependencies import get_current_user
     get_current_user(request)
@@ -24,11 +24,10 @@ async def get_activity_timeline(request: Request, days: int = 30):
     db = _get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
-        contribs = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.timestamp >= cutoff)
-            .all()
-        )
+        query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= cutoff)
+        if room_id:
+            query = query.filter(ContributionRecord.room_id == room_id)
+        contribs = query.all()
 
         daily: dict[str, int] = {}
         for c in contribs:
@@ -51,14 +50,17 @@ async def get_activity_timeline(request: Request, days: int = 30):
 
 
 @router.get("/source-breakdown")
-async def get_source_breakdown(request: Request):
+async def get_source_breakdown(request: Request, room_id: str | None = None):
     """Artifact counts by source type."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        artifacts = db.query(ArtifactRecord).all()
+        query = db.query(ArtifactRecord)
+        if room_id:
+            query = query.filter(ArtifactRecord.room_id == room_id)
+        artifacts = query.all()
         breakdown = Counter(a.source_type for a in artifacts)
         total_chunks = sum(a.chunk_count or 0 for a in artifacts)
         return {
@@ -74,20 +76,37 @@ async def get_source_breakdown(request: Request):
 
 
 @router.get("/expertise-matrix")
-async def get_expertise_matrix(request: Request):
+async def get_expertise_matrix(request: Request, room_id: str | None = None):
     """Member expertise scores as a matrix for heatmap visualization."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.total_contributions > 0)
-            .order_by(MemberRecord.total_contributions.desc())
-            .limit(20)
-            .all()
-        )
+        if room_id:
+            # Only members with contributions in this room
+            member_ids = [
+                mid for (mid,) in
+                db.query(ContributionRecord.member_id)
+                .filter(ContributionRecord.room_id == room_id)
+                .distinct()
+                .all()
+            ]
+            members = (
+                db.query(MemberRecord)
+                .filter(MemberRecord.id.in_(member_ids))
+                .order_by(MemberRecord.total_contributions.desc())
+                .limit(20)
+                .all()
+            ) if member_ids else []
+        else:
+            members = (
+                db.query(MemberRecord)
+                .filter(MemberRecord.total_contributions > 0)
+                .order_by(MemberRecord.total_contributions.desc())
+                .limit(20)
+                .all()
+            )
 
         # Collect all unique topics
         all_topics: set[str] = set()
@@ -112,14 +131,17 @@ async def get_expertise_matrix(request: Request):
 
 
 @router.get("/contribution-types")
-async def get_contribution_types(request: Request):
+async def get_contribution_types(request: Request, room_id: str | None = None):
     """Contribution breakdown by type."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        contribs = db.query(ContributionRecord).all()
+        query = db.query(ContributionRecord)
+        if room_id:
+            query = query.filter(ContributionRecord.room_id == room_id)
+        contribs = query.all()
         type_counts = Counter(c.contribution_type for c in contribs)
         return {
             "types": [
@@ -133,7 +155,7 @@ async def get_contribution_types(request: Request):
 
 
 @router.get("/member-activity")
-async def get_member_activity(request: Request, days: int = 30):
+async def get_member_activity(request: Request, days: int = 30, room_id: str | None = None):
     """Per-member contribution counts over last N days."""
     from app.dependencies import get_current_user
     get_current_user(request)
@@ -141,11 +163,10 @@ async def get_member_activity(request: Request, days: int = 30):
     db = _get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
-        contribs = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.timestamp >= cutoff)
-            .all()
-        )
+        query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= cutoff)
+        if room_id:
+            query = query.filter(ContributionRecord.room_id == room_id)
+        contribs = query.all()
 
         member_counts: dict[str, int] = {}
         for c in contribs:
@@ -180,7 +201,7 @@ async def get_member_activity(request: Request, days: int = 30):
 
 
 @router.get("/topic-trends")
-async def get_topic_trends(request: Request, days: int = 30):
+async def get_topic_trends(request: Request, days: int = 30, room_id: str | None = None):
     """Most common topics in recent contributions."""
     from app.dependencies import get_current_user
     get_current_user(request)
@@ -188,11 +209,10 @@ async def get_topic_trends(request: Request, days: int = 30):
     db = _get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
-        contribs = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.timestamp >= cutoff)
-            .all()
-        )
+        query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= cutoff)
+        if room_id:
+            query = query.filter(ContributionRecord.room_id == room_id)
+        contribs = query.all()
 
         topic_counts: Counter = Counter()
         for c in contribs:

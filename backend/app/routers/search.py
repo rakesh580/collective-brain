@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request
 from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.insight import InsightRecord
+from app.models.room import ChatRoom
 from app.db.database import get_session
 
 router = APIRouter()
@@ -13,15 +14,15 @@ def _get_db():
 
 
 @router.get("")
-async def search(request: Request, q: str, limit: int = 20):
-    """Cross-entity search across members, artifacts, and insights."""
+async def search(request: Request, q: str, room_id: str | None = None, limit: int = 20):
+    """Cross-entity search across members, artifacts, insights, and rooms."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
         query_lower = q.lower()
-        results = {"members": [], "artifacts": [], "insights": []}
+        results = {"members": [], "artifacts": [], "insights": [], "rooms": []}
 
         # Search members
         members = db.query(MemberRecord).all()
@@ -38,8 +39,11 @@ async def search(request: Request, q: str, limit: int = 20):
                     "total_contributions": m.total_contributions or 0,
                 })
 
-        # Search artifacts
-        artifacts = db.query(ArtifactRecord).all()
+        # Search artifacts (scoped by room_id if provided)
+        art_query = db.query(ArtifactRecord)
+        if room_id:
+            art_query = art_query.filter(ArtifactRecord.room_id == room_id)
+        artifacts = art_query.all()
         for a in artifacts:
             if (
                 query_lower in (a.title or "").lower()
@@ -55,12 +59,11 @@ async def search(request: Request, q: str, limit: int = 20):
                     "chunk_count": a.chunk_count or 0,
                 })
 
-        # Search insights
-        insights = (
-            db.query(InsightRecord)
-            .order_by(InsightRecord.generated_at.desc())
-            .all()
-        )
+        # Search insights (scoped by room_id if provided)
+        ins_query = db.query(InsightRecord).order_by(InsightRecord.generated_at.desc())
+        if room_id:
+            ins_query = ins_query.filter(InsightRecord.room_id == room_id)
+        insights = ins_query.all()
         for i in insights:
             if (
                 query_lower in (i.title or "").lower()
@@ -73,6 +76,21 @@ async def search(request: Request, q: str, limit: int = 20):
                     "body": (i.body or "")[:200],
                     "generated_at": i.generated_at.isoformat() if i.generated_at else None,
                     "confidence": i.confidence or 0,
+                })
+
+        # Search public rooms (for discovery)
+        rooms = db.query(ChatRoom).filter(ChatRoom.is_public == True).all()  # noqa: E712
+        for r in rooms:
+            if (
+                query_lower in (r.name or "").lower()
+                or query_lower in (r.description or "").lower()
+            ):
+                results["rooms"].append({
+                    "id": r.id,
+                    "name": r.name,
+                    "description": r.description,
+                    "is_public": r.is_public,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
                 })
 
         # Trim to limit

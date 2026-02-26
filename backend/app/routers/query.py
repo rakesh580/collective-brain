@@ -51,6 +51,7 @@ async def query_brain(body: QueryRequest, request: Request):
             filters=body.filters,
             sender_user_id=user.id,
             sender_name=user.display_name or user.username,
+            room_id=body.room_id,
         )
     finally:
         db.close()

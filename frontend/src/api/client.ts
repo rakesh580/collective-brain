@@ -27,6 +27,7 @@ import type {
   DiscussionThreadDetail,
   DiscussionThreadListResponse,
   DiscussionMessage,
+  DiscoverRoomsResponse,
   ExpertiseMatrixData,
   Room,
   RoomDetail,
@@ -110,15 +111,21 @@ export const api = {
   getUsers: () => request<User[]>("/auth/users"),
 
   // Query
-  query: (question: string, conversationId?: string, filters?: Record<string, unknown>) =>
+  query: (question: string, conversationId?: string, filters?: Record<string, unknown>, roomId?: string) =>
     request<QueryResponse>("/query", {
       method: "POST",
-      body: JSON.stringify({ question, conversation_id: conversationId, filters }),
+      body: JSON.stringify({ question, conversation_id: conversationId, filters, room_id: roomId }),
     }),
 
   // Members
-  getMembers: () => request<Member[]>("/members"),
-  getMember: (id: string) => request<MemberDetail>(`/members/${id}`),
+  getMembers: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<Member[]>(`/members${p}`);
+  },
+  getMember: (id: string, roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<MemberDetail>(`/members/${id}${p}`);
+  },
   updateAliases: (id: string, aliases: string[]) =>
     request<Member>(`/members/${id}/aliases`, {
       method: "PUT",
@@ -140,17 +147,40 @@ export const api = {
     }),
 
   // Insights
-  getDashboard: () => request<DashboardData>("/insights/dashboard"),
-  getWeeklySummary: () => request<WeeklySummary>("/insights/weekly"),
-  getPatterns: () => request<Insight[]>("/insights/patterns"),
-  generateInsights: () =>
-    request<Insight[]>("/insights/generate", { method: "POST" }),
+  getDashboard: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<DashboardData>(`/insights/dashboard${p}`);
+  },
+  getWeeklySummary: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<WeeklySummary>(`/insights/weekly${p}`);
+  },
+  getPatterns: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<Insight[]>(`/insights/patterns${p}`);
+  },
+  generateInsights: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<Insight[]>(`/insights/generate${p}`, { method: "POST" });
+  },
 
   // Graph
-  getFullGraph: () => request<GraphData>("/graph/full"),
-  getMemberGraph: (id: string) => request<GraphData>(`/graph/member/${id}`),
-  getTopicGraph: (topic: string) => request<GraphData>(`/graph/topic/${topic}`),
-  getExpertiseMatrix: () => request<ExpertiseMatrixData>("/graph/expertise-matrix"),
+  getFullGraph: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<GraphData>(`/graph/full${p}`);
+  },
+  getMemberGraph: (id: string, roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<GraphData>(`/graph/member/${id}${p}`);
+  },
+  getTopicGraph: (topic: string, roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<GraphData>(`/graph/topic/${topic}${p}`);
+  },
+  getExpertiseMatrix: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<ExpertiseMatrixData>(`/graph/expertise-matrix${p}`);
+  },
 
   // Ingest
   ingestGit: (repoPath: string, branch = "main", sinceDays = 90) =>
@@ -223,8 +253,11 @@ export const api = {
   },
 
   // Conversations
-  getConversations: (limit = 20, offset = 0) =>
-    request<ConversationListResponse>(`/conversations?limit=${limit}&offset=${offset}`),
+  getConversations: (limit = 20, offset = 0, roomId?: string) => {
+    const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (roomId) p.set("room_id", roomId);
+    return request<ConversationListResponse>(`/conversations?${p}`);
+  },
   getConversation: (id: string) =>
     request<ConversationDetail>(`/conversations/${id}`),
   deleteConversation: (id: string) =>
@@ -242,39 +275,56 @@ export const api = {
     }),
 
   // Artifacts
-  getArtifacts: (sourceType?: string, limit = 50, offset = 0) => {
+  getArtifacts: (sourceType?: string, limit = 50, offset = 0, roomId?: string) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (sourceType) params.set("source_type", sourceType);
+    if (roomId) params.set("room_id", roomId);
     return request<ArtifactListResponse>(`/artifacts?${params}`);
   },
   deleteArtifact: (id: string) =>
     request<{ status: string; artifact_id: string }>(`/artifacts/${id}`, { method: "DELETE" }),
 
   // Analytics
-  getActivityTimeline: (days = 30) =>
-    request<ActivityTimeline>(`/analytics/activity-timeline?days=${days}`),
-  getSourceBreakdown: () =>
-    request<SourceBreakdown>("/analytics/source-breakdown"),
-  getAnalyticsExpertiseMatrix: () =>
-    request<ExpertiseMatrix>("/analytics/expertise-matrix"),
-  getContributionTypes: () =>
-    request<ContributionTypes>("/analytics/contribution-types"),
-  getMemberActivity: (days = 30) =>
-    request<MemberActivity>(`/analytics/member-activity?days=${days}`),
-  getTopicTrends: (days = 30) =>
-    request<TopicTrends>(`/analytics/topic-trends?days=${days}`),
+  getActivityTimeline: (days = 30, roomId?: string) => {
+    const p = new URLSearchParams({ days: String(days) });
+    if (roomId) p.set("room_id", roomId);
+    return request<ActivityTimeline>(`/analytics/activity-timeline?${p}`);
+  },
+  getSourceBreakdown: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<SourceBreakdown>(`/analytics/source-breakdown${p}`);
+  },
+  getAnalyticsExpertiseMatrix: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<ExpertiseMatrix>(`/analytics/expertise-matrix${p}`);
+  },
+  getContributionTypes: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<ContributionTypes>(`/analytics/contribution-types${p}`);
+  },
+  getMemberActivity: (days = 30, roomId?: string) => {
+    const p = new URLSearchParams({ days: String(days) });
+    if (roomId) p.set("room_id", roomId);
+    return request<MemberActivity>(`/analytics/member-activity?${p}`);
+  },
+  getTopicTrends: (days = 30, roomId?: string) => {
+    const p = new URLSearchParams({ days: String(days) });
+    if (roomId) p.set("room_id", roomId);
+    return request<TopicTrends>(`/analytics/topic-trends?${p}`);
+  },
 
   // Discussions
-  createThread: (data: { title: string; context_type?: string; context_id?: string }) =>
+  createThread: (data: { title: string; context_type?: string; context_id?: string; room_id?: string }) =>
     request<DiscussionThread>("/discussions", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  getThreads: (params?: { context_type?: string; context_id?: string; status?: string; limit?: number; offset?: number }) => {
+  getThreads: (params?: { context_type?: string; context_id?: string; status?: string; room_id?: string; limit?: number; offset?: number }) => {
     const p = new URLSearchParams();
     if (params?.context_type) p.set("context_type", params.context_type);
     if (params?.context_id) p.set("context_id", params.context_id);
     if (params?.status) p.set("status", params.status);
+    if (params?.room_id) p.set("room_id", params.room_id);
     if (params?.limit) p.set("limit", String(params.limit));
     if (params?.offset) p.set("offset", String(params.offset));
     return request<DiscussionThreadListResponse>(`/discussions?${p}`);
@@ -297,16 +347,23 @@ export const api = {
     }),
 
   // Rooms (Group Collaboration)
-  createRoom: (data: { name: string; description?: string; member_user_ids?: string[] }) =>
+  createRoom: (data: { name: string; description?: string; member_user_ids?: string[]; is_public?: boolean }) =>
     request<Room>("/rooms", {
       method: "POST",
       body: JSON.stringify(data),
     }),
   getRooms: (limit = 50, offset = 0) =>
     request<RoomListResponse>(`/rooms?limit=${limit}&offset=${offset}`),
+  discoverRooms: (q?: string, limit = 50, offset = 0) => {
+    const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (q) p.set("q", q);
+    return request<DiscoverRoomsResponse>(`/rooms/discover?${p}`);
+  },
+  joinRoom: (roomId: string) =>
+    request<{ status: string; room_id: string }>(`/rooms/${roomId}/join`, { method: "POST" }),
   getRoom: (id: string) =>
     request<RoomDetail>(`/rooms/${id}`),
-  updateRoom: (id: string, data: { name?: string; description?: string }) =>
+  updateRoom: (id: string, data: { name?: string; description?: string; is_public?: boolean }) =>
     request<{ status: string }>(`/rooms/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -337,6 +394,9 @@ export const api = {
   },
 
   // Search
-  search: (q: string, limit = 20) =>
-    request<SearchResults>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  search: (q: string, limit = 20, roomId?: string) => {
+    const p = new URLSearchParams({ q, limit: String(limit) });
+    if (roomId) p.set("room_id", roomId);
+    return request<SearchResults>(`/search?${p}`);
+  },
 };

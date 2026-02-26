@@ -56,7 +56,7 @@ def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
     return member
 
 
-def _run_ingestion(request: Request, connector, source_input, source_path: str):
+def _run_ingestion(request: Request, connector, source_input, source_path: str, room_id: str | None = None):
     """Common ingestion pipeline: parse → embed → store → record."""
     db = _get_db()
     embedder = request.app.state.embedding_service
@@ -82,6 +82,7 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str):
         chunk_count=len(chunks),
         member_ids=member_ids,
         status="completed",
+        room_id=room_id,
     )
     db.add(artifact)
 
@@ -94,14 +95,17 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str):
         documents = texts
         metadatas = []
         for c in chunks:
-            metadatas.append({
+            meta = {
                 "source_type": c.source_type,
                 "source_ref": c.source_ref,
                 "artifact_id": artifact_id,
                 "author": c.author or "unknown",
                 "timestamp": c.timestamp.isoformat() if c.timestamp else "",
                 "topics": ",".join(c.topics),
-            })
+            }
+            if room_id:
+                meta["room_id"] = room_id
+            metadatas.append(meta)
 
         vs.add_documents(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
 
@@ -119,6 +123,7 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str):
                         timestamp=c.timestamp,
                         description=c.text[:200],
                         topics=c.topics,
+                        room_id=room_id,
                     )
                     db.add(contrib)
                     member.total_contributions = (member.total_contributions or 0) + 1
@@ -205,7 +210,7 @@ async def ingest_markdown(body: MarkdownIngestRequest, request: Request):
     from app.ingestion.markdown_connector import MarkdownConnector
     settings = request.app.state.settings
     connector = MarkdownConnector(settings.chunk_size, settings.chunk_overlap)
-    return _run_ingestion(request, connector, resolved_path, body.directory_path)
+    return _run_ingestion(request, connector, resolved_path, body.directory_path, room_id=body.room_id)
 
 
 @router.post("/git", response_model=IngestionResponse)
@@ -248,7 +253,7 @@ async def ingest_git(body: GitIngestRequest, request: Request):
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
         )
-        return _run_ingestion(request, connector, resolved_path, repo_path)
+        return _run_ingestion(request, connector, resolved_path, repo_path, room_id=body.room_id)
     finally:
         if clone_dir and os.path.exists(clone_dir):
             import shutil
@@ -256,7 +261,7 @@ async def ingest_git(body: GitIngestRequest, request: Request):
 
 
 @router.post("/markdown-upload", response_model=IngestionResponse)
-async def ingest_markdown_upload(request: Request, files: list[UploadFile] = File(...)):
+async def ingest_markdown_upload(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None):
     """Upload .md, .txt, or .zip files to ingest as markdown docs."""
     from app.dependencies import get_current_user
     get_current_user(request)
@@ -302,11 +307,11 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
         connector = MarkdownConnector(settings.chunk_size, settings.chunk_overlap)
 
         upload_names = ", ".join(f.filename or "file" for f in files)
-        return _run_ingestion(request, connector, doc_dir, f"upload: {upload_names}")
+        return _run_ingestion(request, connector, doc_dir, f"upload: {upload_names}", room_id=room_id)
 
 
 @router.post("/slack", response_model=IngestionResponse)
-async def ingest_slack(request: Request, file: UploadFile = File(...)):
+async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
@@ -331,11 +336,11 @@ async def ingest_slack(request: Request, file: UploadFile = File(...)):
             extract_dir = zip_path
 
         connector = SlackConnector(settings.chunk_size, settings.chunk_overlap)
-        return _run_ingestion(request, connector, extract_dir, file.filename or "slack_export")
+        return _run_ingestion(request, connector, extract_dir, file.filename or "slack_export", room_id=room_id)
 
 
 @router.post("/discord", response_model=IngestionResponse)
-async def ingest_discord(request: Request, file: UploadFile = File(...)):
+async def ingest_discord(request: Request, file: UploadFile = File(...), room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
@@ -350,11 +355,11 @@ async def ingest_discord(request: Request, file: UploadFile = File(...)):
             f.write(content)
 
         connector = DiscordConnector(settings.chunk_size, settings.chunk_overlap)
-        return _run_ingestion(request, connector, file_path, file.filename or "discord_export")
+        return _run_ingestion(request, connector, file_path, file.filename or "discord_export", room_id=room_id)
 
 
 @router.post("/tasks", response_model=IngestionResponse)
-async def ingest_tasks(request: Request, file: UploadFile = File(...)):
+async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: str | None = None):
     from app.dependencies import get_current_user
     get_current_user(request)
 
@@ -369,11 +374,11 @@ async def ingest_tasks(request: Request, file: UploadFile = File(...)):
             f.write(content)
 
         connector = TaskConnector(settings.chunk_size, settings.chunk_overlap)
-        return _run_ingestion(request, connector, file_path, file.filename or "tasks")
+        return _run_ingestion(request, connector, file_path, file.filename or "tasks", room_id=room_id)
 
 
 @router.post("/documents", response_model=IngestionResponse)
-async def ingest_documents(request: Request, files: list[UploadFile] = File(...)):
+async def ingest_documents(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None):
     """Upload PDF, DOCX, or TXT files to ingest as documents."""
     from app.dependencies import get_current_user
     get_current_user(request)
@@ -436,6 +441,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
                 chunk_count=len(all_chunks),
                 member_ids=[],
                 status="completed",
+                room_id=room_id,
             )
             db.add(artifact)
 
@@ -445,14 +451,17 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
             ids = [f"chunk-{uuid4()}" for _ in all_chunks]
             metadatas = []
             for c in all_chunks:
-                metadatas.append({
+                meta = {
                     "source_type": c.source_type,
                     "source_ref": c.source_ref,
                     "artifact_id": artifact_id,
                     "author": c.author or "unknown",
                     "timestamp": c.timestamp.isoformat() if c.timestamp else "",
                     "topics": ",".join(c.topics),
-                })
+                }
+                if room_id:
+                    meta["room_id"] = room_id
+                metadatas.append(meta)
 
             vs.add_documents(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
             db.commit()

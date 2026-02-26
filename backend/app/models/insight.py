@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, Float, JSON
+from sqlalchemy import Column, String, Text, DateTime, Float, JSON, ForeignKey
 from app.db.database import Base
 
 
@@ -16,3 +16,4 @@ class InsightRecord(Base):
     period_start = Column(DateTime, nullable=True)
     period_end = Column(DateTime, nullable=True)
     metadata_json = Column(JSON, default=dict)
+    room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)

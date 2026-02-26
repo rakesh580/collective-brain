@@ -14,6 +14,7 @@ class ConversationRecord(Base):
     metadata_json = Column(JSON, default=dict)
     owner_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     visibility = Column(String, default="private")  # "private", "shared", "team"
+    room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)
 
 
 class MessageRecord(Base):

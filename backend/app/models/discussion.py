@@ -12,6 +12,7 @@ class DiscussionThread(Base):
     status = Column(String, default="open")  # "open" or "closed"
     context_type = Column(String, nullable=True)  # "member", "insight", or None (standalone)
     context_id = Column(String, nullable=True)  # ID of the related member/insight
+    room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
