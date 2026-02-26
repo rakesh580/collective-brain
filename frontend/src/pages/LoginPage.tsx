@@ -1,11 +1,26 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { LogIn } from "lucide-react";
 
+function parseApiError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : "Login failed";
+  try {
+    const match = msg.match(/API error \d+: (.+)/);
+    if (match) {
+      const body = JSON.parse(match[1]);
+      return typeof body.detail === "string" ? body.detail : msg;
+    }
+  } catch {
+    // fall through
+  }
+  return msg;
+}
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -20,18 +35,21 @@ export default function LoginPage() {
       await login(username, password);
       navigate("/");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
-      try {
-        const match = msg.match(/API error \d+: (.+)/);
-        if (match) {
-          const body = JSON.parse(match[1]);
-          setError(typeof body.detail === "string" ? body.detail : msg);
-        } else {
-          setError(msg);
-        }
-      } catch {
-        setError(msg);
-      }
+      setError(parseApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await googleLogin(credentialResponse.credential);
+      navigate("/");
+    } catch (err) {
+      setError(parseApiError(err));
     } finally {
       setLoading(false);
     }
@@ -83,7 +101,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="mb-6">
+          <div className="mb-2">
             <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
             <input
               type="password"
@@ -93,6 +111,15 @@ export default function LoginPage() {
               placeholder="********"
               required
             />
+          </div>
+
+          <div className="mb-5 text-right">
+            <Link
+              to="/forgot-password"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Forgot password?
+            </Link>
           </div>
 
           <button
@@ -107,6 +134,25 @@ export default function LoginPage() {
             )}
             {loading ? "Signing in..." : "Sign In"}
           </button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-slate-600/50" />
+            <span className="text-xs text-slate-500 uppercase">or</span>
+            <div className="flex-1 h-px bg-slate-600/50" />
+          </div>
+
+          {/* Google Sign-In */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google sign-in was cancelled or failed")}
+              theme="filled_black"
+              size="large"
+              text="continue_with"
+              shape="pill"
+            />
+          </div>
 
           <p className="text-center text-sm text-slate-400 mt-4">
             Don't have an account?{" "}

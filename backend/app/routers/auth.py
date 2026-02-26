@@ -1,10 +1,21 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.schemas.requests import RegisterRequest, LoginRequest, ProfileUpdateRequest
+from app.schemas.requests import (
+    RegisterRequest,
+    LoginRequest,
+    ProfileUpdateRequest,
+    GoogleAuthRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+)
 from app.schemas.responses import UserResponse, AuthResponse
 from app.services.auth_service import AuthService
 from app.models.user import UserRecord
 from app.db.database import get_session
+
+logger = logging.getLogger(__name__)
 
 
 async def _rate_limit(request: Request, key: str, max_requests: int, window: int = 60):
@@ -53,9 +64,79 @@ async def login(body: LoginRequest, request: Request):
     db = _get_db()
     try:
         auth_svc = AuthService(request.app.state.settings)
-        user = auth_svc.authenticate(db, body.username, body.password)
+        try:
+            user = auth_svc.authenticate(db, body.username, body.password)
+        except ValueError as e:
+            raise HTTPException(status_code=401, detail=str(e))
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
+        token = auth_svc.create_token(user.id)
+        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+    finally:
+        db.close()
+
+
+@router.post("/google", response_model=AuthResponse)
+async def google_auth(body: GoogleAuthRequest, request: Request):
+    """Authenticate with Google ID token. Creates account if new user."""
+    await _rate_limit(request, "auth:google", max_requests=10, window=60)
+
+    settings = request.app.state.settings
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=501,
+            detail="Google Sign-In is not configured on this server",
+        )
+
+    db = _get_db()
+    try:
+        auth_svc = AuthService(settings)
+        try:
+            user = auth_svc.google_authenticate(
+                db, body.credential, settings.google_client_id
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+        token = auth_svc.create_token(user.id)
+        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+    finally:
+        db.close()
+
+
+@router.post("/forgot-password")
+async def forgot_password(body: ForgotPasswordRequest, request: Request):
+    """Generate a 6-digit reset code for password recovery.
+
+    In production, this would send an email. For now, the code is returned
+    in the response so the frontend can proceed.
+    """
+    await _rate_limit(request, "auth:forgot", max_requests=5, window=60)
+    db = _get_db()
+    try:
+        auth_svc = AuthService(request.app.state.settings)
+        try:
+            code = auth_svc.generate_reset_code(db, body.email)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        logger.info("Password reset code generated for %s", body.email)
+        return {"message": "Verification code sent to your email", "code": code}
+    finally:
+        db.close()
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+async def reset_password(body: ResetPasswordRequest, request: Request):
+    """Verify the reset code and set a new password."""
+    await _rate_limit(request, "auth:reset", max_requests=5, window=60)
+    db = _get_db()
+    try:
+        auth_svc = AuthService(request.app.state.settings)
+        try:
+            user = auth_svc.verify_reset_code(
+                db, body.email, body.code, body.new_password
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         token = auth_svc.create_token(user.id)
         return AuthResponse(token=token, user=UserResponse.model_validate(user))
     finally:

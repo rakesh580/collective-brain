@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440  # 24 hours
 
+    # Google OAuth
+    google_client_id: str = ""
+
     # Embeddings
     embedding_model: str = "all-MiniLM-L6-v2"
     embedding_dimension: int = 384

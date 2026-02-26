@@ -128,6 +128,7 @@ class UserResponse(BaseModel):
     linked_member_id: str | None
     is_active: bool
     created_at: datetime
+    auth_provider: str | None = None
 
     model_config = {"from_attributes": True}
 

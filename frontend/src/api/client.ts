@@ -43,7 +43,8 @@ function getAuthToken(): string | null {
 function handle401(res: Response): void {
   if (res.status === 401) {
     localStorage.removeItem("cb_token");
-    if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+    const authPages = ["/login", "/register", "/forgot-password"];
+    if (!authPages.includes(window.location.pathname)) {
       window.location.href = "/login";
     }
   }
@@ -84,6 +85,21 @@ export const api = {
     request<AuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+  authGoogle: (credential: string) =>
+    request<AuthResponse>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    }),
+  authForgotPassword: (email: string) =>
+    request<{ message: string; code: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  authResetPassword: (email: string, code: string, new_password: string) =>
+    request<AuthResponse>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ email, code, new_password }),
     }),
   authProfile: () => request<User>("/auth/me"),
   authUpdateProfile: (data: Partial<User>) =>

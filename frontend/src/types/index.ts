@@ -49,6 +49,7 @@ export interface User {
   linked_member_id: string | null;
   is_active: boolean;
   created_at: string;
+  auth_provider?: string | null;
 }
 
 export interface AuthResponse {

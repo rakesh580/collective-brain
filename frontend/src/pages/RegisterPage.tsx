@@ -1,11 +1,33 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { UserPlus } from "lucide-react";
 
+function parseApiError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : "Registration failed";
+  try {
+    const match = msg.match(/API error \d+: (.+)/);
+    if (match) {
+      const body = JSON.parse(match[1]);
+      if (body.detail && Array.isArray(body.detail)) {
+        const messages = body.detail.map((d: { loc?: string[]; msg?: string }) => {
+          const field = d.loc?.slice(-1)[0] || "field";
+          return `${field}: ${d.msg}`;
+        });
+        return messages.join(". ");
+      }
+      if (body.detail && typeof body.detail === "string") return body.detail;
+    }
+  } catch {
+    // fall through
+  }
+  return msg;
+}
+
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -33,28 +55,21 @@ export default function RegisterPage() {
       await register(username, email, password, displayName || undefined);
       navigate("/");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Registration failed";
-      try {
-        const match = msg.match(/API error \d+: (.+)/);
-        if (match) {
-          const body = JSON.parse(match[1]);
-          if (body.detail && Array.isArray(body.detail)) {
-            const messages = body.detail.map((d: { loc?: string[]; msg?: string }) => {
-              const field = d.loc?.slice(-1)[0] || "field";
-              return `${field}: ${d.msg}`;
-            });
-            setError(messages.join(". "));
-          } else if (body.detail && typeof body.detail === "string") {
-            setError(body.detail);
-          } else {
-            setError(msg);
-          }
-        } else {
-          setError(msg);
-        }
-      } catch {
-        setError(msg);
-      }
+      setError(parseApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await googleLogin(credentialResponse.credential);
+      navigate("/");
+    } catch (err) {
+      setError(parseApiError(err));
     } finally {
       setLoading(false);
     }
@@ -172,6 +187,25 @@ export default function RegisterPage() {
             )}
             {loading ? "Creating account..." : "Create Account"}
           </button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-slate-600/50" />
+            <span className="text-xs text-slate-500 uppercase">or</span>
+            <div className="flex-1 h-px bg-slate-600/50" />
+          </div>
+
+          {/* Google Sign-In */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google sign-in was cancelled or failed")}
+              theme="filled_black"
+              size="large"
+              text="continue_with"
+              shape="pill"
+            />
+          </div>
 
           <p className="text-center text-sm text-slate-400 mt-4">
             Already have an account?{" "}
