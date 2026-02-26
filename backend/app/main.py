@@ -35,6 +35,21 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
 
+    # ── Check persistent storage on HuggingFace Spaces ──
+    _marker = Path("/data/.cb_persistence_marker")
+    if Path("/data").exists():
+        if _marker.exists():
+            logger.info("Persistent storage verified (/data survives restarts)")
+        else:
+            logger.warning(
+                "First boot with /data — if user data disappears after restart, "
+                "enable Persistent Storage in your HF Space Settings"
+            )
+            try:
+                _marker.write_text("ok")
+            except OSError:
+                pass
+
     # ── Database (PostgreSQL or SQLite) ──
     init_db(settings=settings)
 

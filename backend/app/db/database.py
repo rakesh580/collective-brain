@@ -156,7 +156,7 @@ def _run_migrations(engine):
                 except Exception as e:
                     logger.warning("Migration: unique constraint already exists or failed: %s", e)
 
-        # Users: google_id, auth_provider, reset_code, reset_code_expires
+        # Users: google_id, auth_provider, reset_code, reset_code_expires, last_login
         if "users" in tables:
             user_cols = [c["name"] for c in inspector.get_columns("users")]
             if "google_id" not in user_cols:
@@ -171,6 +171,9 @@ def _run_migrations(engine):
             if "reset_code_expires" not in user_cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN reset_code_expires TIMESTAMP"))
                 logger.info("Migration: added users.reset_code_expires")
+            if "last_login" not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN last_login TIMESTAMP"))
+                logger.info("Migration: added users.last_login")
 
         # ChatRooms: is_public
         if "chat_rooms" in tables:
@@ -215,6 +218,12 @@ def _run_migrations(engine):
                 logger.info("Migration: added insights.room_id")
 
         conn.commit()
+
+    # Log user count to help verify database persistence across restarts
+    with engine.connect() as conn:
+        if "users" in tables:
+            count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+            logger.info("Database has %d registered user(s)", count)
 
 
 def get_session() -> Generator[Session, None, None]:
