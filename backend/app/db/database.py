@@ -66,8 +66,16 @@ def init_db(sqlite_url: str = "", settings=None):
         # HuggingFace Spaces persistent volume at /data).
         if db_url.startswith("sqlite:///"):
             db_path = db_url.replace("sqlite:///", "", 1)
-            db_dir = os.path.dirname(os.path.abspath(db_path))
+            abs_db_path = os.path.abspath(db_path)
+            db_dir = os.path.dirname(abs_db_path)
             os.makedirs(db_dir, exist_ok=True)
+
+            # Diagnostic: log whether the database file already exists
+            if os.path.exists(abs_db_path):
+                size_kb = os.path.getsize(abs_db_path) / 1024
+                logger.info("SQLite file found: %s (%.1f KB)", abs_db_path, size_kb)
+            else:
+                logger.warning("SQLite file does NOT exist yet: %s (will be created)", abs_db_path)
 
         # NullPool: each request gets its own connection — no sharing,
         # no "database is locked" under concurrency.  WAL mode allows
@@ -84,7 +92,7 @@ def init_db(sqlite_url: str = "", settings=None):
         def _set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA synchronous=FULL")
             cursor.execute("PRAGMA busy_timeout=30000")
             cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
             cursor.close()
@@ -219,11 +227,22 @@ def _run_migrations(engine):
 
         conn.commit()
 
+    # Flush WAL to main DB file so data survives unclean container shutdowns
+    is_sqlite = not engine.url.get_backend_name() == "postgresql"
+    if is_sqlite:
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+            conn.commit()
+            logger.info("SQLite WAL checkpoint completed")
+
     # Log user count to help verify database persistence across restarts
     with engine.connect() as conn:
         if "users" in tables:
             count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
-            logger.info("Database has %d registered user(s)", count)
+            if count == 0:
+                logger.warning("Database has 0 users — data may have been lost on restart!")
+            else:
+                logger.info("Database has %d registered user(s) (data persisted OK)", count)
 
 
 def get_session() -> Generator[Session, None, None]:

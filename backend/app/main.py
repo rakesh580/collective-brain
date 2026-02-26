@@ -100,6 +100,17 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Graceful Shutdown ──
+    # Flush SQLite WAL to main file before container dies
+    if not settings.is_postgres:
+        try:
+            from app.db.database import get_engine
+            eng = get_engine()
+            if eng:
+                with eng.raw_connection() as raw_conn:
+                    raw_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                logger.info("SQLite WAL flushed on shutdown")
+        except Exception as e:
+            logger.warning("WAL checkpoint on shutdown failed: %s", e)
     await task_queue.stop()
     await redis.close()
     logger.info("Collective Brain shut down gracefully")
