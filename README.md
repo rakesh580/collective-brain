@@ -1,3 +1,12 @@
+---
+title: Collective Brain
+emoji: 🧠
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # Collective Brain
 
 An AI-powered team knowledge platform that ingests your team's work (git repos, documents, markdown files), builds a knowledge graph of members, contributions, and insights, and lets your team collaborate through real-time chat rooms, shared AI conversations, and discussion threads.
