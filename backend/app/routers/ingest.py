@@ -102,9 +102,8 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str, 
                 "author": c.author or "unknown",
                 "timestamp": c.timestamp.isoformat() if c.timestamp else "",
                 "topics": ",".join(c.topics),
+                "room_id": room_id or "",
             }
-            if room_id:
-                meta["room_id"] = room_id
             metadatas.append(meta)
 
         vs.add_documents(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)

@@ -1,6 +1,9 @@
+import logging
 import time
 
 import chromadb
+
+logger = logging.getLogger("collective_brain.vector_store")
 
 
 class VectorStoreService:
@@ -41,6 +44,12 @@ class VectorStoreService:
         where: dict | None = None,
         room_id: str | None = None,
     ) -> dict:
+        # Cap n_results to collection size to avoid ChromaDB errors
+        total = self.collection.count()
+        if total == 0:
+            return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+        n_results = min(n_results, total)
+
         kwargs = {
             "query_embeddings": [query_embedding],
             "n_results": n_results,
@@ -58,7 +67,16 @@ class VectorStoreService:
         elif len(filters) > 1:
             kwargs["where"] = {"$and": filters}
 
-        return self.collection.query(**kwargs)
+        try:
+            return self.collection.query(**kwargs)
+        except Exception as e:
+            logger.warning("ChromaDB query failed (filter=%s): %s", kwargs.get("where"), e)
+            # Retry without filter as fallback
+            kwargs.pop("where", None)
+            try:
+                return self.collection.query(**kwargs)
+            except Exception:
+                return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
 
     def count(self) -> int:
         return self.collection.count()
