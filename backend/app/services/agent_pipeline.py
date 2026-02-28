@@ -58,7 +58,7 @@ class AgentPipeline:
         # Initialize LLM via HuggingFace's OpenAI-compatible Router API
         self.llm = ChatOpenAI(
             model=settings.mistral_model,
-            api_key=settings.mistral_api_key,
+            api_key=settings.effective_mistral_api_key,
             base_url="https://router.huggingface.co/v1/",
             temperature=0.1,
         )

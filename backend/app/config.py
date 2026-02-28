@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 from typing import Literal
 
@@ -11,6 +13,13 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.1:8b"
     mistral_api_key: str = ""
     mistral_model: str = "Qwen/Qwen2.5-72B-Instruct"
+
+    @property
+    def effective_mistral_api_key(self) -> str:
+        """Return mistral_api_key, falling back to HF_TOKEN (auto-set on HF Spaces)."""
+        if self.mistral_api_key:
+            return self.mistral_api_key
+        return os.environ.get("HF_TOKEN", "")
 
     # Agent mode
     agent_mode: Literal["langgraph", "rag"] = "rag"

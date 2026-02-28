@@ -183,17 +183,17 @@ export const api = {
   },
 
   // Ingest
-  ingestGit: (repoPath: string, branch = "main", sinceDays = 90) =>
+  ingestGit: (repoPath: string, branch = "main", sinceDays = 90, roomId?: string) =>
     request<IngestionJob>("/ingest/git", {
       method: "POST",
-      body: JSON.stringify({ repo_path: repoPath, branch, since_days: sinceDays }),
+      body: JSON.stringify({ repo_path: repoPath, branch, since_days: sinceDays, room_id: roomId }),
     }),
-  ingestMarkdown: (directoryPath: string) =>
+  ingestMarkdown: (directoryPath: string, roomId?: string) =>
     request<IngestionJob>("/ingest/markdown", {
       method: "POST",
-      body: JSON.stringify({ directory_path: directoryPath }),
+      body: JSON.stringify({ directory_path: directoryPath, room_id: roomId }),
     }),
-  ingestMarkdownFiles: async (files: File[]): Promise<IngestionJob> => {
+  ingestMarkdownFiles: async (files: File[], roomId?: string): Promise<IngestionJob> => {
     const token = getAuthToken();
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -201,7 +201,8 @@ export const api = {
     for (const f of files) {
       form.append("files", f);
     }
-    const res = await fetch(`${API_BASE}/ingest/markdown-upload`, {
+    const q = roomId ? `?room_id=${roomId}` : "";
+    const res = await fetch(`${API_BASE}/ingest/markdown-upload${q}`, {
       method: "POST",
       headers,
       body: form,
@@ -213,7 +214,7 @@ export const api = {
     }
     return res.json();
   },
-  ingestDocuments: async (files: File[]): Promise<IngestionJob> => {
+  ingestDocuments: async (files: File[], roomId?: string): Promise<IngestionJob> => {
     const token = getAuthToken();
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -221,7 +222,8 @@ export const api = {
     for (const f of files) {
       form.append("files", f);
     }
-    const res = await fetch(`${API_BASE}/ingest/documents`, {
+    const q = roomId ? `?room_id=${roomId}` : "";
+    const res = await fetch(`${API_BASE}/ingest/documents${q}`, {
       method: "POST",
       headers,
       body: form,
@@ -233,13 +235,14 @@ export const api = {
     }
     return res.json();
   },
-  ingestFile: async (sourceType: string, file: File): Promise<IngestionJob> => {
+  ingestFile: async (sourceType: string, file: File, roomId?: string): Promise<IngestionJob> => {
     const token = getAuthToken();
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${API_BASE}/ingest/${sourceType}`, {
+    const q = roomId ? `?room_id=${roomId}` : "";
+    const res = await fetch(`${API_BASE}/ingest/${sourceType}${q}`, {
       method: "POST",
       headers,
       body: form,

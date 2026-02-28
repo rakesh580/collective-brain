@@ -44,7 +44,7 @@ ENV CB_DATABASE_URL=""
 ENV CB_CHROMA_PERSIST_DIR="/data/chroma_db"
 
 # LLM Configuration — uses HuggingFace Inference API (free tier)
-# Override CB_MISTRAL_API_KEY via HF Space Secrets for your own token
+# CB_MISTRAL_API_KEY falls back to HF_TOKEN (auto-set on HF Spaces)
 ENV CB_LLM_PROVIDER="mistral"
 ENV CB_MISTRAL_MODEL="Qwen/Qwen2.5-72B-Instruct"
 ENV CB_AGENT_MODE="langgraph"

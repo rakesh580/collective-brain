@@ -18,7 +18,13 @@ import {
   Sparkles,
   FileText,
   UserCircle,
+  Upload,
+  CheckCircle,
+  XCircle,
+  Clock,
 } from "lucide-react";
+import SourceUploader from "../components/ingest/SourceUploader";
+import type { IngestionJob } from "../types";
 
 const avatarColors = [
   "from-indigo-500 to-violet-500",
@@ -78,6 +84,8 @@ export default function RoomChatPage() {
   const [aiMode, setAiMode] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showIngest, setShowIngest] = useState(false);
+  const [ingestJobs, setIngestJobs] = useState<IngestionJob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -177,6 +185,18 @@ export default function RoomChatPage() {
           </div>
 
           <button
+            onClick={() => { setShowIngest(!showIngest); if (!showIngest) setShowMembers(false); }}
+            className={`p-2 rounded-lg transition-all ${
+              showIngest
+                ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10"
+                : "text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
+            title="Ingest data into this room"
+          >
+            <Upload size={16} />
+          </button>
+
+          <button
             onClick={() => setShowAddMembers(true)}
             className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all"
             title="Add members"
@@ -185,7 +205,7 @@ export default function RoomChatPage() {
           </button>
 
           <button
-            onClick={() => setShowMembers(!showMembers)}
+            onClick={() => { setShowMembers(!showMembers); if (!showMembers) setShowIngest(false); }}
             className={`p-2 rounded-lg transition-all ${
               showMembers
                 ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10"
@@ -351,6 +371,63 @@ export default function RoomChatPage() {
             inputRef.current?.focus();
           }}
         />
+      )}
+
+      {/* Ingest Sidebar */}
+      {showIngest && (
+        <div className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col overflow-auto">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <Upload size={16} className="text-emerald-500" />
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Ingest Data</h3>
+            </div>
+            <button
+              onClick={() => setShowIngest(false)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="p-4 flex-1 overflow-auto">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Data ingested here is scoped to <span className="font-semibold text-slate-700 dark:text-slate-200">{room?.name}</span> only.
+            </p>
+            <SourceUploader
+              roomId={roomId}
+              onComplete={(job) => setIngestJobs((prev) => [job, ...prev])}
+            />
+            {ingestJobs.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">Recent</h4>
+                <div className="space-y-1.5">
+                  {ingestJobs.map((job) => (
+                    <div
+                      key={job.artifact_id}
+                      className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/50 rounded-lg px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        {job.status === "completed" ? (
+                          <CheckCircle size={14} className="text-emerald-500" />
+                        ) : job.status === "failed" ? (
+                          <XCircle size={14} className="text-red-500" />
+                        ) : (
+                          <Clock size={14} className="text-amber-500" />
+                        )}
+                        <span className="text-xs text-slate-700 dark:text-slate-300">
+                          {job.source_type} &middot; {job.chunk_count} chunks
+                        </span>
+                      </div>
+                      <span className={`text-[10px] capitalize font-medium ${
+                        job.status === "completed" ? "text-emerald-600" :
+                        job.status === "failed" ? "text-red-600" : "text-amber-600"
+                      }`}>{job.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Add Members Modal */}

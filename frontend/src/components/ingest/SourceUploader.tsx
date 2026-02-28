@@ -4,6 +4,7 @@ import type { IngestionJob } from "../../types";
 
 interface Props {
   onComplete: (job: IngestionJob) => void;
+  roomId?: string;
 }
 
 type SourceType = "git" | "markdown" | "documents" | "slack" | "discord" | "tasks";
@@ -56,7 +57,7 @@ const sourceConfigs: Record<SourceType, SourceConfig> = {
   },
 };
 
-export default function SourceUploader({ onComplete }: Props) {
+export default function SourceUploader({ onComplete, roomId }: Props) {
   const [sourceType, setSourceType] = useState<SourceType>("markdown");
   const [path, setPath] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -74,15 +75,15 @@ export default function SourceUploader({ onComplete }: Props) {
       let result: IngestionJob;
 
       if (sourceType === "git") {
-        result = await api.ingestGit(path);
+        result = await api.ingestGit(path, "main", 90, roomId);
       } else if (sourceType === "markdown") {
         if (files.length === 0) throw new Error("Please select files to upload");
-        result = await api.ingestMarkdownFiles(files);
+        result = await api.ingestMarkdownFiles(files, roomId);
       } else if (sourceType === "documents") {
         if (files.length === 0) throw new Error("Please select files to upload");
-        result = await api.ingestDocuments(files);
+        result = await api.ingestDocuments(files, roomId);
       } else if (files.length > 0) {
-        result = await api.ingestFile(sourceType, files[0]);
+        result = await api.ingestFile(sourceType, files[0], roomId);
       } else {
         throw new Error("Please select a file");
       }

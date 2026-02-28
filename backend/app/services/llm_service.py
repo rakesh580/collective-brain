@@ -23,7 +23,7 @@ class LLMService:
             self.client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
             self.model = settings.claude_model
         elif self.provider == "mistral":
-            self.hf_api_key = settings.mistral_api_key
+            self.hf_api_key = settings.effective_mistral_api_key
             self.model = settings.mistral_model
             self.hf_base_url = "https://router.huggingface.co/v1"
             self.client = None
