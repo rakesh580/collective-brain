@@ -82,6 +82,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  authConfig: () =>
+    request<{ google_client_id: string; google_enabled: boolean }>("/auth/config"),
   authLogin: (data: { username: string; password: string }) =>
     request<AuthResponse>("/auth/login", {
       method: "POST",

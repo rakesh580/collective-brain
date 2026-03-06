@@ -1,9 +1,37 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GoogleLogin } from "@react-oauth/google";
+import { GoogleLogin, useGoogleOAuth } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { LogIn } from "lucide-react";
+
+function SafeGoogleLogin({ onSuccess, onError }: { onSuccess: (res: any) => void; onError: () => void }) {
+  try {
+    const ctx = useGoogleOAuth();
+    if (!ctx?.clientId) return null;
+  } catch {
+    return null;
+  }
+  return (
+    <>
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px bg-slate-600/50" />
+        <span className="text-xs text-slate-500 uppercase">or</span>
+        <div className="flex-1 h-px bg-slate-600/50" />
+      </div>
+      <div className="flex justify-center">
+        <GoogleLogin
+          onSuccess={onSuccess}
+          onError={onError}
+          theme="filled_black"
+          size="large"
+          text="continue_with"
+          shape="pill"
+        />
+      </div>
+    </>
+  );
+}
 
 function parseApiError(err: unknown): string {
   const msg = err instanceof Error ? err.message : "Login failed";
@@ -135,24 +163,10 @@ export default function LoginPage() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-slate-600/50" />
-            <span className="text-xs text-slate-500 uppercase">or</span>
-            <div className="flex-1 h-px bg-slate-600/50" />
-          </div>
-
-          {/* Google Sign-In */}
-          <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => setError("Google sign-in was cancelled or failed")}
-              theme="filled_black"
-              size="large"
-              text="continue_with"
-              shape="pill"
-            />
-          </div>
+          <SafeGoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError("Google sign-in was cancelled or failed")}
+          />
 
           <p className="text-center text-sm text-slate-400 mt-4">
             Don't have an account?{" "}

@@ -40,6 +40,16 @@ def _get_db():
     return next(get_session())
 
 
+@router.get("/config")
+async def get_auth_config(request: Request):
+    """Public endpoint: returns auth configuration for the frontend."""
+    settings = request.app.state.settings
+    return {
+        "google_client_id": settings.google_client_id or "",
+        "google_enabled": bool(settings.google_client_id),
+    }
+
+
 @router.post("/register", response_model=AuthResponse, status_code=201)
 async def register(body: RegisterRequest, request: Request):
     await _rate_limit(request, "auth:register", max_requests=5, window=60)
