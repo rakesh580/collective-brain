@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
-import { useGoogleAuthEnabled } from "../main";
+import { useGoogleAuthEnabled } from "../hooks/useGoogleAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { LogIn } from "lucide-react";
 

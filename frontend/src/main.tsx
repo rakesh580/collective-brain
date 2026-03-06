@@ -1,18 +1,14 @@
-import { StrictMode, useState, useEffect, createContext, useContext } from "react";
+import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
+import { GoogleAuthEnabledContext } from "./hooks/useGoogleAuth";
 import { api } from "./api/client";
 import "./index.css";
 import App from "./App.tsx";
-
-const GoogleAuthEnabledContext = createContext(false);
-export function useGoogleAuthEnabled() {
-  return useContext(GoogleAuthEnabledContext);
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
