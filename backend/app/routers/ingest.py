@@ -226,10 +226,19 @@ async def ingest_git(body: GitIngestRequest, request: Request):
 
     # Auto-clone if it looks like a URL
     if repo_path.startswith("http://") or repo_path.startswith("https://") or repo_path.startswith("git@"):
+        # Validate it looks like a repo URL (must have at least user/repo)
+        if repo_path.startswith("http"):
+            parts = repo_path.rstrip("/").split("/")
+            if len(parts) < 5:  # https://github.com/user/repo = 5 parts minimum
+                raise HTTPException(
+                    status_code=400,
+                    detail="Please enter a full repository URL (e.g. https://github.com/user/repo), not just a profile URL.",
+                )
         try:
             clone_dir = tempfile.mkdtemp(prefix="cb_git_")
-            # Clone full history (no depth limit) so git diff/log works
-            cloned = GitRepo.clone_from(repo_path, clone_dir)
+            # GIT_TERMINAL_PROMPT=0 prevents hanging on auth prompt for private repos
+            env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+            cloned = GitRepo.clone_from(repo_path, clone_dir, env=env)
             resolved_path = clone_dir
             # Auto-detect the default branch from the cloned repo
             branch = cloned.active_branch.name
@@ -237,6 +246,12 @@ async def ingest_git(body: GitIngestRequest, request: Request):
             if clone_dir and os.path.exists(clone_dir):
                 import shutil
                 shutil.rmtree(clone_dir, ignore_errors=True)
+            err_msg = str(e)
+            if "could not read Username" in err_msg or "Authentication failed" in err_msg:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot clone this repository. Only public repositories are supported. Make sure the URL is correct and the repo is public.",
+                )
             raise HTTPException(status_code=400, detail=f"Failed to clone repository: {e}")
     else:
         resolved_path = _validate_local_path(repo_path)
