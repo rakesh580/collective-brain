@@ -21,7 +21,7 @@ export default function ChatPage() {
   const [showTeam, setShowTeam] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const isOwner = activeConversation?.owner_user_id === user?.id || !activeConversation?.owner_user_id;
+  const isOwner = !activeConversation || activeConversation.owner_user_id === user?.id;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

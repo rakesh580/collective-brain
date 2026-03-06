@@ -49,6 +49,8 @@ def get_current_user(request: Request):
             .filter(UserRecord.id == user_id, UserRecord.is_active == True)  # noqa: E712
             .first()
         )
+        if user:
+            db.expunge(user)
     finally:
         db.close()
     if not user:
