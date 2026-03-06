@@ -18,6 +18,7 @@ from app.schemas.responses import QueryResponse, SourceRef, RelatedMember
 from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.models.conversation import ConversationRecord, MessageRecord
+from app.models.user import UserRecord
 
 logger = logging.getLogger("collective_brain.rag")
 
@@ -232,9 +233,11 @@ class RAGPipeline:
     def _build_context(self, intent: str, question: str, chunks_text: str) -> str:
         if intent == "member_recommendation":
             member_expertise = self._get_member_expertise_summary()
+            user_skills = self._get_user_skills_summary()
             return MEMBER_RECOMMENDATION_TEMPLATE.format(
                 chunks=chunks_text,
                 member_expertise=member_expertise,
+                user_skills=user_skills,
                 question=question,
             )
         if intent == "pattern_analysis":
@@ -252,7 +255,15 @@ class RAGPipeline:
                 task_status="(see context above)",
                 question=question,
             )
-        return CONTEXT_TEMPLATE.format(chunks=chunks_text, question=question)
+        # General queries — include user skills summary for team awareness
+        user_skills = self._get_user_skills_summary()
+        context = CONTEXT_TEMPLATE.format(chunks=chunks_text, question=question)
+        if user_skills and user_skills != "(No user skill profiles yet)":
+            context = context.replace(
+                "=== QUESTION ===",
+                f"=== TEAM SKILL PROFILES ===\n{user_skills}\n\n=== QUESTION ==="
+            )
+        return context
 
     def _build_messages(self, conv_id: str, user_content: str) -> list[dict]:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -300,7 +311,6 @@ class RAGPipeline:
     def _get_member_expertise_summary(self) -> str:
         room_id = getattr(self, "room_id", None)
         if room_id:
-            # Get members who have contributions in this room
             member_ids = (
                 self.db.query(ContributionRecord.member_id)
                 .filter(ContributionRecord.room_id == room_id)
@@ -318,8 +328,42 @@ class RAGPipeline:
             tags = ", ".join(m.expertise_tags or [])
             scores = m.expertise_scores or {}
             score_str = ", ".join(f"{k}: {v:.2f}" for k, v in scores.items())
-            parts.append(f"- {m.name}: tags=[{tags}], scores=[{score_str}]")
+            # Include declared skills from linked user
+            linked_user = self.db.query(UserRecord).filter(UserRecord.linked_member_id == m.id).first()
+            declared = ""
+            role = ""
+            if linked_user:
+                declared = ", ".join(linked_user.skills or [])
+                role = linked_user.role_title or ""
+            role_str = f" ({role})" if role else ""
+            declared_str = f", declared_skills=[{declared}]" if declared else ""
+            parts.append(f"- {m.name}{role_str}: tags=[{tags}], scores=[{score_str}]{declared_str}")
         return "\n".join(parts)
+
+    def _get_user_skills_summary(self) -> str:
+        """Get declared skills for all users (including those not linked to members)."""
+        room_id = getattr(self, "room_id", None)
+        if room_id:
+            from app.models.room import ChatRoomMember
+            user_ids = (
+                self.db.query(ChatRoomMember.user_id)
+                .filter(ChatRoomMember.room_id == room_id)
+                .all()
+            )
+            uid_list = [uid for (uid,) in user_ids]
+            users = self.db.query(UserRecord).filter(UserRecord.id.in_(uid_list)).all() if uid_list else []
+        else:
+            users = self.db.query(UserRecord).filter(UserRecord.is_active == True).all()  # noqa: E712
+        parts = []
+        for u in users:
+            skills = u.skills or []
+            if not skills and not u.role_title:
+                continue
+            name = u.display_name or u.username
+            role = f" ({u.role_title})" if u.role_title else ""
+            skill_str = ", ".join(skills) if skills else "none declared"
+            parts.append(f"- {name}{role}: skills=[{skill_str}]")
+        return "\n".join(parts) if parts else "(No user skill profiles yet)"
 
     def _get_recent_contributions_summary(self) -> str:
         room_id = getattr(self, "room_id", None)

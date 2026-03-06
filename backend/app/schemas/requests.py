@@ -71,6 +71,9 @@ class ProfileUpdateRequest(BaseModel):
     display_name: str | None = Field(None, max_length=100)
     avatar_url: str | None = Field(None, max_length=500)
     linked_member_id: str | None = None
+    skills: list[str] | None = None
+    role_title: str | None = Field(None, max_length=200)
+    bio: str | None = Field(None, max_length=1000)
 
 
 # Conversations

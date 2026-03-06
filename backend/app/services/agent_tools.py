@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.models.insight import InsightRecord
+from app.models.user import UserRecord
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_store import VectorStoreService
 from app.services.memory_graph import MemoryGraph
@@ -78,6 +79,14 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
             "last_active": member.last_active.isoformat() if member.last_active else "unknown",
             "aliases": member.aliases or [],
         }
+
+        # Look up linked user for declared skills
+        linked_user = db.query(UserRecord).filter(UserRecord.linked_member_id == member.id).first()
+        if linked_user:
+            profile["declared_skills"] = linked_user.skills or []
+            profile["role_title"] = linked_user.role_title
+            profile["bio"] = linked_user.bio
+
         return json.dumps(profile, indent=2)
 
     @tool
@@ -91,9 +100,14 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         output = []
         for m in members:
             tags = ", ".join(m.expertise_tags or [])
+            linked_user = db.query(UserRecord).filter(UserRecord.linked_member_id == m.id).first()
+            declared = ", ".join(linked_user.skills or []) if linked_user and linked_user.skills else ""
+            role = linked_user.role_title if linked_user and linked_user.role_title else ""
+            role_str = f" ({role})" if role else ""
+            declared_str = f", declared_skills: [{declared}]" if declared else ""
             output.append(
-                f"- {m.name} (id: {m.id}): {int(m.total_contributions or 0)} contributions, "
-                f"expertise: [{tags}], last active: {m.last_active.strftime('%Y-%m-%d') if m.last_active else 'unknown'}"
+                f"- {m.name}{role_str} (id: {m.id}): {int(m.total_contributions or 0)} contributions, "
+                f"expertise: [{tags}]{declared_str}, last active: {m.last_active.strftime('%Y-%m-%d') if m.last_active else 'unknown'}"
             )
         return "\n".join(output)
 
@@ -132,12 +146,29 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         topic_edges = [e for e in edges if e.type == "KNOWS_ABOUT"]
 
         output = [f"Experts for topic '{topic}':"]
+        seen_names = set()
         for mn in member_nodes:
             weight = next((e.weight for e in topic_edges if e.source == mn.id), 0)
             output.append(
                 f"- {mn.label}: {int(weight)} contributions, "
                 f"tags: {mn.properties.get('expertise_tags', [])}"
             )
+            seen_names.add(mn.label.lower())
+
+        # Also check user-declared skills
+        users_with_skills = db.query(UserRecord).filter(UserRecord.skills.isnot(None)).all()
+        topic_lower = topic.lower()
+        for u in users_with_skills:
+            display = u.display_name or u.username
+            if display.lower() in seen_names:
+                continue
+            user_skills = u.skills or []
+            if any(topic_lower in s.lower() or s.lower() in topic_lower for s in user_skills):
+                role_str = f" ({u.role_title})" if u.role_title else ""
+                output.append(
+                    f"- {display}{role_str}: declared skill in [{', '.join(user_skills)}]"
+                )
+
         return "\n".join(output)
 
     @tool

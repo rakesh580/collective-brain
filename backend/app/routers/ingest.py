@@ -135,6 +135,10 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str, 
 
     db.commit()
 
+    # Invalidate cached graph so new data is reflected
+    from app.services.memory_graph import invalidate_graph_cache
+    invalidate_graph_cache(room_id=room_id)
+
     return IngestionResponse(
         artifact_id=artifact_id,
         source_type=connector.source_type(),
@@ -479,6 +483,9 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
 
             vs.add_documents(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
             db.commit()
+
+            from app.services.memory_graph import invalidate_graph_cache
+            invalidate_graph_cache(room_id=room_id)
         finally:
             db.close()
 

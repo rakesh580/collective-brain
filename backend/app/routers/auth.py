@@ -167,6 +167,12 @@ async def update_profile(body: ProfileUpdateRequest, request: Request):
             db_user.avatar_url = body.avatar_url
         if body.linked_member_id is not None:
             db_user.linked_member_id = body.linked_member_id
+        if body.skills is not None:
+            db_user.skills = body.skills
+        if body.role_title is not None:
+            db_user.role_title = body.role_title
+        if body.bio is not None:
+            db_user.bio = body.bio
         db.commit()
         db.refresh(db_user)
         return UserResponse.model_validate(db_user)

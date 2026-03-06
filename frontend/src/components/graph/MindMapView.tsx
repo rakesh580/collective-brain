@@ -1,6 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../api/client";
 import type { GraphData, GraphEdge } from "../../types";
 
 interface LayoutNode {
@@ -20,10 +19,13 @@ interface LayoutEdge {
   label: string;
 }
 
-export default function MindMapView() {
+interface Props {
+  graphData: GraphData | null;
+  loading: boolean;
+}
+
+export default function MindMapView({ graphData, loading }: Props) {
   const navigate = useNavigate();
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<LayoutNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -31,13 +33,6 @@ export default function MindMapView() {
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
-
-  useEffect(() => {
-    api
-      .getFullGraph()
-      .then(setGraphData)
-      .finally(() => setLoading(false));
-  }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -113,7 +108,7 @@ export default function MindMapView() {
   // For each member, find their connected topics
   const memberTopicMap = new Map<string, GraphEdge[]>();
   for (const e of graphData.edges) {
-    if (e.type === "KNOWS_ABOUT" || e.type === "HAS_EXPERTISE") {
+    if (e.type === "KNOWS_ABOUT" || e.type === "HAS_EXPERTISE" || e.type === "DECLARED_SKILL") {
       const memberId = e.source;
       if (!memberTopicMap.has(memberId)) memberTopicMap.set(memberId, []);
       memberTopicMap.get(memberId)!.push(e);
@@ -173,7 +168,7 @@ export default function MindMapView() {
 
   // Members -> topics
   for (const e of graphData.edges) {
-    if (e.type === "KNOWS_ABOUT" || e.type === "HAS_EXPERTISE") {
+    if (e.type === "KNOWS_ABOUT" || e.type === "HAS_EXPERTISE" || e.type === "DECLARED_SKILL") {
       const src = nodeMap.get(e.source);
       const tgt = nodeMap.get(e.target);
       if (src && tgt) {
@@ -250,6 +245,10 @@ export default function MindMapView() {
             <div className="w-6 h-0.5 border-t-2 border-dashed border-amber-400" />
             <span className="text-xs text-slate-500">Collaborated</span>
           </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-0.5 border-t-2 border-dashed border-violet-400" />
+            <span className="text-xs text-slate-500">Declared Skill</span>
+          </div>
         </div>
       </div>
 
@@ -271,6 +270,8 @@ export default function MindMapView() {
                 ? 0.08
                 : e.type === "COLLABORATED_WITH"
                 ? 0.4
+                : e.type === "DECLARED_SKILL"
+                ? 0.5
                 : 0.25;
             return (
               <line
@@ -279,9 +280,9 @@ export default function MindMapView() {
                 y1={e.source.y}
                 x2={e.target.x}
                 y2={e.target.y}
-                stroke={e.type === "COLLABORATED_WITH" ? "#fbbf24" : "#94a3b8"}
-                strokeWidth={e.type === "COLLABORATED_WITH" ? 2 : 1.5}
-                strokeDasharray={e.type === "COLLABORATED_WITH" ? "6,3" : "none"}
+                stroke={e.type === "COLLABORATED_WITH" ? "#fbbf24" : e.type === "DECLARED_SKILL" ? "#c4b5fd" : "#94a3b8"}
+                strokeWidth={e.type === "COLLABORATED_WITH" ? 2 : e.type === "DECLARED_SKILL" ? 1.5 : 1.5}
+                strokeDasharray={e.type === "COLLABORATED_WITH" || e.type === "DECLARED_SKILL" ? "6,3" : "none"}
                 opacity={opacity}
               />
             );

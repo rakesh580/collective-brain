@@ -50,6 +50,9 @@ export interface User {
   is_active: boolean;
   created_at: string;
   auth_provider?: string | null;
+  skills: string[];
+  role_title: string | null;
+  bio: string | null;
 }
 
 export interface AuthResponse {
@@ -96,7 +99,7 @@ export interface GraphData {
 
 export interface GraphNode {
   id: string;
-  type: "member" | "topic" | "artifact" | "task";
+  type: string;
   label: string;
   properties: Record<string, unknown>;
   size: number;
@@ -320,6 +323,8 @@ export interface RoomMember {
   role: "admin" | "member";
   joined_at: string;
   is_online: boolean;
+  skills: string[];
+  role_title: string | null;
 }
 
 export interface RoomMessage {

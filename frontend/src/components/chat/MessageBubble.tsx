@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { ChatMessage } from "../../types";
 import SourceCard from "./SourceCard";
+import MarkdownContent from "./MarkdownContent";
 
 interface Props {
   message: ChatMessage;
@@ -28,9 +29,13 @@ export default function MessageBubble({ message }: Props) {
             {message.sender_name}
           </p>
         )}
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {message.content}
-        </p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {message.content}
+          </p>
+        ) : (
+          <MarkdownContent content={message.content} className="text-sm leading-relaxed" />
+        )}
         {message.sources && message.sources.length > 0 && (
           <div className="mt-3 space-y-1.5">
             <p className="text-xs font-medium text-slate-500">Sources:</p>

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON, Text
 from app.db.database import Base
 
 
@@ -20,3 +20,6 @@ class UserRecord(Base):
     auth_provider = Column(String, nullable=True, default="local")
     reset_code = Column(String, nullable=True)
     reset_code_expires = Column(DateTime, nullable=True)
+    skills = Column(JSON, default=list)
+    role_title = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)

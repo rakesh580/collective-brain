@@ -66,6 +66,22 @@ async def get_topic_graph(topic: str, request: Request, room_id: str | None = No
         db.close()
 
 
+@router.get("/stats")
+async def get_graph_stats(request: Request, room_id: str | None = None):
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        graph = MemoryGraph(db, room_id=room_id)
+        return graph.get_graph_stats()
+    except Exception as e:
+        logger.error("Graph stats failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to compute graph stats")
+    finally:
+        db.close()
+
+
 @router.get("/expertise-matrix")
 async def get_expertise_matrix(request: Request, room_id: str | None = None):
     from app.dependencies import get_current_user

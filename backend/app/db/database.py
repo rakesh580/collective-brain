@@ -182,6 +182,15 @@ def _run_migrations(engine):
             if "last_login" not in user_cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN last_login TIMESTAMP"))
                 logger.info("Migration: added users.last_login")
+            if "skills" not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '[]'"))
+                logger.info("Migration: added users.skills")
+            if "role_title" not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN role_title TEXT"))
+                logger.info("Migration: added users.role_title")
+            if "bio" not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
+                logger.info("Migration: added users.bio")
 
         # ChatRooms: is_public
         if "chat_rooms" in tables:

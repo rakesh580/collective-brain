@@ -1,9 +1,13 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../api/client";
 import type { GraphData, GraphNode, GraphEdge } from "../../types";
 
 let ForceGraph2D: any = null;
+
+interface Props {
+  graphData: GraphData | null;
+  loading: boolean;
+}
 
 const NODE_COLORS: Record<string, string> = {
   member: "#6366f1",
@@ -16,32 +20,35 @@ const EDGE_COLORS: Record<string, string> = {
   KNOWS_ABOUT: "#a5b4fc",
   HAS_EXPERTISE: "#86efac",
   COLLABORATED_WITH: "#fbbf24",
+  DECLARED_SKILL: "#c4b5fd",
 };
 
 const LEGEND_ITEMS = [
   { type: "member", color: "#6366f1", label: "Members" },
   { type: "topic", color: "#10b981", label: "Topics" },
+  { type: "artifact", color: "#f59e0b", label: "Artifacts" },
 ];
 
 const EDGE_LEGEND = [
   { type: "KNOWS_ABOUT", color: "#a5b4fc", label: "Knows About" },
   { type: "HAS_EXPERTISE", color: "#86efac", label: "Expertise" },
+  { type: "DECLARED_SKILL", color: "#c4b5fd", label: "Declared Skill" },
   { type: "COLLABORATED_WITH", color: "#fbbf24", label: "Collaborated" },
 ];
 
-export default function ForceGraphView() {
+export default function ForceGraphView({ graphData, loading }: Props) {
   const navigate = useNavigate();
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [graphReady, setGraphReady] = useState(false);
   const [search, setSearch] = useState("");
   const [showMembers, setShowMembers] = useState(true);
   const [showTopics, setShowTopics] = useState(true);
+  const [showArtifacts, setShowArtifacts] = useState(false);
   const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
   const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
   const [hoverNode, setHoverNode] = useState<any>(null);
   const fgRef = useRef<any>(null);
+  const hasAutoFit = useRef(false);
 
   useEffect(() => {
     import("react-force-graph-2d").then((mod) => {
@@ -50,9 +57,10 @@ export default function ForceGraphView() {
     });
   }, []);
 
+  // Auto-fit to content when graph data loads
   useEffect(() => {
-    api.getFullGraph().then(setGraphData).finally(() => setLoading(false));
-  }, []);
+    hasAutoFit.current = false;
+  }, [graphData]);
 
   const nodeEdgeMap = useMemo(() => {
     if (!graphData) return new Map<string, GraphEdge[]>();
@@ -71,6 +79,7 @@ export default function ForceGraphView() {
     const visibleTypes = new Set<string>();
     if (showMembers) visibleTypes.add("member");
     if (showTopics) visibleTypes.add("topic");
+    if (showArtifacts) visibleTypes.add("artifact");
     const visibleNodeIds = new Set(
       graphData.nodes.filter((n) => visibleTypes.has(n.type)).map((n) => n.id)
     );
@@ -80,7 +89,7 @@ export default function ForceGraphView() {
         (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)
       ),
     };
-  }, [graphData, showMembers, showTopics]);
+  }, [graphData, showMembers, showTopics, showArtifacts]);
 
   useEffect(() => {
     if (!filteredData || !search.trim()) {
@@ -175,6 +184,7 @@ export default function ForceGraphView() {
 
   const memberCount = graphData.nodes.filter((n) => n.type === "member").length;
   const topicCount = graphData.nodes.filter((n) => n.type === "topic").length;
+  const artifactCount = graphData.nodes.filter((n) => n.type === "artifact").length;
 
   const fgData = filteredData
     ? {
@@ -210,10 +220,15 @@ export default function ForceGraphView() {
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Filters</p>
             <div className="space-y-1">
               {LEGEND_ITEMS.map((item) => {
-                const isActive = item.type === "member" ? showMembers : showTopics;
-                const count = item.type === "member" ? memberCount : topicCount;
+                const isActive = item.type === "member" ? showMembers : item.type === "topic" ? showTopics : showArtifacts;
+                const count = item.type === "member" ? memberCount : item.type === "topic" ? topicCount : artifactCount;
+                const toggle = () => {
+                  if (item.type === "member") setShowMembers(!showMembers);
+                  else if (item.type === "topic") setShowTopics(!showTopics);
+                  else setShowArtifacts(!showArtifacts);
+                };
                 return (
-                  <button key={item.type} onClick={() => item.type === "member" ? setShowMembers(!showMembers) : setShowTopics(!showTopics)} className={`flex items-center gap-2 w-full px-2 py-1 rounded text-left transition-colors ${isActive ? "hover:bg-slate-50" : "opacity-40"}`}>
+                  <button key={item.type} onClick={toggle} className={`flex items-center gap-2 w-full px-2 py-1 rounded text-left transition-colors ${isActive ? "hover:bg-slate-50" : "opacity-40"}`}>
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color, opacity: isActive ? 1 : 0.3 }} />
                     <span className="text-xs text-slate-600 flex-1">{item.label}</span>
                     <span className="text-[10px] text-slate-400">{count}</span>
@@ -251,7 +266,8 @@ export default function ForceGraphView() {
             ref={fgRef}
             graphData={fgData}
             nodeColor={nodeColor}
-            nodeVal={(node: any) => Math.max((node.size || 1) + 1, 2)}
+            nodeVal={(node: any) => Math.max((node.size || 1) * 2 + 3, 5)}
+            warmupTicks={50}
             nodeLabel=""
             linkColor={linkColor}
             linkWidth={(link: any) => {
@@ -270,36 +286,63 @@ export default function ForceGraphView() {
             onNodeClick={handleNodeClick}
             onNodeHover={(node: any) => setHoverNode(node || null)}
             onBackgroundClick={clearHighlight}
+            onEngineStop={() => {
+              if (!hasAutoFit.current && fgRef.current) {
+                fgRef.current.zoomToFit(400, 80);
+                hasAutoFit.current = true;
+              }
+            }}
             cooldownTicks={100}
+            d3AlphaDecay={0.03}
+            d3VelocityDecay={0.3}
             nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-              const radius = Math.max((node.size || 2) + 2, 4);
+              const baseRadius = node.type === "member" ? 10 : node.type === "topic" ? 7 : 5;
+              const radius = Math.max(baseRadius, Math.min(20, (node.size || 1) * 2 + baseRadius));
               const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node.id);
               const isHovered = hoverNode?.id === node.id;
+
+              // Glow effect
               if (isHovered || (isHighlighted && highlightNodes.size > 0)) {
                 ctx.shadowColor = NODE_COLORS[node.type] || "#94a3b8";
-                ctx.shadowBlur = isHovered ? 15 : 8;
+                ctx.shadowBlur = isHovered ? 20 : 10;
               }
+
+              // Node circle
               ctx.fillStyle = nodeColor(node);
               ctx.beginPath();
               ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
               ctx.fill();
               ctx.shadowBlur = 0;
+
+              // White border for members
               if (node.type === "member") {
                 ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 1.5 / globalScale;
+                ctx.lineWidth = 2 / globalScale;
                 ctx.stroke();
               }
-              const fontSize = Math.min(14 / globalScale, 4);
-              if (globalScale > 0.4 || isHighlighted) {
-                ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
-                ctx.textAlign = "center";
+
+              // Always show labels — scale with zoom but ensure readability
+              const fontSize = Math.max(10 / globalScale, 3);
+              const isBold = isHighlighted && highlightNodes.size > 0;
+              ctx.font = `${isBold ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              ctx.fillStyle = isHighlighted ? "#1e293b" : "#94a3b8";
+              ctx.fillText(node.label, node.x, node.y + radius + 3 / globalScale);
+
+              // Initials inside member nodes
+              if (node.type === "member" && radius > 6) {
+                const initials = node.label.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                const innerFontSize = Math.max(radius * 0.7, 3);
+                ctx.font = `bold ${innerFontSize}px Inter, system-ui, sans-serif`;
                 ctx.textBaseline = "middle";
-                ctx.fillStyle = isHighlighted ? "#1e293b" : "#94a3b8";
-                ctx.fillText(node.label, node.x, node.y + radius + fontSize * 0.8);
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(initials, node.x, node.y);
               }
             }}
             nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
-              const radius = Math.max((node.size || 2) + 4, 6);
+              const baseRadius = node.type === "member" ? 10 : node.type === "topic" ? 7 : 5;
+              const radius = Math.max(baseRadius + 4, Math.min(24, (node.size || 1) * 2 + baseRadius + 4));
               ctx.fillStyle = color;
               ctx.beginPath();
               ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);

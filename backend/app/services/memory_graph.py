@@ -3,31 +3,62 @@
 Layers:
   Social   — Member nodes + COLLABORATED_WITH edges
   Artifact — ArtifactRecord nodes + CONTRIBUTED_TO edges (member → artifact)
-  Concept  — Topic nodes + KNOWS_ABOUT / COVERS_TOPIC / HAS_EXPERTISE edges
+  Concept  — Topic nodes + KNOWS_ABOUT / COVERS_TOPIC / HAS_EXPERTISE / DECLARED_SKILL edges
 
 Features:
+  - NetworkX in-memory graph with cache invalidation
   - Temporal decay on edges so recent contributions weigh more
-  - Redis caching for expensive graph builds (optional)
-  - "Stale expertise" pattern detection
+  - User-declared skills integrated as topic nodes
+  - PageRank, betweenness centrality, community detection
 """
 
 import math
+import time
 import logging
+import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+import networkx as nx
 from sqlalchemy.orm import Session
 
 from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
+from app.models.user import UserRecord
 from app.schemas.responses import GraphNode, GraphEdge
 
 logger = logging.getLogger("collective_brain.graph")
 
-# Half-life for temporal decay (days).  Contributions older than this
-# contribute ~50 % of a recent one's weight.
+# Half-life for temporal decay (days).
 _HALF_LIFE_DAYS = 180
+
+# Global cached graph with thread-safe access
+_graph_cache: dict[str | None, "CachedGraph"] = {}
+_cache_lock = threading.Lock()
+_CACHE_TTL_SECONDS = 300  # 5 minutes
+
+
+class CachedGraph:
+    """Holds a NetworkX graph and its build timestamp."""
+
+    def __init__(self, G: nx.Graph, built_at: float):
+        self.G = G
+        self.built_at = built_at
+
+    @property
+    def is_stale(self) -> bool:
+        return (time.time() - self.built_at) > _CACHE_TTL_SECONDS
+
+
+def invalidate_graph_cache(room_id: str | None = None):
+    """Call after ingestion or member changes to force a rebuild."""
+    with _cache_lock:
+        if room_id in _graph_cache:
+            del _graph_cache[room_id]
+        # Also invalidate the global (None) cache
+        if room_id is not None and None in _graph_cache:
+            del _graph_cache[None]
 
 
 def _temporal_decay(
@@ -37,22 +68,644 @@ def _temporal_decay(
 ) -> float:
     """Exponential decay weight: 1.0 for *now*, 0.5 at half-life, etc."""
     if timestamp is None:
-        return 0.5  # unknown date → neutral weight
+        return 0.5
     now = now or datetime.utcnow()
     age_days = max(0, (now - timestamp).total_seconds() / 86400)
-    return math.exp(-0.693 * age_days / half_life_days)  # ln(2) ≈ 0.693
+    return math.exp(-0.693 * age_days / half_life_days)
+
+
+def _contribution_type_weight(ctype: str | None) -> float:
+    """Assign weight by contribution type — code weighs more than chat."""
+    weights = {
+        "git_content": 0.5,
+        "slack_content": 0.3,
+        "discord_content": 0.3,
+        "markdown_content": 0.25,
+        "tasks_content": 0.15,
+        "document_content": 0.35,
+    }
+    return weights.get(ctype or "", 0.2)
 
 
 class MemoryGraph:
-    """Build and query a three-layer knowledge graph from the DB."""
+    """Build and query a three-layer knowledge graph backed by NetworkX."""
 
     def __init__(self, db: Session, *, redis=None, room_id: str | None = None):
         self.db = db
-        self._redis = redis  # optional RedisService for caching
+        self._redis = redis
         self.room_id = room_id
 
+    # ── NetworkX Graph Building ────────────────────────────────
+
+    def _get_or_build_nx_graph(self) -> nx.Graph:
+        """Return cached NetworkX graph or build a fresh one."""
+        with _cache_lock:
+            cached = _graph_cache.get(self.room_id)
+            if cached and not cached.is_stale:
+                return cached.G
+
+        # Build outside the lock to avoid blocking other requests
+        G = self._build_nx_graph()
+
+        with _cache_lock:
+            _graph_cache[self.room_id] = CachedGraph(G, time.time())
+        return G
+
+    def _build_nx_graph(self) -> nx.Graph:
+        """Build a full NetworkX graph from DB data."""
+        now = datetime.utcnow()
+        G = nx.Graph()
+
+        members = self._query_members()
+        artifacts = self._query_artifacts()
+        contribs = self._query_contributions()
+        users = self._query_users()
+
+        member_map = {m.id: m for m in members}
+        artifact_map = {a.id: a for a in artifacts}
+
+        # Map member → linked user for skill integration
+        member_user_map: dict[str, UserRecord] = {}
+        for u in users:
+            if u.linked_member_id and u.linked_member_id in member_map:
+                member_user_map[u.linked_member_id] = u
+
+        # ── Member nodes ──────────────────────────────────────
+        for m in members:
+            linked_user = member_user_map.get(m.id)
+            G.add_node(
+                m.id,
+                node_type="member",
+                label=m.name,
+                expertise_tags=m.expertise_tags or [],
+                total_contributions=m.total_contributions or 0,
+                declared_skills=(linked_user.skills if linked_user and linked_user.skills else []),
+                role_title=(linked_user.role_title if linked_user else None),
+            )
+
+        # ── Artifact nodes ────────────────────────────────────
+        for a in artifacts:
+            G.add_node(
+                f"artifact-{a.id}",
+                node_type="artifact",
+                label=a.title or a.id,
+                artifact_type=a.source_type or "unknown",
+                member_count=len(a.member_ids or []),
+            )
+
+        # ── CONTRIBUTED_TO edges ──────────────────────────────
+        artifact_contributors: dict[str, dict[str, float]] = defaultdict(
+            lambda: defaultdict(float)
+        )
+        for c in contribs:
+            if c.artifact_id and c.artifact_id in artifact_map:
+                weight = _temporal_decay(c.timestamp, now)
+                artifact_contributors[c.artifact_id][c.member_id] += weight
+
+        for art_id, member_weights in artifact_contributors.items():
+            for mid, weight in member_weights.items():
+                if mid in member_map:
+                    G.add_edge(
+                        mid,
+                        f"artifact-{art_id}",
+                        edge_type="CONTRIBUTED_TO",
+                        weight=round(weight, 2),
+                    )
+
+        # ── Topic nodes from contributions ────────────────────
+        topic_member_weights: dict[str, dict[str, float]] = defaultdict(
+            lambda: defaultdict(float)
+        )
+        topic_artifact: dict[str, set[str]] = defaultdict(set)
+
+        for c in contribs:
+            decay = _temporal_decay(c.timestamp, now)
+            type_weight = _contribution_type_weight(c.contribution_type)
+            for topic in c.topics or []:
+                topic_member_weights[topic][c.member_id] += decay * type_weight
+                if c.artifact_id:
+                    topic_artifact[topic].add(c.artifact_id)
+
+        seen_topics: set[str] = set()
+        for topic, mw in topic_member_weights.items():
+            seen_topics.add(topic)
+            tid = f"topic-{topic}"
+            G.add_node(tid, node_type="topic", label=topic, member_count=len(mw))
+
+            for mid, weight in mw.items():
+                if mid in member_map:
+                    G.add_edge(mid, tid, edge_type="KNOWS_ABOUT", weight=round(weight, 2))
+
+            for art_id in topic_artifact.get(topic, set()):
+                if art_id in artifact_map:
+                    G.add_edge(
+                        f"artifact-{art_id}", tid,
+                        edge_type="COVERS_TOPIC", weight=1.0,
+                    )
+
+        # ── Topics from expertise_tags ────────────────────────
+        expertise_topic_members: dict[str, list[str]] = defaultdict(list)
+        for m in members:
+            for tag in self._normalize_tags(m.expertise_tags or []):
+                if tag not in seen_topics:
+                    expertise_topic_members[tag].append(m.id)
+
+        for topic, member_ids in expertise_topic_members.items():
+            seen_topics.add(topic)
+            tid = f"topic-{topic}"
+            G.add_node(tid, node_type="topic", label=topic, member_count=len(member_ids))
+            for mid in member_ids:
+                G.add_edge(mid, tid, edge_type="HAS_EXPERTISE", weight=1.0)
+
+        # ── User-declared skills as topic nodes ───────────────
+        for mid, user in member_user_map.items():
+            if not user.skills:
+                continue
+            for skill in user.skills:
+                skill_lower = skill.strip().lower()
+                if not skill_lower:
+                    continue
+                tid = f"topic-{skill_lower}"
+                if tid not in G:
+                    seen_topics.add(skill_lower)
+                    G.add_node(tid, node_type="topic", label=skill_lower, member_count=1)
+                else:
+                    # Increment member count
+                    G.nodes[tid]["member_count"] = G.nodes[tid].get("member_count", 0) + 1
+
+                # Add DECLARED_SKILL edge if not already connected
+                if not G.has_edge(mid, tid):
+                    G.add_edge(mid, tid, edge_type="DECLARED_SKILL", weight=0.8)
+
+        # ── Users with skills but NO linked member ────────────
+        # Create virtual member nodes so their skills still appear
+        for u in users:
+            if u.linked_member_id or not u.skills:
+                continue
+            virtual_id = f"user-{u.id}"
+            G.add_node(
+                virtual_id,
+                node_type="member",
+                label=u.display_name or u.email,
+                expertise_tags=[],
+                total_contributions=0,
+                declared_skills=u.skills,
+                role_title=u.role_title,
+                is_virtual=True,
+            )
+            for skill in u.skills:
+                skill_lower = skill.strip().lower()
+                if not skill_lower:
+                    continue
+                tid = f"topic-{skill_lower}"
+                if tid not in G:
+                    G.add_node(tid, node_type="topic", label=skill_lower, member_count=1)
+                else:
+                    G.nodes[tid]["member_count"] = G.nodes[tid].get("member_count", 0) + 1
+                if not G.has_edge(virtual_id, tid):
+                    G.add_edge(virtual_id, tid, edge_type="DECLARED_SKILL", weight=0.8)
+
+        # ── COLLABORATED_WITH edges ───────────────────────────
+        collab_pairs = self._get_collaboration_pairs()
+        for (m1, m2), weight in collab_pairs.items():
+            if m1 in G and m2 in G:
+                G.add_edge(m1, m2, edge_type="COLLABORATED_WITH", weight=weight)
+
+        # ── Compute graph metrics ─────────────────────────────
+        self._compute_metrics(G)
+
+        return G
+
+    def _compute_metrics(self, G: nx.Graph):
+        """Add PageRank, betweenness centrality, and community labels."""
+        if G.number_of_nodes() == 0:
+            return
+
+        # PageRank
+        try:
+            pr = nx.pagerank(G, weight="weight", max_iter=100)
+            for node_id, score in pr.items():
+                G.nodes[node_id]["pagerank"] = round(score, 4)
+        except Exception:
+            logger.debug("PageRank computation failed, skipping")
+
+        # Betweenness centrality (only for member/topic nodes for performance)
+        try:
+            bc = nx.betweenness_centrality(G, weight="weight", k=min(50, G.number_of_nodes()))
+            for node_id, score in bc.items():
+                G.nodes[node_id]["betweenness"] = round(score, 4)
+        except Exception:
+            logger.debug("Betweenness centrality computation failed, skipping")
+
+        # Community detection via greedy modularity
+        try:
+            communities = nx.community.greedy_modularity_communities(G)
+            for idx, community in enumerate(communities):
+                for node_id in community:
+                    G.nodes[node_id]["community"] = idx
+        except Exception:
+            logger.debug("Community detection failed, skipping")
+
+    # ── Public API: Full Graph ─────────────────────────────────
+
+    def build_full_graph(self) -> tuple[list[GraphNode], list[GraphEdge]]:
+        """Build Social + Artifact + Concept layers from cached NetworkX graph."""
+        G = self._get_or_build_nx_graph()
+        nodes: list[GraphNode] = []
+        edges: list[GraphEdge] = []
+
+        for node_id, data in G.nodes(data=True):
+            ntype = data.get("node_type", "unknown")
+            props: dict = {}
+
+            if ntype == "member":
+                props["expertise_tags"] = data.get("expertise_tags", [])
+                props["total_contributions"] = data.get("total_contributions", 0)
+                declared = data.get("declared_skills", [])
+                if declared:
+                    props["declared_skills"] = declared
+                rt = data.get("role_title")
+                if rt:
+                    props["role_title"] = rt
+            elif ntype == "artifact":
+                props["artifact_type"] = data.get("artifact_type", "unknown")
+                props["member_count"] = data.get("member_count", 0)
+            elif ntype == "topic":
+                props["member_count"] = data.get("member_count", 0)
+
+            # Add graph metrics
+            if "pagerank" in data:
+                props["pagerank"] = data["pagerank"]
+            if "betweenness" in data:
+                props["betweenness"] = data["betweenness"]
+            if "community" in data:
+                props["community"] = data["community"]
+
+            size = self._compute_node_size(ntype, data)
+            nodes.append(
+                GraphNode(
+                    id=node_id,
+                    type=ntype,
+                    label=data.get("label", node_id),
+                    properties=props,
+                    size=size,
+                )
+            )
+
+        for u, v, data in G.edges(data=True):
+            etype = data.get("edge_type", "UNKNOWN")
+            weight = data.get("weight", 1.0)
+            label = self._edge_label(etype, weight)
+            edges.append(
+                GraphEdge(
+                    source=u, target=v, type=etype,
+                    weight=weight, label=label,
+                )
+            )
+
+        return nodes, edges
+
+    def _compute_node_size(self, ntype: str, data: dict) -> float:
+        """Size nodes using PageRank when available, fallback to simple heuristics."""
+        pr = data.get("pagerank", 0)
+        if pr > 0:
+            # Scale PageRank to a visible size range
+            if ntype == "member":
+                return max(2.0, pr * 500)
+            elif ntype == "topic":
+                return max(1.0, pr * 400)
+            else:
+                return max(1.0, pr * 300)
+
+        # Fallback
+        if ntype == "member":
+            return max(1.0, (data.get("total_contributions", 0)) * 0.5)
+        elif ntype == "topic":
+            return max(1.0, data.get("member_count", 0) * 2)
+        else:
+            return max(1.0, data.get("member_count", 0) * 1.5)
+
+    @staticmethod
+    def _edge_label(etype: str, weight: float) -> str:
+        if etype == "CONTRIBUTED_TO":
+            return f"weight {weight:.1f}"
+        elif etype == "KNOWS_ABOUT":
+            return f"score {weight:.1f}"
+        elif etype == "COLLABORATED_WITH":
+            return f"{int(weight)} shared artifacts"
+        elif etype == "HAS_EXPERTISE":
+            return "expertise"
+        elif etype == "DECLARED_SKILL":
+            return "declared"
+        elif etype == "COVERS_TOPIC":
+            return "covers"
+        return ""
+
+    # ── Expertise Matrix ───────────────────────────────────────
+
+    def get_expertise_matrix(self) -> dict:
+        """Return a member x topic matrix for heatmap visualization."""
+        G = self._get_or_build_nx_graph()
+
+        member_nodes = [
+            (nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "member"
+        ]
+        topic_nodes = [
+            (nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "topic"
+        ]
+
+        all_topics = sorted(d["label"] for _, d in topic_nodes)
+        topic_id_map = {d["label"]: nid for nid, d in topic_nodes}
+
+        member_data = []
+        for mid, mdata in member_nodes:
+            scores: dict[str, float] = {}
+            for topic_label in all_topics:
+                tid = topic_id_map.get(topic_label)
+                if tid and G.has_edge(mid, tid):
+                    edge_data = G.edges[mid, tid]
+                    etype = edge_data.get("edge_type", "")
+                    w = edge_data.get("weight", 0)
+                    if etype == "DECLARED_SKILL":
+                        scores[topic_label] = max(w, 0.3)
+                    else:
+                        scores[topic_label] = w
+                else:
+                    scores[topic_label] = 0.0
+            member_data.append({
+                "id": mid,
+                "name": mdata.get("label", mid),
+                "scores": scores,
+            })
+
+        # Normalize scores per topic
+        if member_data and all_topics:
+            for topic in all_topics:
+                max_score = max((m["scores"].get(topic, 0) for m in member_data), default=0)
+                if max_score > 0:
+                    for m in member_data:
+                        m["scores"][topic] = round(m["scores"].get(topic, 0) / max_score, 2)
+
+        return {"members": member_data, "topics": all_topics}
+
+    # ── Sub-graphs ─────────────────────────────────────────────
+
+    def get_member_subgraph(
+        self, member_id: str
+    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+        """1-hop neighbourhood around a member."""
+        G = self._get_or_build_nx_graph()
+        if member_id not in G:
+            return [], []
+
+        neighbors = set(G.neighbors(member_id))
+        neighbors.add(member_id)
+
+        sub = G.subgraph(neighbors)
+        return self._nx_to_response(sub)
+
+    def get_topic_subgraph(
+        self, topic: str
+    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+        """2-hop neighbourhood: topic → members → their artifacts."""
+        G = self._get_or_build_nx_graph()
+        topic_id = f"topic-{topic}"
+        if topic_id not in G:
+            return [], []
+
+        # 1st hop
+        hop1 = set(G.neighbors(topic_id))
+        hop1.add(topic_id)
+
+        # 2nd hop: for members found, include their artifact edges
+        hop2 = set(hop1)
+        for nid in hop1:
+            if G.nodes[nid].get("node_type") == "member":
+                for nbr in G.neighbors(nid):
+                    if G.nodes[nbr].get("node_type") == "artifact":
+                        hop2.add(nbr)
+
+        sub = G.subgraph(hop2)
+        return self._nx_to_response(sub)
+
+    def _nx_to_response(
+        self, G: nx.Graph
+    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+        """Convert a NetworkX (sub)graph to response format."""
+        nodes = []
+        edges = []
+        for nid, data in G.nodes(data=True):
+            ntype = data.get("node_type", "unknown")
+            props: dict = {}
+            if ntype == "member":
+                props["expertise_tags"] = data.get("expertise_tags", [])
+                props["total_contributions"] = data.get("total_contributions", 0)
+                declared = data.get("declared_skills", [])
+                if declared:
+                    props["declared_skills"] = declared
+            elif ntype == "artifact":
+                props["artifact_type"] = data.get("artifact_type", "unknown")
+                props["member_count"] = data.get("member_count", 0)
+            elif ntype == "topic":
+                props["member_count"] = data.get("member_count", 0)
+
+            if "pagerank" in data:
+                props["pagerank"] = data["pagerank"]
+            if "community" in data:
+                props["community"] = data["community"]
+
+            size = self._compute_node_size(ntype, data)
+            nodes.append(GraphNode(
+                id=nid, type=ntype, label=data.get("label", nid),
+                properties=props, size=size,
+            ))
+
+        for u, v, data in G.edges(data=True):
+            etype = data.get("edge_type", "UNKNOWN")
+            weight = data.get("weight", 1.0)
+            edges.append(GraphEdge(
+                source=u, target=v, type=etype,
+                weight=weight, label=self._edge_label(etype, weight),
+            ))
+
+        return nodes, edges
+
+    # ── Expertise Scores ───────────────────────────────────────
+
+    def compute_expertise_scores(self, member_id: str) -> dict[str, float]:
+        """Compute temporally-weighted expertise score per topic."""
+        G = self._get_or_build_nx_graph()
+        if member_id not in G:
+            return {}
+
+        topic_scores: dict[str, float] = {}
+        for nbr in G.neighbors(member_id):
+            if G.nodes[nbr].get("node_type") == "topic":
+                edge_data = G.edges[member_id, nbr]
+                weight = edge_data.get("weight", 0)
+                topic_label = G.nodes[nbr].get("label", nbr)
+                topic_scores[topic_label] = weight
+
+        if topic_scores:
+            max_score = max(topic_scores.values())
+            if max_score > 0:
+                topic_scores = {
+                    k: round(v / max_score, 2) for k, v in topic_scores.items()
+                }
+
+        return topic_scores
+
+    # ── Pattern Detection ──────────────────────────────────────
+
+    def detect_patterns(self) -> list[dict]:
+        """Identify collaboration patterns using graph algorithms."""
+        G = self._get_or_build_nx_graph()
+        patterns = []
+
+        member_nodes = {
+            nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "member"
+        }
+
+        # Bus factor: topics with only 1 member contributor
+        topic_nodes = {
+            nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "topic"
+        }
+        for tid, tdata in topic_nodes.items():
+            member_neighbors = [
+                n for n in G.neighbors(tid) if G.nodes[n].get("node_type") == "member"
+            ]
+            if len(member_neighbors) == 1:
+                mid = member_neighbors[0]
+                name = G.nodes[mid].get("label", mid)
+                topic = tdata.get("label", tid)
+                patterns.append({
+                    "type": "risk",
+                    "title": f"Bus factor risk: {topic}",
+                    "body": (
+                        f"Only {name} has contributed to '{topic}'. "
+                        "If they're unavailable, this area has no coverage."
+                    ),
+                    "related_members": [mid],
+                    "confidence": 0.8,
+                })
+
+        # Siloed members: no collaboration edges
+        for mid, mdata in member_nodes.items():
+            total = mdata.get("total_contributions", 0)
+            has_collab = any(
+                G.edges[mid, nbr].get("edge_type") == "COLLABORATED_WITH"
+                for nbr in G.neighbors(mid)
+                if G.has_edge(mid, nbr)
+            )
+            if not has_collab and total > 2:
+                patterns.append({
+                    "type": "pattern",
+                    "title": f"Siloed member: {mdata.get('label', mid)}",
+                    "body": (
+                        f"{mdata.get('label', mid)} has {int(total)} "
+                        "contributions but hasn't collaborated with others."
+                    ),
+                    "related_members": [mid],
+                    "confidence": 0.6,
+                })
+
+        # Strong collaboration pairs
+        for u, v, edata in G.edges(data=True):
+            if edata.get("edge_type") == "COLLABORATED_WITH" and edata.get("weight", 0) >= 5:
+                n1 = G.nodes[u].get("label", u)
+                n2 = G.nodes[v].get("label", v)
+                w = edata["weight"]
+                patterns.append({
+                    "type": "pattern",
+                    "title": f"Strong collaboration: {n1} & {n2}",
+                    "body": f"{n1} and {n2} have collaborated on {int(w)} artifacts together.",
+                    "related_members": [u, v],
+                    "confidence": 0.7,
+                })
+
+        # Key connector nodes (high betweenness centrality)
+        for mid, mdata in member_nodes.items():
+            bc = mdata.get("betweenness", 0)
+            if bc > 0.1:
+                patterns.append({
+                    "type": "pattern",
+                    "title": f"Key connector: {mdata.get('label', mid)}",
+                    "body": (
+                        f"{mdata.get('label', mid)} is a key connector in the knowledge network "
+                        f"(betweenness centrality: {bc:.2f}). They bridge different knowledge areas."
+                    ),
+                    "related_members": [mid],
+                    "confidence": 0.7,
+                })
+
+        # Stale expertise: members inactive >90 days
+        now = datetime.utcnow()
+        stale_threshold = now - timedelta(days=90)
+        contribs = self._query_contributions()
+        member_last_active: dict[str, datetime] = {}
+        for c in contribs:
+            if c.timestamp and c.member_id:
+                prev = member_last_active.get(c.member_id)
+                if prev is None or c.timestamp > prev:
+                    member_last_active[c.member_id] = c.timestamp
+
+        for mid, mdata in member_nodes.items():
+            last = member_last_active.get(mid)
+            total = mdata.get("total_contributions", 0)
+            if last and last < stale_threshold and total > 3:
+                days_ago = (now - last).days
+                patterns.append({
+                    "type": "risk",
+                    "title": f"Stale expertise: {mdata.get('label', mid)}",
+                    "body": (
+                        f"{mdata.get('label', mid)} hasn't contributed in {days_ago} days. "
+                        "Their knowledge may be outdated."
+                    ),
+                    "related_members": [mid],
+                    "confidence": 0.5,
+                })
+
+        return patterns
+
+    # ── Graph Analytics (new) ──────────────────────────────────
+
+    def get_graph_stats(self) -> dict:
+        """Return high-level graph statistics."""
+        G = self._get_or_build_nx_graph()
+        member_count = sum(1 for _, d in G.nodes(data=True) if d.get("node_type") == "member")
+        topic_count = sum(1 for _, d in G.nodes(data=True) if d.get("node_type") == "topic")
+        artifact_count = sum(1 for _, d in G.nodes(data=True) if d.get("node_type") == "artifact")
+
+        # Count communities
+        communities = set()
+        for _, d in G.nodes(data=True):
+            if "community" in d:
+                communities.add(d["community"])
+
+        # Top PageRank members
+        member_pr = sorted(
+            [(nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "member"],
+            key=lambda x: x[1].get("pagerank", 0),
+            reverse=True,
+        )[:5]
+
+        return {
+            "total_nodes": G.number_of_nodes(),
+            "total_edges": G.number_of_edges(),
+            "members": member_count,
+            "topics": topic_count,
+            "artifacts": artifact_count,
+            "communities": len(communities),
+            "density": round(nx.density(G), 4) if G.number_of_nodes() > 1 else 0,
+            "top_members": [
+                {"id": nid, "name": d.get("label", nid), "pagerank": d.get("pagerank", 0)}
+                for nid, d in member_pr
+            ],
+        }
+
+    # ── DB Query Helpers ───────────────────────────────────────
+
     def _query_members(self):
-        """Get members, optionally filtered by room contributions."""
         if self.room_id:
             member_ids = [
                 mid for (mid,) in
@@ -69,393 +722,23 @@ class MemoryGraph:
         return self.db.query(MemberRecord).all()
 
     def _query_artifacts(self):
-        """Get artifacts, optionally filtered by room."""
         query = self.db.query(ArtifactRecord)
         if self.room_id:
             query = query.filter(ArtifactRecord.room_id == self.room_id)
         return query.all()
 
     def _query_contributions(self):
-        """Get contributions, optionally filtered by room."""
         query = self.db.query(ContributionRecord)
         if self.room_id:
             query = query.filter(ContributionRecord.room_id == self.room_id)
         return query.all()
 
-    # ── Full Graph ────────────────────────────────────────────
-
-    def build_full_graph(self) -> tuple[list[GraphNode], list[GraphEdge]]:
-        """Build Social + Artifact + Concept layers."""
-        now = datetime.utcnow()
-        nodes: list[GraphNode] = []
-        edges: list[GraphEdge] = []
-
-        members = self._query_members()
-        artifacts = self._query_artifacts()
-        contribs = self._query_contributions()
-
-        member_map = {m.id: m for m in members}
-        artifact_map = {a.id: a for a in artifacts}
-
-        # ── Social Layer: Member nodes ────────────────────────
-        for m in members:
-            nodes.append(
-                GraphNode(
-                    id=m.id,
-                    type="member",
-                    label=m.name,
-                    properties={
-                        "expertise_tags": m.expertise_tags or [],
-                        "total_contributions": m.total_contributions or 0,
-                    },
-                    size=max(1.0, (m.total_contributions or 0) * 0.5),
-                )
-            )
-
-        # ── Artifact Layer: Artifact nodes ────────────────────
-        for a in artifacts:
-            nodes.append(
-                GraphNode(
-                    id=f"artifact-{a.id}",
-                    type="artifact",
-                    label=a.title or a.id,
-                    properties={
-                        "artifact_type": a.source_type or "unknown",
-                        "member_count": len(a.member_ids or []),
-                    },
-                    size=max(1.0, len(a.member_ids or []) * 1.5),
-                )
-            )
-
-        # ── CONTRIBUTED_TO edges (member → artifact) ──────────
-        # Build from ContributionRecords for temporal weighting
-        artifact_contributors: dict[str, dict[str, float]] = defaultdict(
-            lambda: defaultdict(float)
-        )
-        for c in contribs:
-            if c.artifact_id and c.artifact_id in artifact_map:
-                weight = _temporal_decay(c.timestamp, now)
-                artifact_contributors[c.artifact_id][c.member_id] += weight
-
-        for art_id, member_weights in artifact_contributors.items():
-            for mid, weight in member_weights.items():
-                if mid in member_map:
-                    edges.append(
-                        GraphEdge(
-                            source=mid,
-                            target=f"artifact-{art_id}",
-                            type="CONTRIBUTED_TO",
-                            weight=round(weight, 2),
-                            label=f"weight {weight:.1f}",
-                        )
-                    )
-
-        # ── Concept Layer: Topic nodes ────────────────────────
-        # Aggregate topics from contributions with temporal decay
-        topic_member_weights: dict[str, dict[str, float]] = defaultdict(
-            lambda: defaultdict(float)
-        )
-        topic_artifact: dict[str, set[str]] = defaultdict(set)
-
-        for c in contribs:
-            decay = _temporal_decay(c.timestamp, now)
-            type_weight = _contribution_type_weight(c.contribution_type)
-            for topic in c.topics or []:
-                topic_member_weights[topic][c.member_id] += decay * type_weight
-                if c.artifact_id:
-                    topic_artifact[topic].add(c.artifact_id)
-
-        seen_topics: set[str] = set()
-        for topic, member_weights in topic_member_weights.items():
-            seen_topics.add(topic)
-            nodes.append(
-                GraphNode(
-                    id=f"topic-{topic}",
-                    type="topic",
-                    label=topic,
-                    properties={"member_count": len(member_weights)},
-                    size=max(1.0, len(member_weights) * 2),
-                )
-            )
-            # KNOWS_ABOUT edges (member → topic) with temporal weight
-            for mid, weight in member_weights.items():
-                if mid in member_map:
-                    edges.append(
-                        GraphEdge(
-                            source=mid,
-                            target=f"topic-{topic}",
-                            type="KNOWS_ABOUT",
-                            weight=round(weight, 2),
-                            label=f"score {weight:.1f}",
-                        )
-                    )
-            # COVERS_TOPIC edges (artifact → topic)
-            for art_id in topic_artifact.get(topic, set()):
-                if art_id in artifact_map:
-                    edges.append(
-                        GraphEdge(
-                            source=f"artifact-{art_id}",
-                            target=f"topic-{topic}",
-                            type="COVERS_TOPIC",
-                            weight=1.0,
-                            label="covers",
-                        )
-                    )
-
-        # Topics from expertise_tags that don't appear in contributions
-        expertise_topic_members: dict[str, list[str]] = defaultdict(list)
-        for m in members:
-            for tag in self._normalize_tags(m.expertise_tags or []):
-                if tag not in seen_topics:
-                    expertise_topic_members[tag].append(m.id)
-
-        for topic, member_ids in expertise_topic_members.items():
-            seen_topics.add(topic)
-            nodes.append(
-                GraphNode(
-                    id=f"topic-{topic}",
-                    type="topic",
-                    label=topic,
-                    properties={"member_count": len(member_ids)},
-                    size=max(1.0, len(member_ids) * 2),
-                )
-            )
-            for mid in member_ids:
-                edges.append(
-                    GraphEdge(
-                        source=mid,
-                        target=f"topic-{topic}",
-                        type="HAS_EXPERTISE",
-                        weight=1,
-                        label="expertise",
-                    )
-                )
-
-        # ── COLLABORATED_WITH edges (member ↔ member) ─────────
-        collab_pairs = self._get_collaboration_pairs()
-        for (m1, m2), weight in collab_pairs.items():
-            edges.append(
-                GraphEdge(
-                    source=m1,
-                    target=m2,
-                    type="COLLABORATED_WITH",
-                    weight=weight,
-                    label=f"{weight} shared artifacts",
-                )
-            )
-
-        return nodes, edges
-
-    # ── Expertise Matrix ──────────────────────────────────────
-
-    def get_expertise_matrix(self) -> dict:
-        """Return a member × topic matrix for heatmap visualization."""
-        members = self._query_members()
-        topic_members = self._get_topic_member_map()
-
-        all_topics: set[str] = set(topic_members.keys())
-        for m in members:
-            for tag in self._normalize_tags(m.expertise_tags or []):
-                all_topics.add(tag)
-
-        sorted_topics = sorted(all_topics)
-        member_data = []
-        for m in members:
-            scores: dict[str, float] = {}
-            expertise_set = set(self._normalize_tags(m.expertise_tags or []))
-            expertise_scores = self.compute_expertise_scores(m.id)
-
-            for topic in sorted_topics:
-                contrib_score = expertise_scores.get(topic, 0.0)
-                has_tag = 1.0 if topic in expertise_set else 0.0
-                scores[topic] = max(contrib_score, has_tag * 0.3)
-
-            member_data.append({
-                "id": m.id,
-                "name": m.name,
-                "scores": scores,
-            })
-
-        return {
-            "members": member_data,
-            "topics": sorted_topics,
-        }
-
-    # ── Sub-graphs ────────────────────────────────────────────
-
-    def get_member_subgraph(
-        self, member_id: str
-    ) -> tuple[list[GraphNode], list[GraphEdge]]:
-        """1-hop neighbourhood around a member."""
-        full_nodes, full_edges = self.build_full_graph()
-        connected_ids = {member_id}
-        relevant_edges = []
-        for e in full_edges:
-            if e.source == member_id or e.target == member_id:
-                relevant_edges.append(e)
-                connected_ids.add(e.source)
-                connected_ids.add(e.target)
-
-        relevant_nodes = [n for n in full_nodes if n.id in connected_ids]
-        return relevant_nodes, relevant_edges
-
-    def get_topic_subgraph(
-        self, topic: str
-    ) -> tuple[list[GraphNode], list[GraphEdge]]:
-        """2-hop neighbourhood: topic → members → their artifacts."""
-        full_nodes, full_edges = self.build_full_graph()
-        node_map = {n.id: n for n in full_nodes}
-
-        topic_id = f"topic-{topic}"
-        if topic_id not in node_map:
-            return [], []
-
-        # 1st hop: edges touching the topic
-        hop1_ids = {topic_id}
-        hop1_edges = []
-        for e in full_edges:
-            if e.source == topic_id or e.target == topic_id:
-                hop1_edges.append(e)
-                hop1_ids.add(e.source)
-                hop1_ids.add(e.target)
-
-        # 2nd hop: for each member found, include their artifact edges
-        hop2_ids = set(hop1_ids)
-        hop2_edges = list(hop1_edges)
-        member_ids = {nid for nid in hop1_ids if nid in node_map and node_map[nid].type == "member"}
-        for e in full_edges:
-            if e in hop1_edges:
-                continue
-            if e.type == "CONTRIBUTED_TO" and e.source in member_ids:
-                hop2_edges.append(e)
-                hop2_ids.add(e.target)
-
-        relevant_nodes = [n for n in full_nodes if n.id in hop2_ids]
-        return relevant_nodes, hop2_edges
-
-    # ── Expertise Scores ──────────────────────────────────────
-
-    def compute_expertise_scores(self, member_id: str) -> dict[str, float]:
-        """Compute temporally-weighted expertise score per topic."""
-        now = datetime.utcnow()
-        query = (
-            self.db.query(ContributionRecord)
-            .filter(ContributionRecord.member_id == member_id)
-        )
-        if self.room_id:
-            query = query.filter(ContributionRecord.room_id == self.room_id)
-        contribs = query.all()
-
-        topic_scores: dict[str, float] = defaultdict(float)
-        for c in contribs:
-            decay = _temporal_decay(c.timestamp, now)
-            type_w = _contribution_type_weight(c.contribution_type)
-            for topic in c.topics or []:
-                topic_scores[topic] += decay * type_w
-
-        if topic_scores:
-            max_score = max(topic_scores.values())
-            if max_score > 0:
-                topic_scores = {
-                    k: round(v / max_score, 2) for k, v in topic_scores.items()
-                }
-
-        return dict(topic_scores)
-
-    # ── Pattern Detection ─────────────────────────────────────
-
-    def detect_patterns(self) -> list[dict]:
-        """Identify collaboration patterns including stale expertise."""
-        now = datetime.utcnow()
-        patterns = []
-
-        # Prefetch all members once to avoid N+1 queries
-        members = self._query_members()
-        member_map = {m.id: m for m in members}
-
-        # Bus factor: topics with only 1 contributor
-        topic_members = self._get_topic_member_map()
-        for topic, member_counts in topic_members.items():
-            if len(member_counts) == 1:
-                member_id = list(member_counts.keys())[0]
-                member = member_map.get(member_id)
-                name = member.name if member else member_id
-                patterns.append({
-                    "type": "risk",
-                    "title": f"Bus factor risk: {topic}",
-                    "body": (
-                        f"Only {name} has contributed to '{topic}'. "
-                        "If they're unavailable, this area has no coverage."
-                    ),
-                    "related_members": [member_id],
-                    "confidence": 0.8,
-                })
-
-        # Siloed members: no shared artifacts despite contributions
-        collab_pairs = self._get_collaboration_pairs()
-        for m in members:
-            collab_count = sum(
-                w for (m1, m2), w in collab_pairs.items() if m.id in (m1, m2)
-            )
-            if collab_count == 0 and (m.total_contributions or 0) > 2:
-                patterns.append({
-                    "type": "pattern",
-                    "title": f"Siloed member: {m.name}",
-                    "body": (
-                        f"{m.name} has {int(m.total_contributions or 0)} "
-                        "contributions but hasn't collaborated with others "
-                        "on shared artifacts."
-                    ),
-                    "related_members": [m.id],
-                    "confidence": 0.6,
-                })
-
-        # Strong collaboration pairs
-        for (m1, m2), weight in collab_pairs.items():
-            if weight >= 5:
-                m1_rec = member_map.get(m1)
-                m2_rec = member_map.get(m2)
-                n1 = m1_rec.name if m1_rec else m1
-                n2 = m2_rec.name if m2_rec else m2
-                patterns.append({
-                    "type": "pattern",
-                    "title": f"Strong collaboration: {n1} & {n2}",
-                    "body": (
-                        f"{n1} and {n2} have collaborated on "
-                        f"{weight} artifacts together."
-                    ),
-                    "related_members": [m1, m2],
-                    "confidence": 0.7,
-                })
-
-        # Stale expertise: members inactive >90 days on a topic
-        stale_threshold = now - timedelta(days=90)
-        contribs = self._query_contributions()
-        member_last_active: dict[str, datetime] = {}
-        for c in contribs:
-            if c.timestamp and c.member_id:
-                prev = member_last_active.get(c.member_id)
-                if prev is None or c.timestamp > prev:
-                    member_last_active[c.member_id] = c.timestamp
-
-        for m in members:
-            last = member_last_active.get(m.id)
-            if last and last < stale_threshold and (m.total_contributions or 0) > 3:
-                days_ago = (now - last).days
-                patterns.append({
-                    "type": "risk",
-                    "title": f"Stale expertise: {m.name}",
-                    "body": (
-                        f"{m.name} hasn't contributed in {days_ago} days. "
-                        "Their knowledge may be outdated."
-                    ),
-                    "related_members": [m.id],
-                    "confidence": 0.5,
-                })
-
-        return patterns
-
-    # ── Helpers ────────────────────────────────────────────────
+    def _query_users(self) -> list:
+        """Get all users with skills or linked members."""
+        try:
+            return self.db.query(UserRecord).all()
+        except Exception:
+            return []
 
     @staticmethod
     def _normalize_tags(tags: list[str]) -> list[str]:
@@ -487,16 +770,3 @@ class MemoryGraph:
                     pair = tuple(sorted([member_ids[i], member_ids[j]]))
                     pairs[pair] += 1
         return pairs
-
-
-def _contribution_type_weight(ctype: str | None) -> float:
-    """Assign weight by contribution type — code weighs more than chat."""
-    weights = {
-        "git_content": 0.5,
-        "slack_content": 0.3,
-        "discord_content": 0.3,
-        "markdown_content": 0.25,
-        "tasks_content": 0.15,
-        "document_content": 0.35,
-    }
-    return weights.get(ctype or "", 0.2)

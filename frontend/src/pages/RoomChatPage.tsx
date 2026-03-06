@@ -24,6 +24,7 @@ import {
   Clock,
 } from "lucide-react";
 import SourceUploader from "../components/ingest/SourceUploader";
+import MarkdownContent from "../components/chat/MarkdownContent";
 import type { IngestionJob } from "../types";
 
 const avatarColors = [
@@ -522,7 +523,11 @@ function MessageItem({
                 : "bg-slate-100 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-tl-md"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          {isAI ? (
+            <MarkdownContent content={message.content} className="break-words" />
+          ) : (
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          )}
         </div>
 
         {/* AI Sources */}
@@ -720,6 +725,21 @@ function MemberRow({
             <span className="text-[9px] text-slate-400">(you)</span>
           )}
         </div>
+        {member.role_title && (
+          <p className="text-[9px] text-slate-400 truncate">{member.role_title}</p>
+        )}
+        {member.skills && member.skills.length > 0 && (
+          <div className="flex flex-wrap gap-0.5 mt-0.5">
+            {member.skills.slice(0, 3).map((s) => (
+              <span key={s} className="text-[8px] px-1.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full">
+                {s}
+              </span>
+            ))}
+            {member.skills.length > 3 && (
+              <span className="text-[8px] text-slate-400">+{member.skills.length - 3}</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

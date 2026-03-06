@@ -63,8 +63,13 @@ def init_redis_from_app(app):
 def _get_user_info(db, user_id: str) -> dict:
     u = db.query(UserRecord).filter(UserRecord.id == user_id).first()
     if u:
-        return {"username": u.username, "display_name": u.display_name}
-    return {"username": "unknown", "display_name": None}
+        return {
+            "username": u.username,
+            "display_name": u.display_name,
+            "skills": u.skills or [],
+            "role_title": u.role_title,
+        }
+    return {"username": "unknown", "display_name": None, "skills": [], "role_title": None}
 
 
 def _msg_to_dict(msg: ChatRoomMessage) -> dict:
@@ -440,6 +445,8 @@ async def get_room(room_id: str, request: Request):
                 "role": m.role,
                 "joined_at": m.joined_at.isoformat() if m.joined_at else None,
                 "is_online": m.user_id in online_set,
+                "skills": u_info.get("skills", []),
+                "role_title": u_info.get("role_title"),
             })
 
         # Get messages (last 100)
@@ -803,9 +810,28 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             f"{m.sender_name}: {m.content}" for m in recent_msgs
         )
 
+        # Build room member skills context
+        room_member_users = (
+            db.query(UserRecord)
+            .join(ChatRoomMember, ChatRoomMember.user_id == UserRecord.id)
+            .filter(ChatRoomMember.room_id == room_id)
+            .all()
+        )
+        skills_lines = []
+        for u in room_member_users:
+            skills = u.skills or []
+            if skills or u.role_title:
+                name = u.display_name or u.username
+                role = f" ({u.role_title})" if u.role_title else ""
+                skill_str = ", ".join(skills) if skills else "none declared"
+                skills_lines.append(f"- {name}{role}: skills=[{skill_str}]")
+        skills_context = "\n".join(skills_lines) if skills_lines else ""
+
         # Enrich question with room context
+        skills_block = f"Room member skills:\n{skills_context}\n\n" if skills_context else ""
         enriched_question = (
             f"[Group chat context - Room: {room.name}]\n"
+            f"{skills_block}"
             f"Recent conversation:\n{room_context}\n\n"
             f"{user.display_name or user.username} asks: {body.question}"
         )

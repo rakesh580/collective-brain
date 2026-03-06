@@ -129,6 +129,9 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     auth_provider: str | None = None
+    skills: list[str] = []
+    role_title: str | None = None
+    bio: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -188,6 +191,8 @@ class RoomMemberResponse(BaseModel):
     role: str
     joined_at: datetime
     is_online: bool = False
+    skills: list[str] = []
+    role_title: str | None = None
 
 
 class RoomMessageResponse(BaseModel):

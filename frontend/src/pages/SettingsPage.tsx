@@ -1,15 +1,60 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { useAuth } from "../hooks/useAuth";
 import type { HealthStatus, ArtifactListResponse } from "../types";
 import {
-  Activity, Server, Brain, Database, Cpu, Trash2, Settings, Info,
+  Activity, Server, Brain, Database, Cpu, Trash2, Settings, Info, User, X, Plus, Save,
 } from "lucide-react";
 
 export default function SettingsPage() {
+  const { user, updateUser } = useAuth();
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Profile state
+  const [roleTitle, setRoleTitle] = useState(user?.role_title || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [skills, setSkills] = useState<string[]>(user?.skills || []);
+  const [newSkill, setNewSkill] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      setRoleTitle(user.role_title || "");
+      setBio(user.bio || "");
+      setSkills(user.skills || []);
+    }
+  }, [user]);
+
+  const handleAddSkill = () => {
+    const s = newSkill.trim();
+    if (s && !skills.includes(s)) {
+      setSkills([...skills, s]);
+    }
+    setNewSkill("");
+  };
+
+  const handleRemoveSkill = (skill: string) => {
+    setSkills(skills.filter((s) => s !== skill));
+  };
+
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileMsg(null);
+    try {
+      const updated = await api.authUpdateProfile({ role_title: roleTitle || null, bio: bio || null, skills });
+      updateUser(updated);
+      setProfileMsg("Profile saved!");
+      setTimeout(() => setProfileMsg(null), 3000);
+    } catch (err) {
+      setProfileMsg(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -55,6 +100,99 @@ export default function SettingsPage() {
         <Settings size={20} className="text-slate-500" />
         <h2 className="text-lg font-bold text-slate-800 dark:text-white">Settings</h2>
       </div>
+
+      {/* My Profile */}
+      {user && (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <User size={16} className="text-indigo-500" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">My Profile</h3>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Role / Title</label>
+              <input
+                type="text"
+                value={roleTitle}
+                onChange={(e) => setRoleTitle(e.target.value)}
+                placeholder="e.g. Senior Backend Engineer"
+                maxLength={200}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Bio</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Tell your team about yourself..."
+                maxLength={1000}
+                rows={3}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
+              />
+              <p className="text-xs text-slate-400 mt-0.5">{bio.length}/1000</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Skills</label>
+              {skills.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 rounded-full"
+                    >
+                      {skill}
+                      <button
+                        onClick={() => handleRemoveSkill(skill)}
+                        className="hover:text-red-500 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newSkill}
+                  onChange={(e) => setNewSkill(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSkill(); } }}
+                  placeholder="Add a skill..."
+                  className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+                <button
+                  onClick={handleAddSkill}
+                  disabled={!newSkill.trim()}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-40 transition-colors"
+                >
+                  <Plus size={14} />
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleSaveProfile}
+                disabled={profileSaving}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                <Save size={14} />
+                {profileSaving ? "Saving..." : "Save Profile"}
+              </button>
+              {profileMsg && (
+                <span className={`text-sm ${profileMsg.includes("saved") ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {profileMsg}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* System Status */}
       {health && (

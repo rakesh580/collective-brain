@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ForceGraphView from "../components/graph/ForceGraphView";
 import HeatmapView from "../components/graph/HeatmapView";
 import MindMapView from "../components/graph/MindMapView";
 import { Network, GitBranch, Grid3x3 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { api } from "../api/client";
+import type { GraphData } from "../types";
 
 type ViewType = "force" | "mindmap" | "heatmap";
 
@@ -15,6 +17,12 @@ const VIEWS: { id: ViewType; label: string; description: string; icon: LucideIco
 
 export default function GraphPage() {
   const [activeView, setActiveView] = useState<ViewType>("force");
+  const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getFullGraph().then(setGraphData).finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="flex flex-col h-screen">
@@ -45,8 +53,8 @@ export default function GraphPage() {
 
       {/* View content */}
       <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900">
-        {activeView === "force" && <ForceGraphView />}
-        {activeView === "mindmap" && <MindMapView />}
+        {activeView === "force" && <ForceGraphView graphData={graphData} loading={loading} />}
+        {activeView === "mindmap" && <MindMapView graphData={graphData} loading={loading} />}
         {activeView === "heatmap" && <HeatmapView />}
       </div>
     </div>
