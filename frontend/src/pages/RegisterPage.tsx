@@ -1,17 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GoogleLogin, useGoogleOAuth } from "@react-oauth/google";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
+import { useGoogleAuthEnabled } from "../main";
 import { LogoIcon } from "../components/layout/Logo";
 import { UserPlus } from "lucide-react";
 
 function SafeGoogleLogin({ onSuccess, onError }: { onSuccess: (res: any) => void; onError: () => void }) {
-  try {
-    const ctx = useGoogleOAuth();
-    if (!ctx?.clientId) return null;
-  } catch {
-    return null;
-  }
+  const enabled = useGoogleAuthEnabled();
+  if (!enabled) return null;
   return (
     <>
       <div className="flex items-center gap-3 my-4">
