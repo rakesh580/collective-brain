@@ -192,13 +192,39 @@ def _sanitize_filename(name: str) -> str:
     return os.path.basename(name.replace("\\", "/"))
 
 
+def _get_allowed_base_dirs() -> list[str]:
+    """Return the list of directories that local path ingestion is restricted to."""
+    # Allow the working directory and /data (HF Spaces persistent volume)
+    base_dirs = [os.path.realpath(os.getcwd())]
+    if os.path.isdir("/data"):
+        base_dirs.append(os.path.realpath("/data"))
+    # Allow additional dirs via CB_ALLOWED_INGEST_DIRS (comma-separated)
+    extra = os.environ.get("CB_ALLOWED_INGEST_DIRS", "")
+    for d in extra.split(","):
+        d = d.strip()
+        if d and os.path.isdir(d):
+            base_dirs.append(os.path.realpath(d))
+    return base_dirs
+
+
 def _validate_local_path(path: str) -> str:
-    """Resolve and validate a local filesystem path to prevent traversal attacks."""
+    """Resolve and validate a local filesystem path.
+
+    Prevents path traversal AND restricts to an allow-listed set of base
+    directories (working dir, /data, or CB_ALLOWED_INGEST_DIRS).
+    """
     resolved = os.path.realpath(path)
     if ".." in os.path.normpath(path).split(os.sep):
         raise HTTPException(status_code=400, detail="Path traversal is not allowed")
     if not os.path.exists(resolved):
         raise HTTPException(status_code=400, detail=f"Path does not exist: {path}")
+    # Ensure the resolved path is within an allowed base directory
+    allowed = _get_allowed_base_dirs()
+    if not any(resolved == base or resolved.startswith(base + os.sep) for base in allowed):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: path is outside allowed directories",
+        )
     return resolved
 
 

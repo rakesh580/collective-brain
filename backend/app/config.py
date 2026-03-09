@@ -25,8 +25,9 @@ class Settings(BaseSettings):
     agent_mode: Literal["langgraph", "rag"] = "rag"
     agent_max_iterations: int = 10
 
-    # JWT Auth
-    jwt_secret: str = "dev-secret-change-in-production"
+    # JWT Auth — no default; must be set via CB_JWT_SECRET env var.
+    # A random secret is generated at startup if unset (see main.py lifespan).
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30  # 30 minutes
 

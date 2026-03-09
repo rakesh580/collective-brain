@@ -25,7 +25,6 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +38,7 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await api.authForgotPassword(email);
-      // In development, the code is returned in the response
-      setResetCode(res.code || "");
+      await api.authForgotPassword(email);
       setStep("code");
     } catch (err) {
       setError(parseApiError(err));
@@ -149,12 +146,9 @@ export default function ForgotPasswordPage() {
           {/* Step 2: Enter code + new password */}
           {step === "code" && (
             <form onSubmit={handleCodeSubmit}>
-              {resetCode && (
-                <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm rounded-lg p-3 mb-4">
-                  <p className="font-medium mb-1">Development mode</p>
-                  <p>Your verification code is: <span className="font-mono font-bold text-white">{resetCode}</span></p>
-                </div>
-              )}
+              <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm rounded-lg p-3 mb-4">
+                <p>Check your email for a 6-digit verification code.</p>
+              </div>
 
               <div className="mb-3">
                 <label className="block text-sm font-medium text-slate-300 mb-1">Verification Code</label>

@@ -117,8 +117,8 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
 async def forgot_password(body: ForgotPasswordRequest, request: Request):
     """Generate a 6-digit reset code for password recovery.
 
-    In production, this would send an email. For now, the code is returned
-    in the response so the frontend can proceed.
+    The code is stored server-side only. In development, it is logged at
+    DEBUG level. In production, integrate an email provider to deliver it.
     """
     await _rate_limit(request, "auth:forgot", max_requests=5, window=60)
     db = _get_db()
@@ -126,10 +126,14 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
         auth_svc = AuthService(request.app.state.settings)
         try:
             code = auth_svc.generate_reset_code(db, body.email)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        logger.info("Password reset code generated for %s", body.email)
-        return {"message": "Verification code sent to your email", "code": code}
+            # DEV ONLY: log the code so developers can test the flow.
+            # Remove this line or gate behind a CB_DEBUG flag before production.
+            logger.debug("DEV reset code for %s: %s", body.email, code)
+        except ValueError:
+            # Swallow error — return the same response whether the email
+            # exists or not, to prevent user enumeration.
+            pass
+        return {"message": "If an account exists with that email, a verification code has been sent."}
     finally:
         db.close()
 

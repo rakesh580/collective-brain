@@ -81,11 +81,15 @@ async def lifespan(app: FastAPI):
     redis_ok = await redis.ping()
     db_type = "PostgreSQL" if settings.is_postgres else "SQLite"
 
-    # Warn if using default JWT secret in a non-local environment
-    if settings.jwt_secret == "dev-secret-change-in-production":
+    # Auto-generate a random JWT secret if none was provided.
+    # This is safe for single-worker or single-container deployments.
+    # For multi-worker/replica setups, set CB_JWT_SECRET explicitly.
+    if not settings.jwt_secret:
+        import secrets as _secrets
+        settings.jwt_secret = _secrets.token_urlsafe(64)
         logger.warning(
-            "JWT_SECRET is still the default dev value! "
-            "Set CB_JWT_SECRET to a strong random string before deploying to production."
+            "CB_JWT_SECRET is not set — generated a random secret for this process. "
+            "JWTs will be invalidated on restart. Set CB_JWT_SECRET for persistence."
         )
 
     logger.info(
@@ -181,10 +185,13 @@ if _static_dir.is_dir():
     # Serve asset files (JS, CSS, images)
     app.mount("/assets", StaticFiles(directory=_static_dir / "assets"), name="assets")
 
+    _static_dir_resolved = _static_dir.resolve()
+
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """SPA fallback — serve index.html for all non-API routes."""
-        file_path = _static_dir / full_path
-        if file_path.is_file():
+        file_path = (_static_dir / full_path).resolve()
+        # Prevent path traversal — only serve files within the static dir
+        if file_path.is_relative_to(_static_dir_resolved) and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(_static_dir / "index.html")
