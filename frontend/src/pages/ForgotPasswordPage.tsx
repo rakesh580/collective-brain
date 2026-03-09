@@ -33,12 +33,15 @@ export default function ForgotPasswordPage() {
   const inputClass =
     "w-full bg-slate-800/50 border border-slate-600/50 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
 
+  const [devCode, setDevCode] = useState<string | null>(null);
+
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await api.authForgotPassword(email);
+      const res = await api.authForgotPassword(email);
+      if (res.code) setDevCode(res.code);
       setStep("code");
     } catch (err) {
       setError(parseApiError(err));
@@ -147,7 +150,11 @@ export default function ForgotPasswordPage() {
           {step === "code" && (
             <form onSubmit={handleCodeSubmit}>
               <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm rounded-lg p-3 mb-4">
-                <p>Check your email for a 6-digit verification code.</p>
+                {devCode ? (
+                  <p>Demo mode — your verification code is: <span className="font-mono font-bold text-white">{devCode}</span></p>
+                ) : (
+                  <p>Check your email for a 6-digit verification code.</p>
+                )}
               </div>
 
               <div className="mb-3">

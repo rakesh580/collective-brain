@@ -86,11 +86,28 @@ async def lifespan(app: FastAPI):
     # For multi-worker/replica setups, set CB_JWT_SECRET explicitly.
     if not settings.jwt_secret:
         import secrets as _secrets
-        settings.jwt_secret = _secrets.token_urlsafe(64)
-        logger.warning(
-            "CB_JWT_SECRET is not set — generated a random secret for this process. "
-            "JWTs will be invalidated on restart. Set CB_JWT_SECRET for persistence."
-        )
+        # Persist JWT secret to /data so tokens survive container restarts
+        _jwt_path = Path("/data/.cb_jwt_secret")
+        if _jwt_path.exists():
+            settings.jwt_secret = _jwt_path.read_text().strip()
+            logger.info("Loaded JWT secret from %s", _jwt_path)
+        else:
+            settings.jwt_secret = _secrets.token_urlsafe(64)
+            try:
+                _jwt_path.write_text(settings.jwt_secret)
+                logger.info("Generated and persisted JWT secret to %s", _jwt_path)
+            except OSError:
+                logger.warning(
+                    "CB_JWT_SECRET is not set and could not persist to %s — "
+                    "JWTs will be invalidated on restart.", _jwt_path
+                )
+
+    # Eager-load the embedding model to avoid 5-10s latency on first query
+    try:
+        _ = app.state.embedding_service.model
+        logger.info("Embedding model pre-loaded successfully")
+    except Exception as e:
+        logger.warning("Failed to pre-load embedding model: %s", e)
 
     logger.info(
         "Collective Brain started (DB: %s, Redis: %s, LLM: %s/%s, Agent: %s)",
@@ -131,10 +148,16 @@ _extra_origin = os.environ.get("CB_CORS_ORIGIN")
 if _extra_origin:
     _cors_origins.append(_extra_origin)
 
+# On HuggingFace Spaces the app is served inside an iframe from
+# huggingface.co.  SPACE_ID is auto-set by the HF runtime.
+_on_hf_spaces = bool(os.environ.get("SPACE_ID"))
+if _on_hf_spaces:
+    _cors_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_credentials=True,
+    allow_credentials=not _on_hf_spaces,  # credentials not allowed with wildcard origin
     allow_methods=["*"],
     allow_headers=["*"],
 )

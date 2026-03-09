@@ -47,9 +47,12 @@ ENV CB_CHROMA_PERSIST_DIR="/data/chroma_db"
 # CB_MISTRAL_API_KEY falls back to HF_TOKEN (auto-set on HF Spaces)
 ENV CB_LLM_PROVIDER="mistral"
 ENV CB_MISTRAL_MODEL="Qwen/Qwen2.5-72B-Instruct"
-ENV CB_AGENT_MODE="langgraph"
+ENV CB_AGENT_MODE="rag"
+ENV CB_DEV_MODE="1"
 
 # HF Spaces uses port 7860, Render uses 8000
 EXPOSE 7860 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "2"]
+# Single worker: WebSocket connections are process-local and don't
+# work across multiple workers without a Redis pub/sub layer.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

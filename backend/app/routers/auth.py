@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -124,6 +125,7 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
     db = _get_db()
     try:
         auth_svc = AuthService(request.app.state.settings)
+        code = None
         try:
             code = auth_svc.generate_reset_code(db, body.email)
             # DEV ONLY: log the code so developers can test the flow.
@@ -133,7 +135,12 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
             # Swallow error — return the same response whether the email
             # exists or not, to prevent user enumeration.
             pass
-        return {"message": "If an account exists with that email, a verification code has been sent."}
+        resp: dict = {"message": "If an account exists with that email, a verification code has been sent."}
+        # In dev/demo mode, return the code in the response so users can
+        # test password reset without an email provider.
+        if os.environ.get("CB_DEV_MODE") and code:
+            resp["code"] = code
+        return resp
     finally:
         db.close()
 

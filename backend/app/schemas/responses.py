@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime
 
 
@@ -133,6 +133,19 @@ class UserResponse(BaseModel):
     role_title: str | None = None
     bio: str | None = None
 
+    @field_validator("skills", mode="before")
+    @classmethod
+    def _coerce_skills(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return v
+
     model_config = {"from_attributes": True}
 
 
@@ -193,6 +206,19 @@ class RoomMemberResponse(BaseModel):
     is_online: bool = False
     skills: list[str] = []
     role_title: str | None = None
+
+    @field_validator("skills", mode="before")
+    @classmethod
+    def _coerce_skills(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return v
 
 
 class RoomMessageResponse(BaseModel):

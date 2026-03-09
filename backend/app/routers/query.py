@@ -29,15 +29,26 @@ async def query_brain(body: QueryRequest, request: Request):
     await _rate_limit_ai(request, user.id)
     db = next(get_session())
     settings = request.app.state.settings
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
     try:
         if settings.agent_mode == "langgraph":
-            from app.services.agent_pipeline import AgentPipeline
-            pipeline = AgentPipeline(
-                db=db,
-                settings=settings,
-                embedder=request.app.state.embedding_service,
-                vector_store=request.app.state.vector_store,
-            )
+            try:
+                from app.services.agent_pipeline import AgentPipeline
+                pipeline = AgentPipeline(
+                    db=db,
+                    settings=settings,
+                    embedder=request.app.state.embedding_service,
+                    vector_store=request.app.state.vector_store,
+                )
+            except Exception as e:
+                _logger.warning("LangGraph agent failed to init, falling back to RAG: %s", e)
+                pipeline = RAGPipeline(
+                    llm=request.app.state.llm_service,
+                    embedder=request.app.state.embedding_service,
+                    vector_store=request.app.state.vector_store,
+                    db=db,
+                )
         else:
             pipeline = RAGPipeline(
                 llm=request.app.state.llm_service,
