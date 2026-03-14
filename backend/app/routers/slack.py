@@ -17,6 +17,23 @@ def _get_db():
     return next(get_session())
 
 
+# ─── Status Check ─────────────────────────────────────────────
+
+
+@router.get("/status")
+async def slack_status(request: Request):
+    """Check whether Slack integration is configured on the server."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    settings = request.app.state.settings
+    configured = bool(settings.slack_client_id and settings.slack_client_secret)
+    return {
+        "configured": configured,
+        "has_signing_secret": bool(settings.slack_signing_secret),
+    }
+
+
 # ─── OAuth Flow ───────────────────────────────────────────────
 
 

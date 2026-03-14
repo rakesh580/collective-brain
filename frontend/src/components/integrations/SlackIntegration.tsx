@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { api } from "../../api/client";
 import type { SlackWorkspace, SlackChannel } from "../../types";
-import { MessageSquare, RefreshCw, Trash2, Play, Square, History, ExternalLink, Hash, Lock } from "lucide-react";
+import { MessageSquare, RefreshCw, Trash2, Play, Square, History, ExternalLink, Hash, Lock, AlertTriangle, CheckCircle2, Settings } from "lucide-react";
 
 export default function SlackIntegration() {
+  const [configured, setConfigured] = useState<boolean | null>(null); // null = loading
   const [workspaces, setWorkspaces] = useState<SlackWorkspace[]>([]);
   const [channels, setChannels] = useState<SlackChannel[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
@@ -13,8 +14,20 @@ export default function SlackIntegration() {
   const [backfilling, setBackfilling] = useState<string | null>(null);
 
   useEffect(() => {
-    loadWorkspaces();
+    checkStatusAndLoad();
   }, []);
+
+  async function checkStatusAndLoad() {
+    try {
+      const status = await api.slackStatus();
+      setConfigured(status.configured);
+      if (status.configured) {
+        await loadWorkspaces();
+      }
+    } catch {
+      setConfigured(false);
+    }
+  }
 
   async function loadWorkspaces() {
     try {
@@ -106,15 +119,20 @@ export default function SlackIntegration() {
     }
   }
 
+  // ── Slack icon SVG ──
+  const SlackIcon = () => (
+    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.124 2.521a2.528 2.528 0 0 1 2.52-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.52V8.834zm-1.271 0a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.166 0a2.528 2.528 0 0 1 2.521 2.522v6.312zm-2.521 10.124a2.528 2.528 0 0 1 2.521 2.52A2.528 2.528 0 0 1 15.166 24a2.528 2.528 0 0 1-2.521-2.522v-2.52h2.521zm0-1.271a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.312A2.528 2.528 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522 2.521h-6.312z"/>
+    </svg>
+  );
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-purple-100 dark:bg-purple-500/15 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.124 2.521a2.528 2.528 0 0 1 2.52-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.52V8.834zm-1.271 0a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.166 0a2.528 2.528 0 0 1 2.521 2.522v6.312zm-2.521 10.124a2.528 2.528 0 0 1 2.521 2.52A2.528 2.528 0 0 1 15.166 24a2.528 2.528 0 0 1-2.521-2.522v-2.52h2.521zm0-1.271a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.312A2.528 2.528 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522 2.521h-6.312z"/>
-            </svg>
+            <SlackIcon />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Slack Integration</h3>
@@ -123,15 +141,69 @@ export default function SlackIntegration() {
             </p>
           </div>
         </div>
-        <button
-          onClick={handleInstall}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-        >
-          <ExternalLink size={12} />
-          {loading ? "Loading..." : "Add to Slack"}
-        </button>
+        {configured && (
+          <button
+            onClick={handleInstall}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            <ExternalLink size={12} />
+            {loading ? "Loading..." : "Add to Slack"}
+          </button>
+        )}
       </div>
+
+      {/* Not Configured Banner */}
+      {configured === false && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                Slack integration is not configured
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                To enable the Slack bot, set these environment variables on your server and restart:
+              </p>
+              <div className="space-y-1.5 mt-2">
+                {[
+                  { key: "CB_SLACK_CLIENT_ID", desc: "Your Slack app's Client ID" },
+                  { key: "CB_SLACK_CLIENT_SECRET", desc: "Your Slack app's Client Secret" },
+                  { key: "CB_SLACK_SIGNING_SECRET", desc: "Your Slack app's Signing Secret" },
+                ].map((v) => (
+                  <div key={v.key} className="flex items-center gap-2 text-xs">
+                    <code className="bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                      {v.key}
+                    </code>
+                    <span className="text-amber-600 dark:text-amber-400">— {v.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 p-3 bg-white dark:bg-slate-800/50 border border-amber-200 dark:border-slate-700 rounded-lg">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+                  <Settings size={12} />
+                  How to create a Slack App:
+                </p>
+                <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
+                  <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 underline hover:no-underline">api.slack.com/apps</a> and click "Create New App"</li>
+                  <li>Choose "From scratch", name it "Collective Brain", pick your workspace</li>
+                  <li>Under <strong>OAuth & Permissions</strong>, add Bot Token Scopes: <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:history</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:read</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">chat:write</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">commands</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">users:read</code></li>
+                  <li>Copy <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Signing Secret</strong> from "Basic Information"</li>
+                  <li>Set the env vars above and restart the backend</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {configured === null && (
+        <div className="flex items-center justify-center py-6">
+          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">Checking Slack configuration...</span>
+        </div>
+      )}
 
       {/* Status Messages */}
       {error && (
@@ -148,7 +220,7 @@ export default function SlackIntegration() {
       )}
 
       {/* Connected Workspaces */}
-      {workspaces.length > 0 && (
+      {configured && workspaces.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Connected Workspaces</h4>
           {workspaces.map((ws) => (
@@ -212,7 +284,8 @@ export default function SlackIntegration() {
                 <div className="flex items-center gap-1.5">
                   {ch.is_synced ? (
                     <>
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-400/10 px-2 py-1 rounded-full font-medium">
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-400/10 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                        <CheckCircle2 size={10} />
                         Synced
                       </span>
                       {ch.sync_id && (
@@ -253,8 +326,8 @@ export default function SlackIntegration() {
         </div>
       )}
 
-      {/* Setup Instructions - show when no workspaces connected */}
-      {workspaces.length === 0 && (
+      {/* How it works - show when configured but no workspaces */}
+      {configured && workspaces.length === 0 && (
         <div className="p-4 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700/30 rounded-lg">
           <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2 uppercase tracking-wider">How it works</h4>
           <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-1.5 list-decimal list-inside">

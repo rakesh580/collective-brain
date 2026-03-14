@@ -421,6 +421,8 @@ export const api = {
   },
 
   // Slack Integration
+  slackStatus: () =>
+    request<{ configured: boolean; has_signing_secret: boolean }>("/slack/status"),
   slackInstall: () =>
     request<{ install_url: string }>("/slack/install"),
   slackWorkspaces: () =>
