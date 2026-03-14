@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ZoomIn, ZoomOut, RotateCcw, ChevronRight, ChevronDown, Eye, EyeOff, Maximize2, Users } from "lucide-react";
+import { Search, ZoomIn, ZoomOut, Eye, EyeOff, Maximize2, Users } from "lucide-react";
 import type { GraphData, GraphEdge } from "../../types";
 
 /* ── Types ── */
@@ -56,11 +56,6 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number, curvature = 
   const cx = mx - dy * curvature;
   const cy = my + dx * curvature;
   return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
-}
-
-function smoothPath(x1: number, y1: number, x2: number, y2: number): string {
-  const mx = (x1 + x2) / 2;
-  return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
 }
 
 export default function MindMapView({ graphData, loading }: Props) {
