@@ -96,3 +96,37 @@ async def get_expertise_matrix(request: Request, room_id: str | None = None):
         raise HTTPException(status_code=500, detail="Failed to build expertise matrix")
     finally:
         db.close()
+
+
+@router.get("/clusters")
+async def get_clusters(request: Request, room_id: str | None = None):
+    """Get detailed community/cluster information."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        graph = MemoryGraph(db, room_id=room_id)
+        return graph.get_cluster_details()
+    except Exception as e:
+        logger.error("Cluster analysis failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to analyze clusters")
+    finally:
+        db.close()
+
+
+@router.get("/expertise-gaps")
+async def get_expertise_gaps(request: Request, room_id: str | None = None):
+    """Identify expertise gaps and bus factor risks."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        graph = MemoryGraph(db, room_id=room_id)
+        return graph.get_expertise_gaps()
+    except Exception as e:
+        logger.error("Expertise gap analysis failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to analyze expertise gaps")
+    finally:
+        db.close()

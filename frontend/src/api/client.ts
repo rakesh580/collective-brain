@@ -197,6 +197,14 @@ export const api = {
     const p = roomId ? `?room_id=${roomId}` : "";
     return request<GraphStats>(`/graph/stats${p}`);
   },
+  getGraphClusters: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<any>(`/graph/clusters${p}`);
+  },
+  getExpertiseGaps: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<any>(`/graph/expertise-gaps${p}`);
+  },
 
   // Ingest
   ingestGit: (repoPath: string, branch = "main", sinceDays = 90, roomId?: string) =>

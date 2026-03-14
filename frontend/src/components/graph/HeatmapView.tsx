@@ -1,23 +1,48 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { AlertTriangle, TrendingUp, Users, Shield, Filter, ArrowUpDown, ChevronDown, ChevronUp, Search, Download, Eye } from "lucide-react";
 import type { ExpertiseMatrixData } from "../../types";
 
+/* ── Types ── */
 type SortBy = "name" | "total" | "topics";
+type SortDir = "asc" | "desc";
 
-function getHeatColor(score: number): string {
-  if (score === 0) return "rgba(248, 250, 252, 1)"; // slate-50
-  // Gradient: indigo-100 → indigo-300 → indigo-500 → violet-600 → purple-700
-  if (score <= 0.15) return `rgba(224, 231, 255, ${0.5 + score * 3})`; // indigo-100
-  if (score <= 0.3) return `rgba(165, 180, 252, ${0.6 + score})`; // indigo-300
-  if (score <= 0.5) return `rgba(129, 140, 248, ${0.7 + score * 0.4})`; // indigo-400
-  if (score <= 0.7) return `rgba(99, 102, 241, ${0.8 + score * 0.2})`; // indigo-500
-  if (score <= 0.85) return `rgba(124, 58, 237, ${0.85 + score * 0.1})`; // violet-600
-  return `rgba(126, 34, 206, 0.95)`; // purple-700
+/* ── Dark mode hook ── */
+function useIsDark() {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  useEffect(() => {
+    const obs = new MutationObserver(() => setDark(document.documentElement.classList.contains("dark")));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
 }
 
-function getTextColor(score: number): string {
-  return score > 0.5 ? "#ffffff" : "#475569";
+/* ── Heat color — dark mode aware ── */
+function getHeatColor(score: number, isDark: boolean): string {
+  if (score === 0) return isDark ? "rgba(30, 41, 59, 0.5)" : "rgba(248, 250, 252, 1)";
+  if (isDark) {
+    // Dark mode: deeper, more saturated colors
+    if (score <= 0.15) return `rgba(99, 102, 241, 0.2)`;
+    if (score <= 0.3) return `rgba(99, 102, 241, 0.35)`;
+    if (score <= 0.5) return `rgba(99, 102, 241, 0.5)`;
+    if (score <= 0.7) return `rgba(124, 58, 237, 0.6)`;
+    if (score <= 0.85) return `rgba(139, 92, 246, 0.75)`;
+    return `rgba(147, 51, 234, 0.9)`;
+  }
+  // Light mode
+  if (score <= 0.15) return `rgba(224, 231, 255, ${0.5 + score * 3})`;
+  if (score <= 0.3) return `rgba(165, 180, 252, ${0.6 + score})`;
+  if (score <= 0.5) return `rgba(129, 140, 248, ${0.7 + score * 0.4})`;
+  if (score <= 0.7) return `rgba(99, 102, 241, ${0.8 + score * 0.2})`;
+  if (score <= 0.85) return `rgba(124, 58, 237, ${0.85 + score * 0.1})`;
+  return `rgba(126, 34, 206, 0.95)`;
+}
+
+function getTextColor(score: number, isDark: boolean): string {
+  if (score === 0) return isDark ? "#475569" : "#cbd5e1";
+  return score > 0.35 ? "#ffffff" : isDark ? "#e2e8f0" : "#475569";
 }
 
 function getInitials(name: string): string {
@@ -31,33 +56,114 @@ function getAvatarColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
+/* ── Sparkline component ── */
+function Sparkline({ values, width = 60, height = 20 }: { values: number[]; width?: number; height?: number }) {
+  if (values.length === 0) return null;
+  const max = Math.max(...values, 0.01);
+  const points = values.map((v, i) => {
+    const x = (i / Math.max(values.length - 1, 1)) * width;
+    const y = height - (v / max) * height;
+    return `${x},${y}`;
+  }).join(" ");
+
+  return (
+    <svg width={width} height={height} className="inline-block">
+      <polyline points={points} fill="none" stroke="#818cf8" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      {values.length > 0 && (
+        <circle cx={(values.length - 1) / Math.max(values.length - 1, 1) * width} cy={height - (values[values.length - 1] / max) * height} r={2} fill="#6366f1" />
+      )}
+    </svg>
+  );
+}
+
+/* ── Main Component ── */
 export default function HeatmapView() {
   const navigate = useNavigate();
+  const isDark = useIsDark();
   const [data, setData] = useState<ExpertiseMatrixData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hoveredCell, setHoveredCell] = useState<{ member: string; topic: string } | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("total");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortByTopic, setSortByTopic] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [hiddenTopics, setHiddenTopics] = useState<Set<string>>(new Set());
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showGaps, setShowGaps] = useState(true);
 
   useEffect(() => {
     api.getExpertiseMatrix().then(setData).finally(() => setLoading(false));
   }, []);
 
-  // Sorted & filtered data
-  const { sortedMembers, activeTopics, memberTotals, topicAverages } = useMemo(() => {
-    if (!data) return { sortedMembers: [], activeTopics: [], memberTotals: new Map(), topicAverages: new Map() };
+  // Toggle sort direction
+  const handleSort = useCallback((newSort: SortBy) => {
+    if (sortBy === newSort) {
+      setSortDir((d) => d === "desc" ? "asc" : "desc");
+    } else {
+      setSortBy(newSort);
+      setSortByTopic(null);
+      setSortDir("desc");
+    }
+  }, [sortBy]);
 
-    const active = data.topics.filter((t) => data.members.some((m) => (m.scores[t] || 0) > 0));
+  // Sort by topic column
+  const handleTopicSort = useCallback((topic: string) => {
+    if (sortByTopic === topic) {
+      setSortDir((d) => d === "desc" ? "asc" : "desc");
+    } else {
+      setSortByTopic(topic);
+      setSortBy("total"); // reset generic sort
+      setSortDir("desc");
+    }
+  }, [sortByTopic]);
 
-    // Sort topics by number of members who have the skill (descending)
+  // Toggle topic visibility
+  const toggleTopic = useCallback((topic: string) => {
+    setHiddenTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(topic)) next.delete(topic);
+      else next.add(topic);
+      return next;
+    });
+  }, []);
+
+  // Export as CSV
+  const exportCSV = useCallback(() => {
+    if (!data) return;
+    const topics = data.topics.filter((t) => !hiddenTopics.has(t));
+    const header = ["Member", ...topics, "Total"].join(",");
+    const rows = data.members.map((m) => {
+      const scores = topics.map((t) => Math.round((m.scores[t] || 0) * 100));
+      const total = scores.reduce((a, b) => a + b, 0);
+      return [m.name, ...scores, total].join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "expertise-matrix.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data, hiddenTopics]);
+
+  // Computed data
+  const { sortedMembers, activeTopics, memberTotals, topicAverages, busFactor, gapTopics, strongTopics } = useMemo(() => {
+    if (!data) return { sortedMembers: [], activeTopics: [], memberTotals: new Map(), topicAverages: new Map(), busFactor: [], gapTopics: [], strongTopics: [] };
+
+    // Filter active topics (topics with at least one score > 0)
+    let active = data.topics.filter((t) => !hiddenTopics.has(t) && data.members.some((m) => (m.scores[t] || 0) > 0));
+
+    // Sort topics by number of members who have the skill
     const topicMemberCount = new Map<string, number>();
     for (const t of active) {
       topicMemberCount.set(t, data.members.filter((m) => (m.scores[t] || 0) > 0).length);
     }
     const sortedTopics = [...active].sort((a, b) => (topicMemberCount.get(b) || 0) - (topicMemberCount.get(a) || 0));
 
-    // Compute member totals
+    // Compute member totals and topic counts
     const totals = new Map<string, number>();
     const topicCounts = new Map<string, number>();
     for (const m of data.members) {
@@ -74,15 +180,48 @@ export default function HeatmapView() {
       avgMap.set(t, scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0);
     }
 
+    // Bus factor: topics with only 1 expert (score > 0.5)
+    const bus: { topic: string; expert: string }[] = [];
+    const gaps: string[] = [];
+    const strong: string[] = [];
+    for (const t of sortedTopics) {
+      const experts = data.members.filter((m) => (m.scores[t] || 0) > 0.5);
+      const knowers = data.members.filter((m) => (m.scores[t] || 0) > 0);
+      if (experts.length === 1) {
+        bus.push({ topic: t, expert: experts[0].name });
+      }
+      if (knowers.length <= 1) {
+        gaps.push(t);
+      }
+      if (experts.length >= 3) {
+        strong.push(t);
+      }
+    }
+
+    // Filter by search
+    let members = data.members;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      members = members.filter((m) => m.name.toLowerCase().includes(term));
+    }
+
     // Sort members
-    const sorted = [...data.members].sort((a, b) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "total") return (totals.get(b.id) || 0) - (totals.get(a.id) || 0);
-      return (topicCounts.get(b.id) || 0) - (topicCounts.get(a.id) || 0);
+    const sorted = [...members].sort((a, b) => {
+      let cmp = 0;
+      if (sortByTopic) {
+        cmp = (a.scores[sortByTopic] || 0) - (b.scores[sortByTopic] || 0);
+      } else if (sortBy === "name") {
+        cmp = a.name.localeCompare(b.name);
+      } else if (sortBy === "total") {
+        cmp = (totals.get(a.id) || 0) - (totals.get(b.id) || 0);
+      } else {
+        cmp = (topicCounts.get(a.id) || 0) - (topicCounts.get(b.id) || 0);
+      }
+      return sortDir === "desc" ? -cmp : cmp;
     });
 
-    return { sortedMembers: sorted, activeTopics: sortedTopics, memberTotals: totals, topicAverages: avgMap };
-  }, [data, sortBy]);
+    return { sortedMembers: sorted, activeTopics: sortedTopics, memberTotals: totals, topicAverages: avgMap, busFactor: bus, gapTopics: gaps, strongTopics: strong };
+  }, [data, sortBy, sortDir, sortByTopic, searchTerm, hiddenTopics]);
 
   if (loading) {
     return (
@@ -108,81 +247,251 @@ export default function HeatmapView() {
   }
 
   return (
-    <div className="p-6 h-full overflow-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+    <div className="p-4 sm:p-6 h-full overflow-auto">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
         <div>
           <h3 className="text-base font-bold text-slate-800 dark:text-white">Expertise Matrix</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Who knows what — darker cells mean stronger expertise ({sortedMembers.length} members × {activeTopics.length} topics)
+            Who knows what — {sortedMembers.length} members × {activeTopics.length} topics
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Sort control */}
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Filter members..."
+              className="pl-7 pr-3 py-1.5 w-40 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            />
+          </div>
+
+          {/* Sort buttons */}
+          <div className="flex items-center gap-1">
             <span className="text-[10px] font-semibold text-slate-400 uppercase">Sort:</span>
             {(["total", "topics", "name"] as SortBy[]).map((s) => (
               <button
                 key={s}
-                onClick={() => setSortBy(s)}
-                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all ${
-                  sortBy === s
+                onClick={() => handleSort(s)}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all flex items-center gap-0.5 ${
+                  sortBy === s && !sortByTopic
                     ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
                     : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                 }`}
               >
                 {s === "total" ? "Expertise" : s === "topics" ? "Breadth" : "Name"}
+                {sortBy === s && !sortByTopic && (sortDir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+              </button>
+            ))}
+          </div>
+
+          {/* Filter */}
+          <button
+            onClick={() => setShowFilterPanel(!showFilterPanel)}
+            className={`p-1.5 rounded-lg border transition-colors ${showFilterPanel ? "bg-indigo-50 dark:bg-indigo-500/20 border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400" : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+            title="Filter topics"
+          >
+            <Filter className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Export */}
+          <button
+            onClick={exportCSV}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            title="Export CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Toggle gaps */}
+          <button
+            onClick={() => setShowGaps(!showGaps)}
+            className={`p-1.5 rounded-lg border transition-colors ${showGaps ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400" : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+            title={showGaps ? "Hide gap analysis" : "Show gap analysis"}
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Filter panel ── */}
+      {showFilterPanel && (
+        <div className="mb-4 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Filter Topics</p>
+            <div className="flex gap-2">
+              <button onClick={() => setHiddenTopics(new Set())} className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline">Show All</button>
+              <button onClick={() => setHiddenTopics(new Set(data?.topics || []))} className="text-[10px] text-slate-500 hover:underline">Hide All</button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(data?.topics || []).filter((t) => data!.members.some((m) => (m.scores[t] || 0) > 0)).map((topic) => (
+              <button
+                key={topic}
+                onClick={() => toggleTopic(topic)}
+                className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${
+                  hiddenTopics.has(topic)
+                    ? "bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 line-through"
+                    : "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"
+                }`}
+              >
+                {topic}
               </button>
             ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Color legend */}
-      <div className="flex items-center gap-3 mb-5">
+      {/* ── Gap Analysis Cards ── */}
+      {showGaps && (busFactor.length > 0 || gapTopics.length > 0 || strongTopics.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          {/* Bus Factor Risks */}
+          {busFactor.length > 0 && (
+            <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-800/30 rounded-xl">
+              <div className="flex items-center gap-1.5 mb-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                <span className="text-xs font-bold text-red-700 dark:text-red-400">Bus Factor Risks</span>
+                <span className="ml-auto text-[10px] font-mono font-bold text-red-500 bg-red-100 dark:bg-red-500/20 px-1.5 py-0.5 rounded">{busFactor.length}</span>
+              </div>
+              <div className="space-y-1 max-h-20 overflow-y-auto">
+                {busFactor.slice(0, 5).map((bf) => (
+                  <div key={bf.topic} className="flex items-center justify-between text-[10px]">
+                    <span className="text-red-600 dark:text-red-400 truncate">{bf.topic}</span>
+                    <span className="text-red-500 dark:text-red-400 font-medium shrink-0 ml-2">→ {bf.expert}</span>
+                  </div>
+                ))}
+                {busFactor.length > 5 && <p className="text-[10px] text-red-400 italic">+{busFactor.length - 5} more</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Knowledge Gaps */}
+          {gapTopics.length > 0 && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/30 rounded-xl">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Shield className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Knowledge Gaps</span>
+                <span className="ml-auto text-[10px] font-mono font-bold text-amber-500 bg-amber-100 dark:bg-amber-500/20 px-1.5 py-0.5 rounded">{gapTopics.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {gapTopics.slice(0, 8).map((t) => (
+                  <span key={t} className="text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">{t}</span>
+                ))}
+                {gapTopics.length > 8 && <span className="text-[10px] text-amber-400 italic">+{gapTopics.length - 8} more</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Well Covered */}
+          {strongTopics.length > 0 && (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800/30 rounded-xl">
+              <div className="flex items-center gap-1.5 mb-2">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Well Covered</span>
+                <span className="ml-auto text-[10px] font-mono font-bold text-emerald-500 bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 rounded">{strongTopics.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {strongTopics.slice(0, 8).map((t) => (
+                  <span key={t} className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Color legend ── */}
+      <div className="flex items-center gap-3 mb-4">
         <span className="text-[10px] font-semibold text-slate-400 uppercase">Novice</span>
         <div className="flex gap-0.5">
           {[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((v) => (
             <div
               key={v}
               className="w-6 h-4 rounded-sm first:rounded-l-md last:rounded-r-md"
-              style={{ backgroundColor: getHeatColor(v) }}
+              style={{ backgroundColor: getHeatColor(v, isDark) }}
             />
           ))}
         </div>
         <span className="text-[10px] font-semibold text-slate-400 uppercase">Expert</span>
+        {sortByTopic && (
+          <button
+            onClick={() => setSortByTopic(null)}
+            className="ml-2 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            Clear topic sort: {sortByTopic}
+          </button>
+        )}
       </div>
 
-      {/* Heatmap table */}
+      {/* ── Heatmap table ── */}
       <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 bg-white dark:bg-slate-800 px-3 py-3 text-left text-xs font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-700 min-w-[160px]">
-                Member
+              <th className="sticky left-0 z-20 bg-white dark:bg-slate-800 px-3 py-3 text-left text-xs font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-700 min-w-[180px]">
+                <button onClick={() => handleSort("name")} className="flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                  Member
+                  {sortBy === "name" && !sortByTopic && (sortDir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                </button>
               </th>
-              {activeTopics.map((topic) => (
-                <th
-                  key={topic}
-                  className={`px-1 py-2 text-center border-b border-slate-200 dark:border-slate-700 min-w-[68px] transition-colors ${
-                    hoveredCol === topic ? "bg-indigo-50 dark:bg-indigo-500/10" : ""
-                  }`}
-                  onMouseEnter={() => setHoveredCol(topic)}
-                  onMouseLeave={() => setHoveredCol(null)}
-                >
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span
-                      className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block max-w-[60px] truncate"
-                      title={topic}
-                      style={{ writingMode: "vertical-rl", textOrientation: "mixed", transform: "rotate(180deg)", height: "70px", lineHeight: "1.2" }}
-                    >
-                      {topic}
-                    </span>
-                  </div>
-                </th>
-              ))}
+              {activeTopics.map((topic) => {
+                const isBusRisk = busFactor.some((bf) => bf.topic === topic);
+                const isGap = gapTopics.includes(topic);
+                const isSorted = sortByTopic === topic;
+                return (
+                  <th
+                    key={topic}
+                    className={`px-1 py-2 text-center border-b border-slate-200 dark:border-slate-700 min-w-[68px] transition-colors cursor-pointer group ${
+                      hoveredCol === topic ? "bg-indigo-50 dark:bg-indigo-500/10" : ""
+                    } ${isSorted ? "bg-violet-50 dark:bg-violet-500/10" : ""}`}
+                    onMouseEnter={() => setHoveredCol(topic)}
+                    onMouseLeave={() => setHoveredCol(null)}
+                    onClick={() => handleTopicSort(topic)}
+                  >
+                    <div className="flex flex-col items-center gap-0.5 relative">
+                      {/* Bus factor warning badge */}
+                      {showGaps && isBusRisk && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center" title="Bus factor risk">
+                          <span className="text-white text-[6px] font-bold">!</span>
+                        </div>
+                      )}
+                      {showGaps && isGap && !isBusRisk && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full" title="Knowledge gap" />
+                      )}
+                      <span
+                        className={`text-[10px] font-medium block max-w-[60px] truncate transition-colors ${
+                          isSorted ? "text-violet-600 dark:text-violet-400 font-bold" : "text-slate-500 dark:text-slate-400"
+                        }`}
+                        title={topic}
+                        style={{ writingMode: "vertical-rl", textOrientation: "mixed", transform: "rotate(180deg)", height: "70px", lineHeight: "1.2" }}
+                      >
+                        {topic}
+                      </span>
+                      {/* Sort indicator */}
+                      {isSorted && (
+                        <div className="mt-0.5">
+                          {sortDir === "desc" ? <ChevronDown className="w-3 h-3 text-violet-500" /> : <ChevronUp className="w-3 h-3 text-violet-500" />}
+                        </div>
+                      )}
+                      {/* Sort icon on hover */}
+                      {!isSorted && (
+                        <ArrowUpDown className="w-2.5 h-2.5 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5" />
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+              {/* Sparkline column */}
+              <th className="px-2 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-l border-slate-200 dark:border-slate-700 min-w-[80px]">
+                Profile
+              </th>
               <th className="sticky right-0 z-20 bg-white dark:bg-slate-800 px-3 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-l border-slate-200 dark:border-slate-700 min-w-[70px]">
-                Total
+                <button onClick={() => handleSort("total")} className="flex items-center gap-0.5 mx-auto hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                  Total
+                  {sortBy === "total" && !sortByTopic && (sortDir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                </button>
               </th>
             </tr>
           </thead>
@@ -190,56 +499,75 @@ export default function HeatmapView() {
             {sortedMembers.map((member, idx) => {
               const total = memberTotals.get(member.id) || 0;
               const isRowHovered = hoveredRow === member.id;
+              const sparkValues = activeTopics.map((t) => member.scores[t] || 0);
+              const topicCount = activeTopics.filter((t) => (member.scores[t] || 0) > 0).length;
+
               return (
                 <tr
                   key={member.id}
-                  className={`transition-colors ${isRowHovered ? "bg-slate-50 dark:bg-slate-800/50" : idx % 2 === 0 ? "" : "bg-slate-50/30 dark:bg-slate-800/20"}`}
+                  className={`transition-colors ${isRowHovered ? "bg-slate-50 dark:bg-slate-800/60" : idx % 2 === 0 ? "" : "bg-slate-50/30 dark:bg-slate-800/20"}`}
                   onMouseEnter={() => setHoveredRow(member.id)}
                   onMouseLeave={() => setHoveredRow(null)}
                 >
-                  <td className="sticky left-0 z-10 bg-white dark:bg-slate-800 px-3 py-2 border-r border-slate-200 dark:border-slate-700">
+                  <td className={`sticky left-0 z-10 px-3 py-2 border-r border-slate-200 dark:border-slate-700 ${isRowHovered ? "bg-slate-50 dark:bg-slate-800/60" : "bg-white dark:bg-slate-800"}`}>
                     <button
                       onClick={() => navigate(`/members/${member.id}`)}
                       className="flex items-center gap-2.5 group"
                     >
                       <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 shadow-sm"
                         style={{ backgroundColor: getAvatarColor(member.name) }}
                       >
                         <span className="text-[9px] font-bold text-white">{getInitials(member.name)}</span>
                       </div>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate max-w-[100px]">
-                        {member.name}
-                      </span>
+                      <div className="text-left">
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors block truncate max-w-[100px]">
+                          {member.name}
+                        </span>
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500">{topicCount} topics</span>
+                      </div>
                     </button>
                   </td>
                   {activeTopics.map((topic) => {
                     const score = member.scores[topic] || 0;
                     const isCellHovered = hoveredCell?.member === member.id && hoveredCell?.topic === topic;
                     const isColHighlighted = hoveredCol === topic;
+                    const isBusTopic = busFactor.some((bf) => bf.topic === topic && bf.expert === member.name);
+                    const isCrossHair = (isRowHovered && isColHighlighted);
+
                     return (
                       <td
                         key={topic}
                         className="px-0.5 py-0.5"
-                        onMouseEnter={() => setHoveredCell({ member: member.id, topic })}
-                        onMouseLeave={() => setHoveredCell(null)}
+                        onMouseEnter={() => { setHoveredCell({ member: member.id, topic }); setHoveredCol(topic); }}
+                        onMouseLeave={() => { setHoveredCell(null); setHoveredCol(null); }}
                       >
                         <div
                           className={`w-full h-9 rounded-md flex items-center justify-center text-[10px] font-mono font-semibold transition-all relative ${
-                            isCellHovered ? "ring-2 ring-indigo-500 ring-offset-1 scale-110 z-10" : ""
-                          } ${isColHighlighted && !isCellHovered ? "ring-1 ring-indigo-200 dark:ring-indigo-800" : ""}`}
+                            isCellHovered ? "ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900 scale-110 z-10" : ""
+                          } ${isCrossHair && !isCellHovered ? "ring-1 ring-indigo-300 dark:ring-indigo-700" : ""} ${isColHighlighted && !isCellHovered && !isCrossHair ? "ring-1 ring-indigo-200 dark:ring-indigo-800" : ""}`}
                           style={{
-                            backgroundColor: getHeatColor(score),
-                            color: getTextColor(score),
+                            backgroundColor: getHeatColor(score, isDark),
+                            color: getTextColor(score, isDark),
                           }}
                           title={`${member.name} — ${topic}: ${Math.round(score * 100)}%`}
                         >
                           {score > 0 ? Math.round(score * 100) : ""}
+                          {/* Bus factor badge */}
+                          {showGaps && isBusTopic && score > 0 && (
+                            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center shadow-sm" title="Sole expert!">
+                              <AlertTriangle className="w-2 h-2 text-white" />
+                            </div>
+                          )}
                         </div>
                       </td>
                     );
                   })}
-                  <td className="sticky right-0 z-10 bg-white dark:bg-slate-800 px-3 py-2 border-l border-slate-200 dark:border-slate-700 text-center">
+                  {/* Sparkline */}
+                  <td className="px-2 py-2 border-l border-slate-200 dark:border-slate-700 text-center">
+                    <Sparkline values={sparkValues} />
+                  </td>
+                  <td className={`sticky right-0 z-10 px-3 py-2 border-l border-slate-200 dark:border-slate-700 text-center ${isRowHovered ? "bg-slate-50 dark:bg-slate-800/60" : "bg-white dark:bg-slate-800"}`}>
                     <span className="text-xs font-bold text-slate-600 dark:text-slate-300 tabular-nums">{total.toFixed(1)}</span>
                   </td>
                 </tr>
@@ -248,7 +576,10 @@ export default function HeatmapView() {
             {/* Team average row */}
             <tr className="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800">
               <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-3 py-2 border-r border-slate-200 dark:border-slate-700">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 italic">Team Average</span>
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-slate-400" />
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 italic">Team Average</span>
+                </div>
               </td>
               {activeTopics.map((topic) => {
                 const avg = topicAverages.get(topic) || 0;
@@ -257,8 +588,8 @@ export default function HeatmapView() {
                     <div
                       className="w-full h-9 rounded-md flex items-center justify-center text-[10px] font-mono font-semibold"
                       style={{
-                        backgroundColor: getHeatColor(avg),
-                        color: getTextColor(avg),
+                        backgroundColor: getHeatColor(avg, isDark),
+                        color: getTextColor(avg, isDark),
                       }}
                     >
                       {avg > 0 ? Math.round(avg * 100) : ""}
@@ -266,32 +597,35 @@ export default function HeatmapView() {
                   </td>
                 );
               })}
+              <td className="px-2 py-2 border-l border-slate-200 dark:border-slate-700" />
               <td className="sticky right-0 z-10 bg-slate-50 dark:bg-slate-800 px-3 py-2 border-l border-slate-200 dark:border-slate-700" />
             </tr>
           </tbody>
         </table>
       </div>
 
-      {/* Hover tooltip */}
-      {hoveredCell && (
-        <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
-          <div
-            className="w-3 h-3 rounded-sm"
-            style={{ backgroundColor: getHeatColor(sortedMembers.find((m) => m.id === hoveredCell.member)?.scores[hoveredCell.topic] || 0) }}
-          />
-          <span className="text-xs">
-            <span className="font-semibold text-slate-700 dark:text-slate-200">
-              {sortedMembers.find((m) => m.id === hoveredCell.member)?.name}
+      {/* ── Hover tooltip ── */}
+      {hoveredCell && (() => {
+        const member = sortedMembers.find((m) => m.id === hoveredCell.member);
+        if (!member) return null;
+        const score = member.scores[hoveredCell.topic] || 0;
+        const isBus = busFactor.some((bf) => bf.topic === hoveredCell.topic && bf.expert === member.name);
+        return (
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: getHeatColor(score, isDark) }} />
+            <span className="text-xs">
+              <span className="font-semibold text-slate-700 dark:text-slate-200">{member.name}</span>
+              {" → "}
+              <span className="font-semibold text-indigo-600 dark:text-indigo-400">{hoveredCell.topic}</span>
+              {": "}
+              <span className="font-mono font-bold">{Math.round(score * 100)}%</span>
+              {score > 0.7 && <span className="ml-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Expert</span>}
+              {score > 0 && score <= 0.3 && <span className="ml-1.5 text-[10px] text-amber-600 dark:text-amber-400 font-medium">Novice</span>}
+              {isBus && <span className="ml-1.5 text-[10px] text-red-600 dark:text-red-400 font-medium">⚠ Sole Expert</span>}
             </span>
-            {" → "}
-            <span className="font-semibold text-indigo-600 dark:text-indigo-400">{hoveredCell.topic}</span>
-            {": "}
-            <span className="font-mono font-bold">
-              {Math.round((sortedMembers.find((m) => m.id === hoveredCell.member)?.scores[hoveredCell.topic] || 0) * 100)}%
-            </span>
-          </span>
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

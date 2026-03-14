@@ -750,6 +750,149 @@ class MemoryGraph:
                     result.append(cleaned)
         return result
 
+    # ── Cluster Details ──────────────────────────────────────────
+
+    def get_cluster_details(self) -> dict:
+        """Return detailed information about each community/cluster."""
+        G = self._get_or_build_nx_graph()
+
+        # Group nodes by community
+        clusters: dict[int, dict] = {}
+        for nid, data in G.nodes(data=True):
+            community = data.get("community")
+            if community is None:
+                continue
+            if community not in clusters:
+                clusters[community] = {
+                    "id": community,
+                    "members": [],
+                    "topics": [],
+                    "artifacts": [],
+                    "total_contributions": 0,
+                }
+            ntype = data.get("node_type", "")
+            if ntype == "member":
+                clusters[community]["members"].append({
+                    "id": nid,
+                    "name": data.get("label", nid),
+                    "pagerank": data.get("pagerank", 0),
+                    "contributions": data.get("total_contributions", 0),
+                })
+                clusters[community]["total_contributions"] += data.get("total_contributions", 0)
+            elif ntype == "topic":
+                clusters[community]["topics"].append(data.get("label", nid))
+            elif ntype == "artifact":
+                clusters[community]["artifacts"].append(data.get("label", nid))
+
+        # Sort clusters by total contributions
+        sorted_clusters = sorted(clusters.values(), key=lambda c: c["total_contributions"], reverse=True)
+
+        # Add inter-cluster edges count
+        for cluster in sorted_clusters:
+            member_ids = {m["id"] for m in cluster["members"]}
+            internal_edges = 0
+            external_edges = 0
+            for mid in member_ids:
+                for nbr in G.neighbors(mid):
+                    nbr_community = G.nodes[nbr].get("community")
+                    if nbr_community == cluster["id"]:
+                        internal_edges += 1
+                    else:
+                        external_edges += 1
+            cluster["internal_edges"] = internal_edges // 2
+            cluster["external_edges"] = external_edges
+            cluster["cohesion"] = round(
+                internal_edges / max(1, internal_edges + external_edges), 2
+            )
+
+        return {"clusters": sorted_clusters, "total_clusters": len(sorted_clusters)}
+
+    # ── Expertise Gap Analysis ────────────────────────────────────
+
+    def get_expertise_gaps(self) -> dict:
+        """Identify topics with bus factor risks and expertise gaps."""
+        G = self._get_or_build_nx_graph()
+
+        topic_nodes = {
+            nid: d for nid, d in G.nodes(data=True)
+            if d.get("node_type") == "topic"
+        }
+        member_nodes = {
+            nid: d for nid, d in G.nodes(data=True)
+            if d.get("node_type") == "member"
+        }
+
+        bus_factor_risks = []
+        well_covered = []
+        uncovered = []
+
+        for tid, tdata in topic_nodes.items():
+            member_experts = []
+            for nbr in G.neighbors(tid):
+                if G.nodes[nbr].get("node_type") == "member":
+                    edge = G.edges[nbr, tid]
+                    member_experts.append({
+                        "id": nbr,
+                        "name": G.nodes[nbr].get("label", nbr),
+                        "weight": edge.get("weight", 0),
+                        "edge_type": edge.get("edge_type", ""),
+                    })
+
+            topic_label = tdata.get("label", tid)
+
+            if len(member_experts) == 0:
+                uncovered.append({"topic": topic_label, "experts": []})
+            elif len(member_experts) == 1:
+                bus_factor_risks.append({
+                    "topic": topic_label,
+                    "sole_expert": member_experts[0],
+                    "severity": "high",
+                })
+            elif len(member_experts) == 2:
+                bus_factor_risks.append({
+                    "topic": topic_label,
+                    "experts": member_experts,
+                    "severity": "medium",
+                })
+            else:
+                well_covered.append({
+                    "topic": topic_label,
+                    "expert_count": len(member_experts),
+                    "top_expert": max(member_experts, key=lambda e: e["weight"]),
+                })
+
+        # Member breadth analysis
+        member_breadth = []
+        for mid, mdata in member_nodes.items():
+            topic_count = sum(
+                1 for nbr in G.neighbors(mid)
+                if G.nodes[nbr].get("node_type") == "topic"
+            )
+            member_breadth.append({
+                "id": mid,
+                "name": mdata.get("label", mid),
+                "topic_count": topic_count,
+                "contributions": mdata.get("total_contributions", 0),
+            })
+
+        member_breadth.sort(key=lambda m: m["topic_count"], reverse=True)
+
+        return {
+            "bus_factor_risks": bus_factor_risks,
+            "well_covered": well_covered,
+            "uncovered": uncovered,
+            "member_breadth": member_breadth[:10],
+            "summary": {
+                "total_topics": len(topic_nodes),
+                "at_risk": len(bus_factor_risks),
+                "well_covered": len(well_covered),
+                "uncovered": len(uncovered),
+                "coverage_pct": round(
+                    len(well_covered) / max(1, len(topic_nodes)) * 100, 1
+                ),
+            },
+        }
+
     def _get_topic_member_map(self) -> dict[str, dict[str, int]]:
         contribs = self._query_contributions()
         topic_members: dict[str, dict[str, int]] = defaultdict(
