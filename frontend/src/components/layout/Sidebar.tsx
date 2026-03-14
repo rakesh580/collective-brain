@@ -3,7 +3,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, MessageSquare, MessagesSquare, Upload,
   Users, Network, BarChart3, Settings, LogOut, Sun, Moon,
-  ChevronsLeft, ChevronsRight, Hash,
+  ChevronsLeft, ChevronsRight, Hash, Heart,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
@@ -25,6 +25,7 @@ const links: NavItem[] = [
   { to: "/members", label: "Members", icon: Users },
   { to: "/graph", label: "Graph", icon: Network },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/health", label: "Team Health", icon: Heart },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

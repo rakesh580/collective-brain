@@ -11,6 +11,7 @@ from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.insight import InsightRecord
 from app.services.insight_engine import InsightEngine
+from app.services.freshness_service import get_freshness_report, get_stale_artifacts
 from app.db.database import get_session
 
 router = APIRouter()
@@ -176,5 +177,37 @@ async def generate_insights(request: Request, room_id: str | None = None):
             )
             for i in insights
         ]
+    finally:
+        db.close()
+
+
+@router.get("/freshness")
+async def freshness_report(request: Request):
+    """Return full freshness report for all artifacts."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        return get_freshness_report(db)
+    finally:
+        db.close()
+
+
+@router.get("/freshness/alerts")
+async def freshness_alerts(request: Request):
+    """Return top 10 stale/critical freshness alerts."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        report = get_freshness_report(db)
+        # Return stale and aging alerts, prioritized by staleness score
+        all_alerts = report["alerts"]
+        critical_alerts = [
+            a for a in all_alerts if a["status"] in ("stale", "aging")
+        ]
+        return {"alerts": critical_alerts[:10]}
     finally:
         db.close()

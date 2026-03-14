@@ -40,6 +40,11 @@ import type {
   SlackChannel,
   DigestPreview,
   DigestConfig,
+  FreshnessReport,
+  FreshnessAlert,
+  HealthSnapshot,
+  HealthSnapshotRecord,
+  HealthPrediction,
 } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
@@ -485,4 +490,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ expert_member_id: expertMemberId, query, topics }),
     }),
+
+  // Knowledge Freshness
+  getFreshnessReport: () => request<FreshnessReport>("/insights/freshness"),
+  getFreshnessAlerts: () => request<{ alerts: FreshnessAlert[] }>("/insights/freshness/alerts"),
+
+  // Team Health
+  getHealthSnapshot: () => request<HealthSnapshot>("/analytics/health"),
+  getHealthTrends: (days = 90) =>
+    request<{ snapshots: HealthSnapshotRecord[]; period_days: number }>(`/analytics/health/trends?days=${days}`),
+  getHealthPredictions: () =>
+    request<{ predictions: HealthPrediction[] }>("/analytics/health/predictions"),
+  saveHealthSnapshot: () =>
+    request<{ success: boolean }>("/analytics/health/snapshot", { method: "POST" }),
 };

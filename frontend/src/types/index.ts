@@ -441,3 +441,49 @@ export interface DigestConfig {
   enabled: boolean;
   last_sent_at: string | null;
 }
+
+// Knowledge Freshness
+export interface FreshnessAlert {
+  artifact_id: string;
+  title: string;
+  source_type: string;
+  ingested_at: string;
+  days_old: number;
+  staleness_score: number;
+  status: "fresh" | "aging" | "stale";
+  related_changes: number;
+  responsible_members: string[];
+}
+
+export interface FreshnessReport {
+  summary: { fresh: number; aging: number; stale: number; total: number };
+  alerts: FreshnessAlert[];
+  worst_offenders: FreshnessAlert[];
+}
+
+// Team Health
+export interface HealthSnapshot {
+  bus_factor_count: number;
+  coverage_pct: number;
+  collab_density: number;
+  active_member_pct: number;
+  avg_breadth: number;
+  health_score: number;
+  top_risk: { topic: string; expert_count: number; experts: string[] } | null;
+  computed_at: string;
+}
+
+export interface HealthSnapshotRecord extends HealthSnapshot {
+  id: string;
+  timestamp: string;
+}
+
+export interface HealthPrediction {
+  metric: string;
+  current_value: number;
+  predicted_value: number;
+  horizon_days: number;
+  trend: "improving" | "stable" | "declining";
+  risk_level: "low" | "medium" | "high";
+  description: string;
+}

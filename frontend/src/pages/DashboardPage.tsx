@@ -9,6 +9,7 @@ import MemberSummaryCard from "../components/dashboard/MemberSummaryCard";
 import BadgeDisplay from "../components/dashboard/BadgeDisplay";
 import TeamProgressRing from "../components/dashboard/TeamProgressRing";
 import OnboardingWizard from "../components/onboarding/OnboardingWizard";
+import FreshnessAlerts from "../components/insights/FreshnessAlerts";
 import {
   Users, Database, Boxes, ArrowRight, MessageSquare,
   Upload, TrendingUp, Sparkles, Brain, Target,
@@ -300,6 +301,11 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Knowledge Freshness Alerts */}
+      <div className="mb-6">
+        <FreshnessAlerts />
+      </div>
 
       {/* Active members */}
       {data.active_members.length > 0 && (

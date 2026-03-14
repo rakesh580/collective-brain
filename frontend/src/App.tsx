@@ -14,6 +14,7 @@ import SettingsPage from "./pages/SettingsPage";
 import DiscussionsPage from "./pages/DiscussionsPage";
 import RoomsPage from "./pages/RoomsPage";
 import RoomChatPage from "./pages/RoomChatPage";
+import TeamHealthPage from "./pages/TeamHealthPage";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/members/:id" element={<MemberDetailView />} />
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/health" element={<TeamHealthPage />} />
         <Route path="/rooms" element={<RoomsPage />} />
         <Route path="/rooms/:roomId" element={<RoomChatPage />} />
         <Route path="/discussions" element={<DiscussionsPage />} />

@@ -102,6 +102,7 @@ def init_db(sqlite_url: str = "", settings=None):
     _run_migrations(_engine)
     _ensure_help_requests_table(_engine)
     _ensure_slack_digest_config_table(_engine)
+    _ensure_health_snapshots_table(_engine)
 
     logger.info("Database initialized (%s)", "PostgreSQL" if is_postgres else "SQLite")
 
@@ -532,6 +533,156 @@ def update_help_request_status(db: Session, request_id: str, new_status: str) ->
     )
     db.commit()
     return result.rowcount > 0
+
+
+def _ensure_health_snapshots_table(engine):
+    """Create the health_snapshots table if it doesn't exist."""
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS health_snapshots (
+                id TEXT PRIMARY KEY,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                bus_factor_count INTEGER DEFAULT 0,
+                coverage_pct REAL DEFAULT 0,
+                collab_density REAL DEFAULT 0,
+                active_member_pct REAL DEFAULT 0,
+                avg_breadth REAL DEFAULT 0,
+                health_score REAL DEFAULT 0,
+                risk_summary TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.commit()
+    logger.info("Ensured health_snapshots table exists")
+
+
+def save_health_snapshot_record(
+    db: Session,
+    snapshot_id: str,
+    bus_factor_count: int,
+    coverage_pct: float,
+    collab_density: float,
+    active_member_pct: float,
+    avg_breadth: float,
+    health_score: float,
+    risk_summary: str = "{}",
+) -> dict:
+    """Insert a health snapshot record and return it as a dict."""
+    import json
+    from datetime import datetime as _dt
+
+    now = _dt.utcnow()
+    db.execute(
+        text(
+            "INSERT INTO health_snapshots "
+            "(id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+            "active_member_pct, avg_breadth, health_score, risk_summary, created_at) "
+            "VALUES (:id, :timestamp, :bus_factor_count, :coverage_pct, :collab_density, "
+            ":active_member_pct, :avg_breadth, :health_score, :risk_summary, :created_at)"
+        ),
+        {
+            "id": snapshot_id,
+            "timestamp": now,
+            "bus_factor_count": bus_factor_count,
+            "coverage_pct": coverage_pct,
+            "collab_density": collab_density,
+            "active_member_pct": active_member_pct,
+            "avg_breadth": avg_breadth,
+            "health_score": health_score,
+            "risk_summary": risk_summary,
+            "created_at": now,
+        },
+    )
+    db.commit()
+    return {
+        "id": snapshot_id,
+        "timestamp": now.isoformat(),
+        "bus_factor_count": bus_factor_count,
+        "coverage_pct": coverage_pct,
+        "collab_density": collab_density,
+        "active_member_pct": active_member_pct,
+        "avg_breadth": avg_breadth,
+        "health_score": health_score,
+        "risk_summary": json.loads(risk_summary) if isinstance(risk_summary, str) else risk_summary,
+    }
+
+
+def get_health_snapshots(db: Session, days: int = 90) -> list[dict]:
+    """Fetch health snapshots from the last N days."""
+    import json
+    from datetime import datetime as _dt, timedelta as _td
+
+    cutoff = _dt.utcnow() - _td(days=days)
+    rows = db.execute(
+        text(
+            "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+            "active_member_pct, avg_breadth, health_score, risk_summary "
+            "FROM health_snapshots WHERE timestamp >= :cutoff "
+            "ORDER BY timestamp ASC"
+        ),
+        {"cutoff": cutoff},
+    ).fetchall()
+
+    results = []
+    for row in rows:
+        risk_raw = row[8]
+        if isinstance(risk_raw, str):
+            try:
+                risk_parsed = json.loads(risk_raw)
+            except (json.JSONDecodeError, TypeError):
+                risk_parsed = {}
+        else:
+            risk_parsed = risk_raw or {}
+
+        results.append({
+            "id": row[0],
+            "timestamp": row[1].isoformat() if hasattr(row[1], "isoformat") else str(row[1]),
+            "bus_factor_count": row[2],
+            "coverage_pct": row[3],
+            "collab_density": row[4],
+            "active_member_pct": row[5],
+            "avg_breadth": row[6],
+            "health_score": row[7],
+            "risk_summary": risk_parsed,
+        })
+    return results
+
+
+def get_latest_health_snapshot(db: Session) -> dict | None:
+    """Fetch the most recent health snapshot."""
+    import json
+
+    row = db.execute(
+        text(
+            "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+            "active_member_pct, avg_breadth, health_score, risk_summary "
+            "FROM health_snapshots ORDER BY timestamp DESC LIMIT 1"
+        )
+    ).fetchone()
+
+    if not row:
+        return None
+
+    risk_raw = row[8]
+    if isinstance(risk_raw, str):
+        try:
+            risk_parsed = json.loads(risk_raw)
+        except (json.JSONDecodeError, TypeError):
+            risk_parsed = {}
+    else:
+        risk_parsed = risk_raw or {}
+
+    return {
+        "id": row[0],
+        "timestamp": row[1].isoformat() if hasattr(row[1], "isoformat") else str(row[1]),
+        "bus_factor_count": row[2],
+        "coverage_pct": row[3],
+        "collab_density": row[4],
+        "active_member_pct": row[5],
+        "avg_breadth": row[6],
+        "health_score": row[7],
+        "risk_summary": risk_parsed,
+    }
 
 
 def get_session() -> Generator[Session, None, None]:

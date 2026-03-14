@@ -6,6 +6,12 @@ from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.db.database import get_session
+from app.services.team_health_service import (
+    compute_health_snapshot,
+    save_health_snapshot,
+    get_health_trends,
+    predict_risks,
+)
 
 router = APIRouter()
 
@@ -250,5 +256,57 @@ async def get_topic_trends(request: Request, days: int = 30, room_id: str | None
             ],
             "period_days": days,
         }
+    finally:
+        db.close()
+
+
+@router.get("/health")
+async def get_health(request: Request):
+    """Current health snapshot (computed live)."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        return compute_health_snapshot(db)
+    finally:
+        db.close()
+
+
+@router.get("/health/trends")
+async def get_health_trends_endpoint(request: Request, days: int = 90):
+    """Historical trend data for team health."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        return get_health_trends(db, period_days=days)
+    finally:
+        db.close()
+
+
+@router.get("/health/predictions")
+async def get_health_predictions(request: Request):
+    """Risk predictions based on health trends."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        return predict_risks(db)
+    finally:
+        db.close()
+
+
+@router.post("/health/snapshot")
+async def trigger_health_snapshot(request: Request):
+    """Manually trigger a health snapshot save."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    db = _get_db()
+    try:
+        return save_health_snapshot(db)
     finally:
         db.close()
