@@ -267,14 +267,17 @@ class RAGPipeline:
 
     def _build_messages(self, conv_id: str, user_content: str) -> list[dict]:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        # Load conversation history from database (last 6 messages)
+        # Load only the last 6 messages using SQL (not all + Python slice)
         history = (
             self.db.query(MessageRecord)
             .filter(MessageRecord.conversation_id == conv_id)
-            .order_by(MessageRecord.created_at.asc())
+            .order_by(MessageRecord.created_at.desc())
+            .limit(6)
             .all()
         )
-        for msg in history[-6:]:
+        # Reverse to chronological order
+        history.reverse()
+        for msg in history:
             messages.append({"role": msg.role, "content": msg.content})
         messages.append({"role": "user", "content": user_content})
         return messages
@@ -298,7 +301,29 @@ class RAGPipeline:
         return sources
 
     def _extract_related_members(self, response_text: str) -> list[RelatedMember]:
-        members = self.db.query(MemberRecord).all()
+        # Only load members relevant to the current context (room or limited set)
+        room_id = getattr(self, "room_id", None)
+        if room_id:
+            member_ids = (
+                self.db.query(ContributionRecord.member_id)
+                .filter(ContributionRecord.room_id == room_id)
+                .distinct()
+                .all()
+            )
+            mid_list = [mid for (mid,) in member_ids if mid]
+            members = (
+                self.db.query(MemberRecord)
+                .filter(MemberRecord.id.in_(mid_list))
+                .all()
+            ) if mid_list else []
+        else:
+            # Limit to active members (those with contributions)
+            members = (
+                self.db.query(MemberRecord)
+                .filter(MemberRecord.total_contributions > 0)
+                .limit(100)
+                .all()
+            )
         mentioned = []
         response_lower = response_text.lower()
         for m in members:

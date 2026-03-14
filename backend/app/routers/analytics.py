@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
-from collections import Counter
 from fastapi import APIRouter, Request
+from sqlalchemy import func, cast, Date
 
 from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
-from app.models.insight import InsightRecord
 from app.db.database import get_session
 
 router = APIRouter()
@@ -17,58 +16,72 @@ def _get_db():
 
 @router.get("/activity-timeline")
 async def get_activity_timeline(request: Request, days: int = 30, room_id: str | None = None):
-    """Daily contribution counts for the last N days."""
+    """Daily contribution counts for the last N days using SQL aggregation."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
-        query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= cutoff)
+
+        # Use SQL GROUP BY date for aggregation
+        query = (
+            db.query(
+                cast(ContributionRecord.timestamp, Date).label("day"),
+                func.count().label("cnt"),
+            )
+            .filter(ContributionRecord.timestamp >= cutoff)
+        )
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
-        contribs = query.all()
+        daily_rows = query.group_by("day").all()
 
-        daily: dict[str, int] = {}
-        for c in contribs:
-            if c.timestamp:
-                day = c.timestamp.strftime("%Y-%m-%d")
-                daily[day] = daily.get(day, 0) + 1
+        daily = {str(row.day): row.cnt for row in daily_rows}
 
         # Fill in missing days
         timeline = []
         current = cutoff.date()
         today = datetime.utcnow().date()
+        total = 0
         while current <= today:
             day_str = current.strftime("%Y-%m-%d")
-            timeline.append({"date": day_str, "count": daily.get(day_str, 0)})
+            count = daily.get(day_str, 0)
+            timeline.append({"date": day_str, "count": count})
+            total += count
             current += timedelta(days=1)
 
-        return {"timeline": timeline, "total": sum(daily.values())}
+        return {"timeline": timeline, "total": total}
     finally:
         db.close()
 
 
 @router.get("/source-breakdown")
 async def get_source_breakdown(request: Request, room_id: str | None = None):
-    """Artifact counts by source type."""
+    """Artifact counts by source type using SQL aggregation."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        query = db.query(ArtifactRecord)
+        # SQL GROUP BY for source type counts
+        query = db.query(
+            ArtifactRecord.source_type,
+            func.count().label("artifact_count"),
+            func.coalesce(func.sum(ArtifactRecord.chunk_count), 0).label("total_chunks"),
+        )
         if room_id:
             query = query.filter(ArtifactRecord.room_id == room_id)
-        artifacts = query.all()
-        breakdown = Counter(a.source_type for a in artifacts)
-        total_chunks = sum(a.chunk_count or 0 for a in artifacts)
+        rows = query.group_by(ArtifactRecord.source_type).all()
+
+        total_artifacts = sum(r.artifact_count for r in rows)
+        total_chunks = sum(r.total_chunks for r in rows)
+
         return {
             "sources": [
-                {"source_type": k, "artifact_count": v}
-                for k, v in breakdown.most_common()
+                {"source_type": r.source_type, "artifact_count": r.artifact_count}
+                for r in sorted(rows, key=lambda x: x.artifact_count, reverse=True)
             ],
-            "total_artifacts": len(artifacts),
+            "total_artifacts": total_artifacts,
             "total_chunks": total_chunks,
         }
     finally:
@@ -132,23 +145,27 @@ async def get_expertise_matrix(request: Request, room_id: str | None = None):
 
 @router.get("/contribution-types")
 async def get_contribution_types(request: Request, room_id: str | None = None):
-    """Contribution breakdown by type."""
+    """Contribution breakdown by type using SQL aggregation."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
-        query = db.query(ContributionRecord)
+        query = db.query(
+            ContributionRecord.contribution_type,
+            func.count().label("cnt"),
+        )
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
-        contribs = query.all()
-        type_counts = Counter(c.contribution_type for c in contribs)
+        rows = query.group_by(ContributionRecord.contribution_type).all()
+
+        total = sum(r.cnt for r in rows)
         return {
             "types": [
-                {"type": k, "count": v}
-                for k, v in type_counts.most_common()
+                {"type": r.contribution_type, "count": r.cnt}
+                for r in sorted(rows, key=lambda x: x.cnt, reverse=True)
             ],
-            "total": len(contribs),
+            "total": total,
         }
     finally:
         db.close()
@@ -156,40 +173,43 @@ async def get_contribution_types(request: Request, room_id: str | None = None):
 
 @router.get("/member-activity")
 async def get_member_activity(request: Request, days: int = 30, room_id: str | None = None):
-    """Per-member contribution counts over last N days."""
+    """Per-member contribution counts over last N days using SQL aggregation."""
     from app.dependencies import get_current_user
     get_current_user(request)
 
     db = _get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
-        query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= cutoff)
+
+        # SQL GROUP BY member_id for counts
+        query = (
+            db.query(
+                ContributionRecord.member_id,
+                func.count().label("cnt"),
+            )
+            .filter(ContributionRecord.timestamp >= cutoff)
+        )
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
-        contribs = query.all()
+        rows = query.group_by(ContributionRecord.member_id).all()
 
-        member_counts: dict[str, int] = {}
-        for c in contribs:
-            mid = c.member_id or "unknown"
-            member_counts[mid] = member_counts.get(mid, 0) + 1
-
-        # Resolve member names
-        member_ids = list(member_counts.keys())
+        # Resolve member names in one query
+        member_ids = [r.member_id for r in rows if r.member_id]
         members = (
             db.query(MemberRecord)
             .filter(MemberRecord.id.in_(member_ids))
             .all()
-        )
+        ) if member_ids else []
         name_map = {m.id: m.name for m in members}
 
         activity = sorted(
             [
                 {
-                    "member_id": mid,
-                    "member_name": name_map.get(mid, mid),
-                    "contributions": count,
+                    "member_id": r.member_id or "unknown",
+                    "member_name": name_map.get(r.member_id, r.member_id or "unknown"),
+                    "contributions": r.cnt,
                 }
-                for mid, count in member_counts.items()
+                for r in rows
             ],
             key=lambda x: x["contributions"],
             reverse=True,
@@ -209,14 +229,18 @@ async def get_topic_trends(request: Request, days: int = 30, room_id: str | None
     db = _get_db()
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
-        query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= cutoff)
+        query = db.query(ContributionRecord.topics).filter(
+            ContributionRecord.timestamp >= cutoff
+        )
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
-        contribs = query.all()
 
+        # Topics are stored as JSON arrays — need Python-side counting
+        # but we only fetch the topics column, not full records
+        from collections import Counter
         topic_counts: Counter = Counter()
-        for c in contribs:
-            for topic in (c.topics or []):
+        for (topics,) in query.all():
+            for topic in (topics or []):
                 topic_counts[topic] += 1
 
         return {

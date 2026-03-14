@@ -32,7 +32,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
   useEffect(() => {
     api
       .getMembers()
-      .then(setMembers)
+      .then((res) => setMembers(res.members))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

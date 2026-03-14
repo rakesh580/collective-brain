@@ -27,11 +27,15 @@ async def get_dashboard(request: Request, room_id: str | None = None):
 
     db = _get_db()
     try:
+        # Count total members (separate from top-10 query)
+        total_members = db.query(MemberRecord).count()
         members = db.query(MemberRecord).order_by(MemberRecord.total_contributions.desc()).limit(10).all()
+
         art_query = db.query(ArtifactRecord)
         if room_id:
             art_query = art_query.filter(ArtifactRecord.room_id == room_id)
-        artifacts = art_query.all()
+        total_artifacts = art_query.count()
+
         ins_query = (
             db.query(InsightRecord)
             .order_by(InsightRecord.generated_at.desc())
@@ -42,8 +46,8 @@ async def get_dashboard(request: Request, room_id: str | None = None):
         vs = request.app.state.vector_store
 
         return DashboardResponse(
-            total_members=len(members),
-            total_artifacts=len(artifacts),
+            total_members=total_members,
+            total_artifacts=total_artifacts,
             total_chunks=vs.count(),
             top_insights=[
                 InsightResponse(

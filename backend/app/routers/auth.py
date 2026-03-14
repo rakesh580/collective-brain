@@ -10,6 +10,7 @@ from app.schemas.requests import (
     GoogleAuthRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    ChangePasswordRequest,
 )
 from app.schemas.responses import UserResponse, AuthResponse
 from app.services.auth_service import AuthService
@@ -160,6 +161,34 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
             raise HTTPException(status_code=400, detail=str(e))
         token = auth_svc.create_token(user.id)
         return AuthResponse(token=token, user=UserResponse.model_validate(user))
+    finally:
+        db.close()
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordRequest, request: Request):
+    """Change the current user's password after verifying the old one."""
+    from app.dependencies import get_current_user
+
+    await _rate_limit(request, "auth:change-password", max_requests=5, window=60)
+
+    user = get_current_user(request)
+    db = _get_db()
+    try:
+        auth_svc = AuthService(request.app.state.settings)
+        # Verify current password
+        try:
+            auth_svc.authenticate(db, user.username, body.current_password)
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+        # Set new password
+        db_user = db.query(UserRecord).filter(UserRecord.id == user.id).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        db_user.password_hash = auth_svc.hash_password(body.new_password)
+        db.commit()
+        return {"message": "Password changed successfully"}
     finally:
         db.close()
 

@@ -18,8 +18,8 @@ def _get_db():
     return next(get_session())
 
 
-@router.get("", response_model=list[MemberResponse])
-async def list_members(request: Request, room_id: str | None = None):
+@router.get("")
+async def list_members(request: Request, room_id: str | None = None, limit: int = 50, offset: int = 0):
     from app.dependencies import get_current_user
     get_current_user(request)
 
@@ -34,15 +34,25 @@ async def list_members(request: Request, room_id: str | None = None):
                 .distinct()
                 .all()
             ]
-            members = (
-                db.query(MemberRecord)
-                .filter(MemberRecord.id.in_(member_ids))
-                .order_by(MemberRecord.name)
-                .all()
-            ) if member_ids else []
+            if member_ids:
+                base_query = (
+                    db.query(MemberRecord)
+                    .filter(MemberRecord.id.in_(member_ids))
+                    .order_by(MemberRecord.name)
+                )
+                total = base_query.count()
+                members = base_query.offset(offset).limit(limit).all()
+            else:
+                total = 0
+                members = []
         else:
-            members = db.query(MemberRecord).order_by(MemberRecord.name).all()
-        return [_to_response(m) for m in members]
+            base_query = db.query(MemberRecord).order_by(MemberRecord.name)
+            total = base_query.count()
+            members = base_query.offset(offset).limit(limit).all()
+        return {
+            "members": [_to_response(m) for m in members],
+            "total": total,
+        }
     finally:
         db.close()
 
@@ -214,9 +224,14 @@ async def delete_member(member_id: str, request: Request):
         db.query(ContributionRecord).filter(
             ContributionRecord.member_id == member_id
         ).delete()
-        artifacts = db.query(ArtifactRecord).all()
+        # Only load artifacts that reference this member (not ALL artifacts)
+        artifacts = (
+            db.query(ArtifactRecord)
+            .filter(ArtifactRecord.member_ids.isnot(None))
+            .all()
+        )
         for a in artifacts:
-            if a.member_ids and member_id in a.member_ids:
+            if member_id in (a.member_ids or []):
                 a.member_ids = [mid for mid in a.member_ids if mid != member_id]
         db.delete(member)
         db.commit()

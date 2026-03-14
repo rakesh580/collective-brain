@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     rate_limit_requests: int = 60  # per minute
     rate_limit_ai_requests: int = 10  # AI queries per minute per user
 
+    # Slack Bot Integration (set via CB_SLACK_CLIENT_ID, etc.)
+    slack_client_id: str = ""
+    slack_client_secret: str = ""
+    slack_signing_secret: str = ""
+
     @property
     def effective_database_url(self) -> str:
         """Return database_url if explicitly set, else sqlite_url as fallback."""

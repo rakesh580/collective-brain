@@ -11,6 +11,11 @@ export interface Member {
   total_contributions: number;
 }
 
+export interface MembersListResponse {
+  members: Member[];
+  total: number;
+}
+
 export interface MemberDetail extends Member {
   contributions: Contribution[];
 }
@@ -371,9 +376,30 @@ export interface SearchResults {
     rooms?: { id: string; name: string; description: string | null; is_public: boolean; created_at: string }[];
   };
   counts: Record<string, number>;
+  semantic?: {
+    chunks: { chunk_id: string; text: string; source_type: string; source_ref: string; score: number }[];
+  };
 }
 
 export interface DiscoverRoomsResponse {
   rooms: Room[];
   total: number;
+}
+
+// Slack Integration
+export interface SlackWorkspace {
+  id: string;
+  team_name: string;
+  installed_at: string | null;
+  is_active: boolean;
+}
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+  is_private: boolean;
+  member_count: number;
+  is_synced: boolean;
+  sync_id: string | null;
+  sync_mode: string | null;
 }

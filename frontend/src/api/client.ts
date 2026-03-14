@@ -2,6 +2,7 @@ import type {
   QueryResponse,
   Member,
   MemberDetail,
+  MembersListResponse,
   MemberCreateRequest,
   MemberUpdateRequest,
   DashboardData,
@@ -34,6 +35,8 @@ import type {
   RoomDetail,
   RoomMessage,
   RoomListResponse,
+  SlackWorkspace,
+  SlackChannel,
 } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
@@ -105,6 +108,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, code, new_password }),
     }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ status: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
   authProfile: () => request<User>("/auth/me"),
   authUpdateProfile: (data: Partial<User>) =>
     request<User>("/auth/me", {
@@ -121,9 +129,10 @@ export const api = {
     }),
 
   // Members
-  getMembers: (roomId?: string) => {
-    const p = roomId ? `?room_id=${roomId}` : "";
-    return request<Member[]>(`/members${p}`);
+  getMembers: (roomId?: string, limit = 50, offset = 0) => {
+    const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (roomId) p.set("room_id", roomId);
+    return request<MembersListResponse>(`/members?${p}`);
   },
   getMember: (id: string, roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
@@ -404,9 +413,32 @@ export const api = {
   },
 
   // Search
-  search: (q: string, limit = 20, roomId?: string) => {
+  search: (q: string, limit = 20, roomId?: string, semantic = false) => {
     const p = new URLSearchParams({ q, limit: String(limit) });
     if (roomId) p.set("room_id", roomId);
+    if (semantic) p.set("semantic", "true");
     return request<SearchResults>(`/search?${p}`);
   },
+
+  // Slack Integration
+  slackInstall: () =>
+    request<{ install_url: string }>("/slack/install"),
+  slackWorkspaces: () =>
+    request<{ workspaces: SlackWorkspace[] }>("/slack/workspaces"),
+  slackDisconnect: (workspaceId: string) =>
+    request<{ status: string }>(`/slack/workspaces/${workspaceId}`, { method: "DELETE" }),
+  slackChannels: (workspaceId: string) =>
+    request<{ channels: SlackChannel[] }>(`/slack/workspaces/${workspaceId}/channels`),
+  slackSyncChannel: (workspaceId: string, channelId: string, roomId?: string, syncMode = "ingest") => {
+    const p = new URLSearchParams({ sync_mode: syncMode });
+    if (roomId) p.set("room_id", roomId);
+    return request<{ status: string; sync_id: string; channel_name?: string }>(
+      `/slack/workspaces/${workspaceId}/channels/${channelId}/sync?${p}`,
+      { method: "POST" }
+    );
+  },
+  slackStopSync: (syncId: string) =>
+    request<{ status: string }>(`/slack/syncs/${syncId}`, { method: "DELETE" }),
+  slackBackfill: (syncId: string, limit = 200) =>
+    request<{ status: string; messages_ingested: number }>(`/slack/syncs/${syncId}/backfill?limit=${limit}`, { method: "POST" }),
 };

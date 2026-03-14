@@ -18,7 +18,7 @@ from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerError
 import app.models  # noqa: F401 -- ensure all models registered with Base
 from app.routers import (
     health, ingest, query, members, insights, graph,
-    conversations, artifacts, analytics, search, auth, discussions, rooms,
+    conversations, artifacts, analytics, search, auth, discussions, rooms, slack,
 )
 
 import logging
@@ -201,6 +201,7 @@ app.include_router(search.router, prefix="/search", tags=["search"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(discussions.router, prefix="/discussions", tags=["discussions"])
 app.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
+app.include_router(slack.router, prefix="/slack", tags=["slack"])
 
 # ── Serve frontend static files in production ──
 _static_dir = Path(__file__).resolve().parent.parent / "static"

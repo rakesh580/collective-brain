@@ -23,20 +23,39 @@ function getAvatarColor(name: string): string {
   return avatarColors[Math.abs(hash) % avatarColors.length];
 }
 
+const MEMBERS_PAGE_SIZE = 50;
+
 function MemberList() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const loadMembers = useCallback(() => {
     setLoading(true);
     api
-      .getMembers()
-      .then(setMembers)
+      .getMembers(undefined, MEMBERS_PAGE_SIZE, 0)
+      .then((res) => {
+        setMembers(res.members);
+        setTotal(res.total);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load members"))
       .finally(() => setLoading(false));
   }, []);
+
+  const loadMore = useCallback(() => {
+    setLoadingMore(true);
+    api
+      .getMembers(undefined, MEMBERS_PAGE_SIZE, members.length)
+      .then((res) => {
+        setMembers((prev) => [...prev, ...res.members]);
+        setTotal(res.total);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load more members"))
+      .finally(() => setLoadingMore(false));
+  }, [members.length]);
 
   useEffect(() => {
     loadMembers();
@@ -79,7 +98,7 @@ function MemberList() {
         </button>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-        {members.length} member{members.length !== 1 ? "s" : ""}
+        {members.length} of {total} member{total !== 1 ? "s" : ""}
       </p>
 
       {members.length === 0 ? (
@@ -98,11 +117,24 @@ function MemberList() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {members.map((m) => (
-            <MemberProfile key={m.id} member={m} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {members.map((m) => (
+              <MemberProfile key={m.id} member={m} />
+            ))}
+          </div>
+          {members.length < total && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-6 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50 transition-colors"
+              >
+                {loadingMore ? "Loading..." : "Load More"}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       <MemberFormModal

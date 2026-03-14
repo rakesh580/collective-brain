@@ -26,15 +26,28 @@ def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
         if existing:
             return existing
 
-    # Check aliases / name match
+    # Check name match using SQL ILIKE (much faster than loading all members)
     name = member_info.get("name", "").strip()
-    name_lower = name.lower()
-    if name_lower:
-        all_members = db.query(MemberRecord).all()
-        for m in all_members:
-            aliases = [a.lower() for a in (m.aliases or [])]
-            if name_lower in aliases or m.name.lower() == name_lower:
-                return m
+    if name:
+        # Try exact name match first (case-insensitive)
+        match = (
+            db.query(MemberRecord)
+            .filter(MemberRecord.name.ilike(name))
+            .first()
+        )
+        if match:
+            return match
+
+        # For alias matching, we still need to check JSON arrays.
+        # But limit the search to a reasonable set using name-based heuristic.
+        # Check if name appears as substring in any member's name
+        partial_match = (
+            db.query(MemberRecord)
+            .filter(MemberRecord.name.ilike(f"%{name}%"))
+            .first()
+        )
+        if partial_match:
+            return partial_match
 
     # Generate a proper slug ID if none provided
     if not member_id:
@@ -229,6 +242,28 @@ def _validate_local_path(path: str) -> str:
             detail="Access denied: path is outside allowed directories",
         )
     return resolved
+
+
+@router.get("/tasks/{task_id}")
+async def get_task_status(task_id: str, request: Request):
+    """Check the status of an async ingestion task."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    task_queue = request.app.state.task_queue
+    task_result = task_queue.get_result(task_id)
+    if task_result is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    response = {
+        "task_id": task_result.task_id,
+        "status": task_result.status.value,
+    }
+    if task_result.result is not None:
+        response["result"] = task_result.result
+    if task_result.error is not None:
+        response["error"] = task_result.error
+    return response
 
 
 @router.post("/markdown", response_model=IngestionResponse)

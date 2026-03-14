@@ -3,8 +3,9 @@ import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import type { HealthStatus, ArtifactListResponse } from "../types";
 import {
-  Activity, Server, Brain, Database, Cpu, Trash2, Settings, Info, User, X, Plus, Save,
+  Activity, Server, Brain, Database, Cpu, Trash2, Settings, Info, User, X, Plus, Save, Lock,
 } from "lucide-react";
+import SlackIntegration from "../components/integrations/SlackIntegration";
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -20,6 +21,13 @@ export default function SettingsPage() {
   const [newSkill, setNewSkill] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
+
+  // Change Password state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -53,6 +61,35 @@ export default function SettingsPage() {
       setProfileMsg(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordMsg(null);
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordMsg({ type: "error", text: "All fields are required." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ type: "error", text: "New passwords do not match." });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordMsg({ type: "error", text: "New password must be at least 6 characters." });
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setPasswordMsg({ type: "success", text: "Password changed successfully!" });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordMsg(null), 5000);
+    } catch (err) {
+      setPasswordMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to change password" });
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -194,6 +231,67 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Change Password */}
+      {user && (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Lock size={16} className="text-amber-500" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Change Password</h3>
+          </div>
+
+          <div className="space-y-4 max-w-md">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleChangePassword}
+                disabled={passwordSaving}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                <Lock size={14} />
+                {passwordSaving ? "Changing..." : "Change Password"}
+              </button>
+              {passwordMsg && (
+                <span className={`text-sm ${passwordMsg.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {passwordMsg.text}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* System Status */}
       {health && (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
@@ -272,6 +370,11 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Slack Integration */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+        <SlackIntegration />
+      </div>
+
       {/* Configuration Info */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
@@ -296,6 +399,9 @@ export default function SettingsPage() {
             { key: "CB_CHUNK_SIZE", desc: "Text chunk size (tokens)" },
             { key: "CB_RETRIEVAL_TOP_K", desc: "Number of chunks to retrieve" },
             { key: "CB_AGENT_MAX_ITERATIONS", desc: "Max agent reasoning steps" },
+            { key: "CB_SLACK_CLIENT_ID", desc: "Slack app client ID" },
+            { key: "CB_SLACK_CLIENT_SECRET", desc: "Slack app client secret" },
+            { key: "CB_SLACK_SIGNING_SECRET", desc: "Slack request signing secret" },
           ].map((cfg) => (
             <div key={cfg.key} className="flex items-start gap-2 text-xs">
               <code className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
