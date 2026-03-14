@@ -100,6 +100,7 @@ def init_db(sqlite_url: str = "", settings=None):
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
     Base.metadata.create_all(bind=_engine)
     _run_migrations(_engine)
+    _ensure_help_requests_table(_engine)
 
     logger.info("Database initialized (%s)", "PostgreSQL" if is_postgres else "SQLite")
 
@@ -257,6 +258,139 @@ def _run_migrations(engine):
                 logger.warning("Database has 0 users — data may have been lost on restart!")
             else:
                 logger.info("Database has %d registered user(s) (data persisted OK)", count)
+
+
+def _ensure_help_requests_table(engine):
+    """Create the help_requests table if it doesn't exist."""
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS help_requests (
+                id TEXT PRIMARY KEY,
+                requester_user_id TEXT NOT NULL,
+                expert_member_id TEXT NOT NULL,
+                query TEXT NOT NULL,
+                topics TEXT DEFAULT '[]',
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP
+            )
+        """))
+        conn.commit()
+    logger.info("Ensured help_requests table exists")
+
+
+def create_help_request(
+    db: Session,
+    requester_user_id: str,
+    expert_member_id: str,
+    query: str,
+    topics: list[str] | None = None,
+) -> dict:
+    """Insert a new help request and return it as a dict."""
+    import json
+    import uuid
+    from datetime import datetime
+
+    request_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+    topics_json = json.dumps(topics or [])
+
+    db.execute(
+        text(
+            "INSERT INTO help_requests (id, requester_user_id, expert_member_id, query, topics, status, created_at) "
+            "VALUES (:id, :requester_user_id, :expert_member_id, :query, :topics, :status, :created_at)"
+        ),
+        {
+            "id": request_id,
+            "requester_user_id": requester_user_id,
+            "expert_member_id": expert_member_id,
+            "query": query,
+            "topics": topics_json,
+            "status": "pending",
+            "created_at": now,
+        },
+    )
+    db.commit()
+
+    return {
+        "id": request_id,
+        "requester_user_id": requester_user_id,
+        "expert_member_id": expert_member_id,
+        "query": query,
+        "topics": topics or [],
+        "status": "pending",
+        "created_at": now,
+        "resolved_at": None,
+    }
+
+
+def get_help_requests(
+    db: Session,
+    user_id: str,
+    linked_member_id: str | None = None,
+) -> list[dict]:
+    """Fetch help requests where the user is requester or the linked expert."""
+    import json
+
+    if linked_member_id:
+        rows = db.execute(
+            text(
+                "SELECT id, requester_user_id, expert_member_id, query, topics, "
+                "status, created_at, resolved_at FROM help_requests "
+                "WHERE requester_user_id = :uid OR expert_member_id = :mid "
+                "ORDER BY created_at DESC"
+            ),
+            {"uid": user_id, "mid": linked_member_id},
+        ).fetchall()
+    else:
+        rows = db.execute(
+            text(
+                "SELECT id, requester_user_id, expert_member_id, query, topics, "
+                "status, created_at, resolved_at FROM help_requests "
+                "WHERE requester_user_id = :uid "
+                "ORDER BY created_at DESC"
+            ),
+            {"uid": user_id},
+        ).fetchall()
+
+    results = []
+    for row in rows:
+        topics_raw = row[4]
+        if isinstance(topics_raw, str):
+            try:
+                topics_parsed = json.loads(topics_raw)
+            except (json.JSONDecodeError, TypeError):
+                topics_parsed = []
+        else:
+            topics_parsed = topics_raw or []
+
+        results.append({
+            "id": row[0],
+            "requester_user_id": row[1],
+            "expert_member_id": row[2],
+            "query": row[3],
+            "topics": topics_parsed,
+            "status": row[5],
+            "created_at": row[6],
+            "resolved_at": row[7],
+        })
+    return results
+
+
+def update_help_request_status(db: Session, request_id: str, new_status: str) -> bool:
+    """Update the status of a help request. Returns True if a row was updated."""
+    from datetime import datetime
+
+    resolved_at = datetime.utcnow() if new_status == "resolved" else None
+    result = db.execute(
+        text(
+            "UPDATE help_requests SET status = :status, resolved_at = :resolved_at "
+            "WHERE id = :id"
+        ),
+        {"status": new_status, "resolved_at": resolved_at, "id": request_id},
+    )
+    db.commit()
+    return result.rowcount > 0
 
 
 def get_session() -> Generator[Session, None, None]:

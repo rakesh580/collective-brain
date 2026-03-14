@@ -386,6 +386,16 @@ export interface DiscoverRoomsResponse {
   total: number;
 }
 
+// Expert Routing
+export interface ExpertRecommendation {
+  member_id: string;
+  name: string;
+  match_score: number;
+  expertise_topics: string[];
+  last_active: string;
+  availability_hint: string;
+}
+
 // Slack Integration
 export interface SlackWorkspace {
   id: string;

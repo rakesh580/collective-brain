@@ -30,6 +30,7 @@ import type {
   DiscussionMessage,
   DiscoverRoomsResponse,
   ExpertiseMatrixData,
+  ExpertRecommendation,
   GraphStats,
   Room,
   RoomDetail,
@@ -459,4 +460,13 @@ export const api = {
     request<{ configured: boolean; webhook_url: string; instructions: string[]; required_env_vars: string[]; supported_events: string[] }>("/github/setup"),
   githubEvents: (limit = 20) =>
     request<{ events: { id: string; type: string; title: string; source_path: string; chunk_count: number; ingested_at: string | null; member_ids: string[] }[]; total: number }>(`/github/events?limit=${limit}`),
+
+  // Expert Routing
+  recommendExperts: (query: string, topK = 3) =>
+    request<{ experts: ExpertRecommendation[]; query: string; topics: string[] }>(`/experts/recommend?query=${encodeURIComponent(query)}&top_k=${topK}`),
+  requestHelp: (expertMemberId: string, query: string, topics: string[]) =>
+    request<{ id: string; status: string }>("/experts/request-help", {
+      method: "POST",
+      body: JSON.stringify({ expert_member_id: expertMemberId, query, topics }),
+    }),
 };

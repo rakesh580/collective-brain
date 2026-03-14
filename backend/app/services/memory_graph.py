@@ -893,6 +893,117 @@ class MemoryGraph:
             },
         }
 
+    # ── Expert Routing ──────────────────────────────────────────
+
+    def find_experts_for_topics(
+        self, topics: list[str], top_k: int = 3
+    ) -> list[dict]:
+        """Find the best experts for a set of query topics.
+
+        Scoring formula per member:
+            final = expertise_score * 0.6 + pagerank * 0.2 + recency * 0.2
+
+        Returns a sorted list (highest score first) of dicts with keys:
+            member_id, name, match_score, expertise_topics, last_active,
+            availability_hint
+        """
+        G = self._get_or_build_nx_graph()
+
+        # Normalise query topics for matching
+        query_topics = {t.strip().lower() for t in topics if t.strip()}
+        if not query_topics:
+            return []
+
+        # Collect all member nodes
+        member_nodes = {
+            nid: d
+            for nid, d in G.nodes(data=True)
+            if d.get("node_type") == "member"
+        }
+
+        if not member_nodes:
+            return []
+
+        # Determine global max PageRank among members for normalisation
+        max_pr = max(
+            (d.get("pagerank", 0) for d in member_nodes.values()), default=0
+        ) or 1.0
+
+        # Build per-member last-active map from contributions
+        contribs = self._query_contributions()
+        member_last_active: dict[str, datetime] = {}
+        for c in contribs:
+            if c.timestamp and c.member_id:
+                prev = member_last_active.get(c.member_id)
+                if prev is None or c.timestamp > prev:
+                    member_last_active[c.member_id] = c.timestamp
+
+        now = datetime.utcnow()
+        scored: list[dict] = []
+
+        for mid, mdata in member_nodes.items():
+            # Compute expertise scores for this member
+            expertise = self.compute_expertise_scores(mid)
+            if not expertise:
+                continue
+
+            # Find matching topics
+            matched_topics: list[str] = []
+            expertise_score = 0.0
+            for qt in query_topics:
+                for topic_label, score in expertise.items():
+                    if qt in topic_label.lower() or topic_label.lower() in qt:
+                        matched_topics.append(topic_label)
+                        expertise_score += score
+                        break  # one match per query topic
+
+            if not matched_topics:
+                continue
+
+            # Normalise expertise_score to [0, 1]
+            expertise_score = min(expertise_score / max(len(query_topics), 1), 1.0)
+
+            # PageRank component (normalised)
+            pr = mdata.get("pagerank", 0)
+            pr_norm = pr / max_pr if max_pr > 0 else 0
+
+            # Recency component
+            last_active = member_last_active.get(mid)
+            recency = _temporal_decay(last_active, now, half_life_days=90)
+
+            # Weighted final score
+            match_score = round(
+                expertise_score * 0.6 + pr_norm * 0.2 + recency * 0.2,
+                4,
+            )
+
+            # Availability hint based on recency
+            if last_active:
+                days_ago = (now - last_active).days
+                if days_ago <= 7:
+                    availability_hint = "active"
+                elif days_ago <= 30:
+                    availability_hint = "recently active"
+                elif days_ago <= 90:
+                    availability_hint = "occasionally active"
+                else:
+                    availability_hint = "inactive"
+            else:
+                availability_hint = "unknown"
+
+            scored.append({
+                "member_id": mid,
+                "name": mdata.get("label", mid),
+                "match_score": match_score,
+                "expertise_topics": list(set(matched_topics)),
+                "last_active": last_active,
+                "availability_hint": availability_hint,
+            })
+
+        # Sort descending by match_score
+        scored.sort(key=lambda x: x["match_score"], reverse=True)
+        return scored[:top_k]
+
     def _get_topic_member_map(self) -> dict[str, dict[str, int]]:
         contribs = self._query_contributions()
         topic_members: dict[str, dict[str, int]] = defaultdict(

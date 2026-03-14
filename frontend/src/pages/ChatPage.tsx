@@ -1,10 +1,13 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "../hooks/useChat";
 import { useAuth } from "../hooks/useAuth";
+import { api } from "../api/client";
+import type { ExpertRecommendation } from "../types";
 import MessageBubble from "../components/chat/MessageBubble";
 import ChatInput from "../components/chat/ChatInput";
 import ShareModal from "../components/chat/ShareModal";
 import TeamSidebar from "../components/chat/TeamSidebar";
+import ExpertSuggestion from "../components/chat/ExpertSuggestion";
 import { LogoIcon } from "../components/layout/Logo";
 import {
   PanelLeftOpen, PanelLeftClose, Plus, Share2, Users, X, Trash2,
@@ -20,6 +23,33 @@ export default function ChatPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [expertSuggestions, setExpertSuggestions] = useState<ExpertRecommendation[]>([]);
+  const [expertQuery, setExpertQuery] = useState("");
+  const [showExperts, setShowExperts] = useState(false);
+
+  const sendWithExperts = useCallback(
+    async (question: string) => {
+      setShowExperts(false);
+      setExpertSuggestions([]);
+      await send(question);
+      // Fetch expert recommendations after AI response
+      try {
+        const result = await api.recommendExperts(question);
+        if (result.experts.length > 0) {
+          setExpertSuggestions(result.experts);
+          setExpertQuery(question);
+          setShowExperts(true);
+        }
+      } catch {
+        // Expert suggestions are non-critical; silently ignore failures
+      }
+    },
+    [send]
+  );
+
+  const dismissExperts = useCallback(() => {
+    setShowExperts(false);
+  }, []);
 
   const isOwner = !activeConversation || activeConversation.owner_user_id === user?.id;
 
@@ -55,7 +85,7 @@ export default function ChatPage() {
                 }`}
               >
                 <button
-                  onClick={() => loadConversation(conv.id)}
+                  onClick={() => { loadConversation(conv.id); dismissExperts(); }}
                   className="flex-1 text-left min-w-0"
                 >
                   <p className="text-xs font-medium truncate">{conv.title}</p>
@@ -125,7 +155,7 @@ export default function ChatPage() {
               Team
             </button>
             <button
-              onClick={reset}
+              onClick={() => { reset(); dismissExperts(); }}
               className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
               <Plus size={14} />
@@ -154,7 +184,7 @@ export default function ChatPage() {
                 ].map((q) => (
                   <button
                     key={q}
-                    onClick={() => send(q)}
+                    onClick={() => sendWithExperts(q)}
                     className="block w-full text-left text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all"
                   >
                     {q}
@@ -167,6 +197,14 @@ export default function ChatPage() {
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
+
+          {showExperts && expertSuggestions.length > 0 && !isLoading && (
+            <ExpertSuggestion
+              query={expertQuery}
+              experts={expertSuggestions}
+              onDismiss={dismissExperts}
+            />
+          )}
 
           {isLoading && (
             <div className="flex justify-start mb-4">
@@ -187,14 +225,14 @@ export default function ChatPage() {
           )}
         </div>
 
-        <ChatInput onSend={send} disabled={isLoading} />
+        <ChatInput onSend={sendWithExperts} disabled={isLoading} />
       </div>
 
       {/* Team members sidebar */}
       {showTeam && (
         <TeamSidebar
           onAskAbout={(name) => {
-            send(`What does ${name} know? What are their key contributions and expertise?`);
+            sendWithExperts(`What does ${name} know? What are their key contributions and expertise?`);
           }}
         />
       )}

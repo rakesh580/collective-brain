@@ -1,0 +1,191 @@
+import { useState } from "react";
+import { Users, Sparkles, Clock, CheckCircle2, X, MessageCircle } from "lucide-react";
+import type { ExpertRecommendation } from "../../types";
+import { api } from "../../api/client";
+
+interface Props {
+  query: string;
+  experts: ExpertRecommendation[];
+  onDismiss: () => void;
+}
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return `${Math.floor(diffDays / 7)}w ago`;
+}
+
+export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+
+  if (experts.length === 0) {
+    return null;
+  }
+
+  const handleRequestHelp = async (expert: ExpertRecommendation) => {
+    if (requestedIds.has(expert.member_id) || loadingIds.has(expert.member_id)) return;
+
+    setLoadingIds((prev) => new Set(prev).add(expert.member_id));
+    try {
+      await api.requestHelp(expert.member_id, query, expert.expertise_topics);
+      setRequestedIds((prev) => new Set(prev).add(expert.member_id));
+    } catch {
+      // Silently handle error - the button will remain clickable
+    } finally {
+      setLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(expert.member_id);
+        return next;
+      });
+    }
+  };
+
+  return (
+    <div className="mb-4 animate-[fadeSlideUp_0.4s_ease-out]">
+      <style>{`
+        @keyframes fadeSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
+      <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-slate-800 dark:via-slate-800 dark:to-indigo-900/20 border border-indigo-200 dark:border-indigo-500/20 rounded-2xl p-4 shadow-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-500/20">
+              <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Want to talk to an expert?
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                These team members may be able to help
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            aria-label="Dismiss expert suggestions"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Expert cards */}
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {experts.map((expert) => {
+            const isRequested = requestedIds.has(expert.member_id);
+            const isLoadingThis = loadingIds.has(expert.member_id);
+            const scorePercent = Math.round(expert.match_score * 100);
+
+            return (
+              <div
+                key={expert.member_id}
+                className={`flex-shrink-0 w-56 rounded-xl border p-3 transition-all ${
+                  isRequested
+                    ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-500/20"
+                    : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/30 hover:shadow-md"
+                }`}
+              >
+                {/* Name and availability */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex-shrink-0">
+                      <Users size={14} className="text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                        {expert.name}
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {expert.availability_hint}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Match score bar */}
+                <div className="mb-2">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                      Match
+                    </span>
+                    <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                      {scorePercent}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${scorePercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Expertise tags */}
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {expert.expertise_topics.slice(0, 3).map((topic) => (
+                    <span
+                      key={topic}
+                      className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                  {expert.expertise_topics.length > 3 && (
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 self-center">
+                      +{expert.expertise_topics.length - 3}
+                    </span>
+                  )}
+                </div>
+
+                {/* Last active */}
+                <div className="flex items-center gap-1 mb-3">
+                  <Clock size={10} className="text-slate-400 dark:text-slate-500" />
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Active {timeAgo(expert.last_active)}
+                  </span>
+                </div>
+
+                {/* Action button */}
+                {isRequested ? (
+                  <div className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400 text-xs font-medium">
+                    <CheckCircle2 size={14} />
+                    Request Sent
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleRequestHelp(expert)}
+                    disabled={isLoadingThis}
+                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <MessageCircle size={12} />
+                    {isLoadingThis ? "Sending..." : "Request Help"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
