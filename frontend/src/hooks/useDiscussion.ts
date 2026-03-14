@@ -47,7 +47,7 @@ export function useDiscussion(threadId: string | null) {
       if (unmountedRef.current) return;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//${window.location.host}/discussions/ws/${threadId}`);
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/discussions/ws/${threadId}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

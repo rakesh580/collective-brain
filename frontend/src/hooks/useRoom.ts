@@ -82,7 +82,7 @@ export function useRoom(roomId: string | null): UseRoom {
       if (unmountedRef.current) return;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//${window.location.host}/rooms/ws/${roomId}`);
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/rooms/ws/${roomId}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

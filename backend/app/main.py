@@ -188,23 +188,23 @@ async def global_exception_handler(request, exc):
     )
 
 
-# Routers
-app.include_router(health.router, prefix="/health", tags=["health"])
-app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
-app.include_router(query.router, tags=["query"])
-app.include_router(members.router, prefix="/members", tags=["members"])
-app.include_router(insights.router, prefix="/insights", tags=["insights"])
-app.include_router(graph.router, prefix="/graph", tags=["graph"])
-app.include_router(conversations.router, prefix="/conversations", tags=["conversations"])
-app.include_router(artifacts.router, prefix="/artifacts", tags=["artifacts"])
-app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
-app.include_router(search.router, prefix="/search", tags=["search"])
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(discussions.router, prefix="/discussions", tags=["discussions"])
-app.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
-app.include_router(slack.router, prefix="/slack", tags=["slack"])
-app.include_router(github_webhooks.router, prefix="/github", tags=["github"])
-app.include_router(expert_routing.router, prefix="/experts", tags=["experts"])
+# Routers — all under /api prefix so they don't collide with SPA routes
+app.include_router(health.router, prefix="/api/health", tags=["health"])
+app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
+app.include_router(query.router, prefix="/api", tags=["query"])
+app.include_router(members.router, prefix="/api/members", tags=["members"])
+app.include_router(insights.router, prefix="/api/insights", tags=["insights"])
+app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
+app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
+app.include_router(artifacts.router, prefix="/api/artifacts", tags=["artifacts"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(discussions.router, prefix="/api/discussions", tags=["discussions"])
+app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
+app.include_router(slack.router, prefix="/api/slack", tags=["slack"])
+app.include_router(github_webhooks.router, prefix="/api/github", tags=["github"])
+app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"])
 
 # ── Serve frontend static files in production ──
 _static_dir = Path(__file__).resolve().parent.parent / "static"

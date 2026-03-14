@@ -53,7 +53,7 @@ async def slack_install(request: Request):
 
     # Build redirect URI based on request origin
     base_url = str(request.base_url).rstrip("/")
-    redirect_uri = f"{base_url}/slack/oauth/callback"
+    redirect_uri = f"{base_url}/api/slack/oauth/callback"
 
     # Generate state token for CSRF protection
     import secrets
@@ -83,7 +83,7 @@ async def slack_oauth_callback(request: Request, code: str, state: str):
     slack = SlackService(settings)
 
     base_url = str(request.base_url).rstrip("/")
-    redirect_uri = f"{base_url}/slack/oauth/callback"
+    redirect_uri = f"{base_url}/api/slack/oauth/callback"
 
     try:
         oauth_data = await slack.exchange_code(code, redirect_uri)
