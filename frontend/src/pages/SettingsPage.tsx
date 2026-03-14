@@ -6,6 +6,7 @@ import {
   Activity, Server, Brain, Database, Cpu, Trash2, Settings, Info, User, X, Plus, Save, Lock,
 } from "lucide-react";
 import SlackIntegration from "../components/integrations/SlackIntegration";
+import GitHubIntegration from "../components/integrations/GitHubIntegration";
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -375,6 +376,11 @@ export default function SettingsPage() {
         <SlackIntegration />
       </div>
 
+      {/* GitHub Integration */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+        <GitHubIntegration />
+      </div>
+
       {/* Configuration Info */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
@@ -402,6 +408,7 @@ export default function SettingsPage() {
             { key: "CB_SLACK_CLIENT_ID", desc: "Slack app client ID" },
             { key: "CB_SLACK_CLIENT_SECRET", desc: "Slack app client secret" },
             { key: "CB_SLACK_SIGNING_SECRET", desc: "Slack request signing secret" },
+            { key: "CB_GITHUB_WEBHOOK_SECRET", desc: "GitHub webhook HMAC secret" },
           ].map((cfg) => (
             <div key={cfg.key} className="flex items-start gap-2 text-xs">
               <code className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-indigo-600 dark:text-indigo-400 whitespace-nowrap">

@@ -451,4 +451,12 @@ export const api = {
     request<{ status: string }>(`/slack/syncs/${syncId}`, { method: "DELETE" }),
   slackBackfill: (syncId: string, limit = 200) =>
     request<{ status: string; messages_ingested: number }>(`/slack/syncs/${syncId}/backfill?limit=${limit}`, { method: "POST" }),
+
+  // GitHub Integration
+  githubStatus: () =>
+    request<{ configured: boolean; webhook_url: string }>("/github/status"),
+  githubSetup: () =>
+    request<{ configured: boolean; webhook_url: string; instructions: string[]; required_env_vars: string[]; supported_events: string[] }>("/github/setup"),
+  githubEvents: (limit = 20) =>
+    request<{ events: { id: string; type: string; title: string; source_path: string; chunk_count: number; ingested_at: string | null; member_ids: string[] }[]; total: number }>(`/github/events?limit=${limit}`),
 };
