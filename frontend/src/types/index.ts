@@ -118,6 +118,17 @@ export interface ExpertiseMatrixData {
   topics: string[];
 }
 
+export interface GraphStats {
+  total_nodes: number;
+  total_edges: number;
+  members: number;
+  topics: number;
+  artifacts: number;
+  communities: number;
+  density: number;
+  top_members: { id: string; name: string; pagerank: number }[];
+}
+
 export interface Insight {
   id: string;
   insight_type: "pattern" | "risk" | "recommendation" | "weekly_summary";

@@ -168,7 +168,12 @@ def _run_migrations(engine):
         if "users" in tables:
             user_cols = [c["name"] for c in inspector.get_columns("users")]
             if "google_id" not in user_cols:
-                conn.execute(text("ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN google_id TEXT"))
+                # SQLite doesn't support ADD COLUMN ... UNIQUE, so create index separately
+                try:
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)"))
+                except Exception:
+                    pass  # Index may already exist
                 logger.info("Migration: added users.google_id")
             if "auth_provider" not in user_cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'"))

@@ -29,6 +29,7 @@ import type {
   DiscussionMessage,
   DiscoverRoomsResponse,
   ExpertiseMatrixData,
+  GraphStats,
   Room,
   RoomDetail,
   RoomMessage,
@@ -182,6 +183,10 @@ export const api = {
   getExpertiseMatrix: (roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
     return request<ExpertiseMatrixData>(`/graph/expertise-matrix${p}`);
+  },
+  getGraphStats: (roomId?: string) => {
+    const p = roomId ? `?room_id=${roomId}` : "";
+    return request<GraphStats>(`/graph/stats${p}`);
   },
 
   // Ingest

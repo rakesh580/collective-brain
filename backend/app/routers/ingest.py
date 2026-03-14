@@ -59,93 +59,96 @@ def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
 def _run_ingestion(request: Request, connector, source_input, source_path: str, room_id: str | None = None):
     """Common ingestion pipeline: parse → embed → store → record."""
     db = _get_db()
-    embedder = request.app.state.embedding_service
-    vs = request.app.state.vector_store
+    try:
+        embedder = request.app.state.embedding_service
+        vs = request.app.state.vector_store
 
-    # Parse
-    chunks = connector.parse(source_input)
-    members_info = connector.extract_members(source_input)
+        # Parse
+        chunks = connector.parse(source_input)
+        members_info = connector.extract_members(source_input)
 
-    # Resolve members
-    member_ids = []
-    for mi in members_info:
-        member = _resolve_or_create_member(db, mi)
-        member_ids.append(member.id)
+        # Resolve members
+        member_ids = []
+        for mi in members_info:
+            member = _resolve_or_create_member(db, mi)
+            member_ids.append(member.id)
 
-    # Create artifact record
-    artifact_id = str(uuid4())
-    artifact = ArtifactRecord(
-        id=artifact_id,
-        source_type=connector.source_type(),
-        source_path=source_path,
-        title=source_path.split("/")[-1],
-        chunk_count=len(chunks),
-        member_ids=member_ids,
-        status="completed",
-        room_id=room_id,
-    )
-    db.add(artifact)
+        # Create artifact record
+        artifact_id = str(uuid4())
+        artifact = ArtifactRecord(
+            id=artifact_id,
+            source_type=connector.source_type(),
+            source_path=source_path,
+            title=source_path.split("/")[-1],
+            chunk_count=len(chunks),
+            member_ids=member_ids,
+            status="completed",
+            room_id=room_id,
+        )
+        db.add(artifact)
 
-    # Embed and store chunks
-    if chunks:
-        texts = [c.text for c in chunks]
-        embeddings = embedder.embed_batch(texts)
+        # Embed and store chunks
+        if chunks:
+            texts = [c.text for c in chunks]
+            embeddings = embedder.embed_batch(texts)
 
-        ids = [f"chunk-{uuid4()}" for _ in chunks]
-        documents = texts
-        metadatas = []
-        for c in chunks:
-            meta = {
-                "source_type": c.source_type,
-                "source_ref": c.source_ref,
-                "artifact_id": artifact_id,
-                "author": c.author or "unknown",
-                "timestamp": c.timestamp.isoformat() if c.timestamp else "",
-                "topics": ",".join(c.topics),
-                "room_id": room_id or "",
-            }
-            metadatas.append(meta)
+            ids = [f"chunk-{uuid4()}" for _ in chunks]
+            documents = texts
+            metadatas = []
+            for c in chunks:
+                meta = {
+                    "source_type": c.source_type,
+                    "source_ref": c.source_ref,
+                    "artifact_id": artifact_id,
+                    "author": c.author or "unknown",
+                    "timestamp": c.timestamp.isoformat() if c.timestamp else "",
+                    "topics": ",".join(c.topics),
+                    "room_id": room_id or "",
+                }
+                metadatas.append(meta)
 
-        vs.add_documents(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
+            vs.add_documents(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
 
-        # Create contribution records for chunks with authors
-        for c in chunks:
-            if c.author:
-                author_id = c.author.lower().replace(" ", "-")
-                member = db.query(MemberRecord).filter(MemberRecord.id == author_id).first()
-                if member:
-                    contrib = ContributionRecord(
-                        id=str(uuid4()),
-                        member_id=member.id,
-                        artifact_id=artifact_id,
-                        contribution_type=f"{c.source_type}_content",
-                        timestamp=c.timestamp,
-                        description=c.text[:200],
-                        topics=c.topics,
-                        room_id=room_id,
-                    )
-                    db.add(contrib)
-                    member.total_contributions = (member.total_contributions or 0) + 1
-                    if c.timestamp and (not member.last_active or c.timestamp > member.last_active):
-                        member.last_active = c.timestamp
-                    # Update expertise tags
-                    existing_tags = set(member.expertise_tags or [])
-                    existing_tags.update(c.topics)
-                    member.expertise_tags = list(existing_tags)
+            # Create contribution records for chunks with authors
+            for c in chunks:
+                if c.author:
+                    author_id = c.author.lower().replace(" ", "-")
+                    member = db.query(MemberRecord).filter(MemberRecord.id == author_id).first()
+                    if member:
+                        contrib = ContributionRecord(
+                            id=str(uuid4()),
+                            member_id=member.id,
+                            artifact_id=artifact_id,
+                            contribution_type=f"{c.source_type}_content",
+                            timestamp=c.timestamp,
+                            description=c.text[:200],
+                            topics=c.topics,
+                            room_id=room_id,
+                        )
+                        db.add(contrib)
+                        member.total_contributions = (member.total_contributions or 0) + 1
+                        if c.timestamp and (not member.last_active or c.timestamp > member.last_active):
+                            member.last_active = c.timestamp
+                        # Update expertise tags
+                        existing_tags = set(member.expertise_tags or [])
+                        existing_tags.update(c.topics)
+                        member.expertise_tags = list(existing_tags)
 
-    db.commit()
+        db.commit()
 
-    # Invalidate cached graph so new data is reflected
-    from app.services.memory_graph import invalidate_graph_cache
-    invalidate_graph_cache(room_id=room_id)
+        # Invalidate cached graph so new data is reflected
+        from app.services.memory_graph import invalidate_graph_cache
+        invalidate_graph_cache(room_id=room_id)
 
-    return IngestionResponse(
-        artifact_id=artifact_id,
-        source_type=connector.source_type(),
-        status="completed",
-        chunk_count=len(chunks),
-        member_count=len(member_ids),
-    )
+        return IngestionResponse(
+            artifact_id=artifact_id,
+            source_type=connector.source_type(),
+            status="completed",
+            chunk_count=len(chunks),
+            member_count=len(member_ids),
+        )
+    finally:
+        db.close()
 
 
 _MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB per file

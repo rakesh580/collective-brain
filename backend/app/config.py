@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     def is_postgres(self) -> bool:
         return self.effective_database_url.startswith("postgresql")
 
-    model_config = {"env_file": ".env", "env_prefix": "CB_"}
+    model_config = {"env_file": ".env", "env_prefix": "CB_", "extra": "ignore"}
 
 
 _settings: Settings | None = None
