@@ -530,6 +530,9 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.25}
             nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+              // Guard against non-finite coordinates during force simulation init
+              if (!isFinite(node.x) || !isFinite(node.y)) return;
+
               const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node.id);
               const isHovered = hoverNode?.id === node.id;
               const isFocused = focusNodeId === node.id;
