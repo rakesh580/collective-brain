@@ -1,9 +1,10 @@
-"""Slack bot integration endpoints — OAuth, Events API, slash commands."""
+"""Slack bot integration endpoints — OAuth, Events API, slash commands, digest."""
 import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 from app.db.database import get_session
 from app.models.slack_integration import SlackWorkspace, SlackChannelSync
@@ -485,5 +486,133 @@ async def slack_commands(request: Request):
             "response_type": "ephemeral",
             "text": "Sorry, I encountered an error processing your request. Please try again.",
         }
+    finally:
+        db.close()
+
+
+# ─── Pydantic Models for Digest Endpoints ─────────────────────
+
+
+class DigestSendRequest(BaseModel):
+    workspace_id: str
+    channel_id: str
+
+
+class DigestConfigureRequest(BaseModel):
+    workspace_id: str
+    channel_id: str
+    channel_name: str = ""
+    schedule_day: int = 0  # 0=Monday
+    schedule_hour: int = 9
+    enabled: bool = True
+
+
+# ─── Weekly Digest Endpoints ──────────────────────────────────
+
+
+@router.post("/digest/send")
+async def digest_send(body: DigestSendRequest, request: Request):
+    """Manually trigger a weekly digest send to a specified Slack channel."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    from app.services.digest_service import send_digest_to_slack
+
+    db = _get_db()
+    try:
+        result = await send_digest_to_slack(
+            db=db,
+            workspace_id=body.workspace_id,
+            channel_id=body.channel_id,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Digest send failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to send digest")
+    finally:
+        db.close()
+
+
+@router.get("/digest/preview")
+async def digest_preview(request: Request):
+    """Preview the weekly digest content as JSON and plain text (does not send to Slack)."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    from app.services.digest_service import (
+        generate_weekly_digest,
+        format_slack_blocks,
+        format_text_digest,
+    )
+
+    db = _get_db()
+    try:
+        digest_data = generate_weekly_digest(db)
+        blocks = format_slack_blocks(digest_data)
+        text_version = format_text_digest(digest_data)
+
+        return {
+            "digest_data": digest_data,
+            "slack_blocks": blocks,
+            "text_preview": text_version,
+        }
+    except Exception as e:
+        logger.error("Digest preview failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to generate digest preview")
+    finally:
+        db.close()
+
+
+@router.post("/digest/configure")
+async def digest_configure(body: DigestConfigureRequest, request: Request):
+    """Save or update digest schedule configuration for a workspace + channel."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    from app.db.database import save_digest_config
+
+    db = _get_db()
+    try:
+        # Verify workspace exists
+        workspace = db.query(SlackWorkspace).filter(SlackWorkspace.id == body.workspace_id).first()
+        if not workspace or not workspace.is_active:
+            raise HTTPException(status_code=404, detail="Workspace not found or inactive")
+
+        config = save_digest_config(
+            db=db,
+            workspace_id=body.workspace_id,
+            channel_id=body.channel_id,
+            channel_name=body.channel_name,
+            schedule_day=body.schedule_day,
+            schedule_hour=body.schedule_hour,
+            enabled=body.enabled,
+        )
+        return {"status": "saved", "config": config}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Digest configure failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save digest configuration")
+    finally:
+        db.close()
+
+
+@router.get("/digest/config")
+async def digest_get_config(request: Request, workspace_id: str = ""):
+    """Get current digest configuration(s) for a workspace."""
+    from app.dependencies import get_current_user
+    get_current_user(request)
+
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="workspace_id query parameter is required")
+
+    from app.db.database import get_digest_config
+
+    db = _get_db()
+    try:
+        configs = get_digest_config(db, workspace_id)
+        return {"configs": configs}
     finally:
         db.close()

@@ -413,3 +413,31 @@ export interface SlackChannel {
   sync_id: string | null;
   sync_mode: string | null;
 }
+
+// Slack Digest
+export interface DigestPreview {
+  period_start: string;
+  period_end: string;
+  summary: string;
+  highlights: string[];
+  metrics: {
+    total_members: number;
+    total_artifacts: number;
+    new_contributions: number;
+    active_members: number;
+    bus_factor_risks: number;
+  };
+  top_contributors: { name: string; contributions: number }[];
+  trending_topics: string[];
+}
+
+export interface DigestConfig {
+  id: string;
+  workspace_id: string;
+  channel_id: string;
+  channel_name: string;
+  schedule_day: number;
+  schedule_hour: number;
+  enabled: boolean;
+  last_sent_at: string | null;
+}

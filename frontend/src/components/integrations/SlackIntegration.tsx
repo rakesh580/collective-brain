@@ -1,7 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "../../api/client";
-import type { SlackWorkspace, SlackChannel } from "../../types";
-import { MessageSquare, RefreshCw, Trash2, Play, Square, History, ExternalLink, Hash, Lock, AlertTriangle, CheckCircle2, Settings } from "lucide-react";
+import type { SlackWorkspace, SlackChannel, DigestPreview, DigestConfig } from "../../types";
+import {
+  MessageSquare, RefreshCw, Trash2, Play, Square, History, ExternalLink,
+  Hash, Lock, AlertTriangle, CheckCircle2, Settings,
+  Calendar, Clock, Send, Eye, Settings2,
+} from "lucide-react";
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function SlackIntegration() {
   const [configured, setConfigured] = useState<boolean | null>(null); // null = loading
@@ -13,8 +19,35 @@ export default function SlackIntegration() {
   const [success, setSuccess] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState<string | null>(null);
 
+  // Digest state
+  const [digestConfig, setDigestConfig] = useState<DigestConfig | null>(null);
+  const [digestEnabled, setDigestEnabled] = useState(false);
+  const [digestChannel, setDigestChannel] = useState("");
+  const [digestDay, setDigestDay] = useState(1); // Monday
+  const [digestHour, setDigestHour] = useState(9);
+  const [digestSaving, setDigestSaving] = useState(false);
+  const [digestSending, setDigestSending] = useState(false);
+  const [digestPreview, setDigestPreview] = useState<DigestPreview | null>(null);
+  const [digestPreviewLoading, setDigestPreviewLoading] = useState(false);
+  const [digestPreviewOpen, setDigestPreviewOpen] = useState(false);
+
   useEffect(() => {
     checkStatusAndLoad();
+  }, []);
+
+  const loadDigestConfig = useCallback(async () => {
+    try {
+      const data = await api.digestConfig();
+      if (data.config) {
+        setDigestConfig(data.config);
+        setDigestEnabled(data.config.enabled);
+        setDigestChannel(data.config.channel_name);
+        setDigestDay(data.config.schedule_day);
+        setDigestHour(data.config.schedule_hour);
+      }
+    } catch {
+      // No config yet — that's ok
+    }
   }, []);
 
   async function checkStatusAndLoad() {
@@ -23,6 +56,7 @@ export default function SlackIntegration() {
       setConfigured(status.configured);
       if (status.configured) {
         await loadWorkspaces();
+        await loadDigestConfig();
       }
     } catch {
       setConfigured(false);
@@ -119,6 +153,65 @@ export default function SlackIntegration() {
     }
   }
 
+  // ── Digest handlers ──
+
+  async function handleDigestSave() {
+    if (!workspaces.length) return;
+    setDigestSaving(true);
+    setError(null);
+    try {
+      await api.digestConfigure({
+        workspace_id: digestConfig?.workspace_id ?? workspaces[0].id,
+        channel_id: digestConfig?.channel_id ?? digestChannel,
+        schedule_day: digestDay,
+        schedule_hour: digestHour,
+        enabled: digestEnabled,
+      });
+      setSuccess("Digest schedule saved");
+      setTimeout(() => setSuccess(null), 4000);
+      await loadDigestConfig();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save digest config");
+    } finally {
+      setDigestSaving(false);
+    }
+  }
+
+  async function handleDigestSendNow() {
+    if (!workspaces.length) return;
+    setDigestSending(true);
+    setError(null);
+    try {
+      const wsId = digestConfig?.workspace_id ?? workspaces[0].id;
+      const chId = digestConfig?.channel_id ?? digestChannel;
+      const result = await api.digestSend(wsId, chId);
+      setSuccess(result.message || "Digest sent successfully");
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to send digest");
+    } finally {
+      setDigestSending(false);
+    }
+  }
+
+  async function handleDigestPreview() {
+    if (digestPreviewOpen && digestPreview) {
+      setDigestPreviewOpen(false);
+      return;
+    }
+    setDigestPreviewLoading(true);
+    setError(null);
+    try {
+      const data = await api.digestPreview();
+      setDigestPreview(data.digest);
+      setDigestPreviewOpen(true);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load digest preview");
+    } finally {
+      setDigestPreviewLoading(false);
+    }
+  }
+
   // ── Slack icon SVG ──
   const SlackIcon = () => (
     <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="currentColor">
@@ -185,10 +278,10 @@ export default function SlackIntegration() {
                   How to create a Slack App:
                 </p>
                 <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
-                  <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 underline hover:no-underline">api.slack.com/apps</a> and click "Create New App"</li>
-                  <li>Choose "From scratch", name it "Collective Brain", pick your workspace</li>
-                  <li>Under <strong>OAuth & Permissions</strong>, add Bot Token Scopes: <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:history</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:read</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">chat:write</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">commands</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">users:read</code></li>
-                  <li>Copy <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Signing Secret</strong> from "Basic Information"</li>
+                  <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 underline hover:no-underline">api.slack.com/apps</a> and click &quot;Create New App&quot;</li>
+                  <li>Choose &quot;From scratch&quot;, name it &quot;Collective Brain&quot;, pick your workspace</li>
+                  <li>Under <strong>OAuth &amp; Permissions</strong>, add Bot Token Scopes: <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:history</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:read</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">chat:write</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">commands</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">users:read</code></li>
+                  <li>Copy <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Signing Secret</strong> from &quot;Basic Information&quot;</li>
                   <li>Set the env vars above and restart the backend</li>
                 </ol>
               </div>
@@ -326,12 +419,219 @@ export default function SlackIntegration() {
         </div>
       )}
 
+      {/* ── Weekly Digest Section ── */}
+      {configured && workspaces.length > 0 && (
+        <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700/30 rounded-lg">
+          {/* Digest Header with Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Settings2 size={16} className="text-indigo-600 dark:text-indigo-400" />
+              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Weekly Digest
+              </h4>
+            </div>
+            <button
+              onClick={() => setDigestEnabled(!digestEnabled)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                digestEnabled
+                  ? "bg-indigo-600 dark:bg-indigo-500"
+                  : "bg-slate-300 dark:bg-slate-600"
+              }`}
+              role="switch"
+              aria-checked={digestEnabled}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                  digestEnabled ? "translate-x-4" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Automatically post a weekly summary of team activity to a Slack channel.
+          </p>
+
+          {/* Channel Name Input */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
+              <Hash size={11} />
+              Channel name
+            </label>
+            <input
+              type="text"
+              value={digestChannel}
+              onChange={(e) => setDigestChannel(e.target.value)}
+              placeholder="e.g. general or team-updates"
+              className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 dark:focus:border-indigo-400"
+            />
+          </div>
+
+          {/* Schedule Picker */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                <Calendar size={11} />
+                Day of week
+              </label>
+              <select
+                value={digestDay}
+                onChange={(e) => setDigestDay(Number(e.target.value))}
+                className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 dark:focus:border-indigo-400"
+              >
+                {DAY_NAMES.map((name, i) => (
+                  <option key={i} value={i}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                <Clock size={11} />
+                Hour (UTC)
+              </label>
+              <select
+                value={digestHour}
+                onChange={(e) => setDigestHour(Number(e.target.value))}
+                className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 dark:focus:border-indigo-400"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, "0")}:00
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleDigestSave}
+              disabled={digestSaving || !digestChannel.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Settings2 size={11} />
+              {digestSaving ? "Saving..." : "Save Schedule"}
+            </button>
+            <button
+              onClick={handleDigestSendNow}
+              disabled={digestSending || !digestChannel.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Send size={11} />
+              {digestSending ? "Sending..." : "Send Now"}
+            </button>
+            <button
+              onClick={handleDigestPreview}
+              disabled={digestPreviewLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Eye size={11} />
+              {digestPreviewLoading ? "Loading..." : "Preview"}
+            </button>
+          </div>
+
+          {/* Last sent status */}
+          {digestConfig?.last_sent_at && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <CheckCircle2 size={11} className="text-emerald-500 dark:text-emerald-400" />
+              Last sent: {new Date(digestConfig.last_sent_at).toLocaleString()}
+            </div>
+          )}
+
+          {/* Preview Section */}
+          {digestPreviewOpen && digestPreview && (
+            <div className="mt-3 space-y-3 p-3 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                  Digest Preview
+                </h5>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  {new Date(digestPreview.period_start).toLocaleDateString()} — {new Date(digestPreview.period_end).toLocaleDateString()}
+                </span>
+              </div>
+
+              {/* Summary */}
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                {digestPreview.summary}
+              </p>
+
+              {/* Highlights */}
+              {digestPreview.highlights.length > 0 && (
+                <div className="space-y-1">
+                  <h6 className="text-xs font-medium text-slate-600 dark:text-slate-300">Highlights</h6>
+                  <ul className="space-y-1">
+                    {digestPreview.highlights.map((h, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="text-indigo-500 dark:text-indigo-400 mt-0.5 flex-shrink-0">*</span>
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ["Members", digestPreview.metrics.total_members],
+                  ["Artifacts", digestPreview.metrics.total_artifacts],
+                  ["New Contributions", digestPreview.metrics.new_contributions],
+                  ["Active Members", digestPreview.metrics.active_members],
+                  ["Bus Factor Risks", digestPreview.metrics.bus_factor_risks],
+                ] as const).map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="p-2 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/30 rounded-lg text-center"
+                  >
+                    <p className="text-lg font-bold text-slate-700 dark:text-slate-200">{value}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Top Contributors */}
+              {digestPreview.top_contributors.length > 0 && (
+                <div className="space-y-1">
+                  <h6 className="text-xs font-medium text-slate-600 dark:text-slate-300">Top Contributors</h6>
+                  <div className="space-y-1">
+                    {digestPreview.top_contributors.map((c, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600 dark:text-slate-300">{c.name}</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-mono">{c.contributions}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Trending Topics */}
+              {digestPreview.trending_topics.length > 0 && (
+                <div className="space-y-1">
+                  <h6 className="text-xs font-medium text-slate-600 dark:text-slate-300">Trending Topics</h6>
+                  <div className="flex flex-wrap gap-1.5">
+                    {digestPreview.trending_topics.map((t, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 text-[10px] font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* How it works - show when configured but no workspaces */}
       {configured && workspaces.length === 0 && (
         <div className="p-4 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700/30 rounded-lg">
           <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2 uppercase tracking-wider">How it works</h4>
           <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-1.5 list-decimal list-inside">
-            <li>Click <strong>"Add to Slack"</strong> to install the Collective Brain bot</li>
+            <li>Click <strong>&quot;Add to Slack&quot;</strong> to install the Collective Brain bot</li>
             <li>Choose which channels to sync for knowledge ingestion</li>
             <li>Messages are automatically embedded and searchable via AI</li>
             <li>Use <code className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">/brain ask &lt;question&gt;</code> in any synced channel</li>

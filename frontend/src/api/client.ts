@@ -38,6 +38,8 @@ import type {
   RoomListResponse,
   SlackWorkspace,
   SlackChannel,
+  DigestPreview,
+  DigestConfig,
 } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
@@ -460,6 +462,20 @@ export const api = {
     request<{ configured: boolean; webhook_url: string; instructions: string[]; required_env_vars: string[]; supported_events: string[] }>("/github/setup"),
   githubEvents: (limit = 20) =>
     request<{ events: { id: string; type: string; title: string; source_path: string; chunk_count: number; ingested_at: string | null; member_ids: string[] }[]; total: number }>(`/github/events?limit=${limit}`),
+
+  // Slack Digest
+  digestPreview: () => request<{ digest: DigestPreview }>("/slack/digest/preview"),
+  digestSend: (workspaceId: string, channelId: string) =>
+    request<{ success: boolean; message: string }>("/slack/digest/send", {
+      method: "POST",
+      body: JSON.stringify({ workspace_id: workspaceId, channel_id: channelId }),
+    }),
+  digestConfigure: (config: { workspace_id: string; channel_id: string; schedule_day: number; schedule_hour: number; enabled: boolean }) =>
+    request<{ success: boolean }>("/slack/digest/configure", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }),
+  digestConfig: () => request<{ config: DigestConfig | null }>("/slack/digest/config"),
 
   // Expert Routing
   recommendExperts: (query: string, topK = 3) =>

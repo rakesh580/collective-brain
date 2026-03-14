@@ -101,6 +101,7 @@ def init_db(sqlite_url: str = "", settings=None):
     Base.metadata.create_all(bind=_engine)
     _run_migrations(_engine)
     _ensure_help_requests_table(_engine)
+    _ensure_slack_digest_config_table(_engine)
 
     logger.info("Database initialized (%s)", "PostgreSQL" if is_postgres else "SQLite")
 
@@ -277,6 +278,146 @@ def _ensure_help_requests_table(engine):
         """))
         conn.commit()
     logger.info("Ensured help_requests table exists")
+
+
+def _ensure_slack_digest_config_table(engine):
+    """Create the slack_digest_config table if it doesn't exist."""
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS slack_digest_config (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                channel_id TEXT NOT NULL,
+                channel_name TEXT DEFAULT '',
+                schedule_day INTEGER DEFAULT 0,
+                schedule_hour INTEGER DEFAULT 9,
+                enabled INTEGER DEFAULT 1,
+                last_sent_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.commit()
+    logger.info("Ensured slack_digest_config table exists")
+
+
+def save_digest_config(
+    db: Session,
+    workspace_id: str,
+    channel_id: str,
+    channel_name: str = "",
+    schedule_day: int = 0,
+    schedule_hour: int = 9,
+    enabled: bool = True,
+) -> dict:
+    """Insert or update a digest configuration and return it as a dict."""
+    import uuid
+    from datetime import datetime
+
+    # Check if config already exists for this workspace + channel
+    existing = db.execute(
+        text(
+            "SELECT id FROM slack_digest_config "
+            "WHERE workspace_id = :wid AND channel_id = :cid LIMIT 1"
+        ),
+        {"wid": workspace_id, "cid": channel_id},
+    ).fetchone()
+
+    if existing:
+        config_id = existing[0]
+        db.execute(
+            text(
+                "UPDATE slack_digest_config SET "
+                "channel_name = :channel_name, "
+                "schedule_day = :schedule_day, "
+                "schedule_hour = :schedule_hour, "
+                "enabled = :enabled "
+                "WHERE id = :id"
+            ),
+            {
+                "channel_name": channel_name,
+                "schedule_day": schedule_day,
+                "schedule_hour": schedule_hour,
+                "enabled": 1 if enabled else 0,
+                "id": config_id,
+            },
+        )
+        db.commit()
+    else:
+        config_id = str(uuid.uuid4())
+        now = datetime.utcnow()
+        db.execute(
+            text(
+                "INSERT INTO slack_digest_config "
+                "(id, workspace_id, channel_id, channel_name, schedule_day, "
+                "schedule_hour, enabled, created_at) "
+                "VALUES (:id, :workspace_id, :channel_id, :channel_name, "
+                ":schedule_day, :schedule_hour, :enabled, :created_at)"
+            ),
+            {
+                "id": config_id,
+                "workspace_id": workspace_id,
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "schedule_day": schedule_day,
+                "schedule_hour": schedule_hour,
+                "enabled": 1 if enabled else 0,
+                "created_at": now,
+            },
+        )
+        db.commit()
+
+    return {
+        "id": config_id,
+        "workspace_id": workspace_id,
+        "channel_id": channel_id,
+        "channel_name": channel_name,
+        "schedule_day": schedule_day,
+        "schedule_hour": schedule_hour,
+        "enabled": enabled,
+    }
+
+
+def get_digest_config(db: Session, workspace_id: str) -> list[dict]:
+    """Fetch all digest configurations for a workspace."""
+    rows = db.execute(
+        text(
+            "SELECT id, workspace_id, channel_id, channel_name, schedule_day, "
+            "schedule_hour, enabled, last_sent_at, created_at "
+            "FROM slack_digest_config WHERE workspace_id = :wid "
+            "ORDER BY created_at DESC"
+        ),
+        {"wid": workspace_id},
+    ).fetchall()
+
+    results = []
+    for row in rows:
+        results.append({
+            "id": row[0],
+            "workspace_id": row[1],
+            "channel_id": row[2],
+            "channel_name": row[3] or "",
+            "schedule_day": row[4],
+            "schedule_hour": row[5],
+            "enabled": bool(row[6]),
+            "last_sent_at": row[7].isoformat() if row[7] else None,
+            "created_at": row[8].isoformat() if row[8] else None,
+        })
+    return results
+
+
+def update_digest_last_sent(db: Session, config_id: str) -> bool:
+    """Update the last_sent_at timestamp for a digest config. Returns True if updated."""
+    from datetime import datetime
+
+    now = datetime.utcnow()
+    result = db.execute(
+        text(
+            "UPDATE slack_digest_config SET last_sent_at = :now WHERE id = :id"
+        ),
+        {"now": now, "id": config_id},
+    )
+    db.commit()
+    return result.rowcount > 0
 
 
 def create_help_request(
