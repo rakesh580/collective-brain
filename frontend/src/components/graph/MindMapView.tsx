@@ -34,7 +34,7 @@ interface Props {
 const MEMBER_COLOR = "#6366f1";
 const TOPIC_COLOR = "#10b981";
 const ARTIFACT_COLOR = "#f59e0b";
-const CENTER_COLOR = "#8b5cf6";
+// Center color used in mm-centerGrad SVG gradient: #8b5cf6
 
 /* ── Dark mode hook ── */
 function useIsDark() {
@@ -73,7 +73,7 @@ export default function MindMapView({ graphData, loading }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
   const [showLabels, setShowLabels] = useState(true);
-  const [animatePulse, setAnimatePulse] = useState(true);
+  const [animatePulse] = useState(true);
   const [layoutMode, setLayoutMode] = useState<"radial" | "tree">("radial");
 
   // Measure container
@@ -266,7 +266,7 @@ export default function MindMapView({ graphData, loading }: Props) {
         const src = nodeMap.get(e.source);
         const tgt = nodeMap.get(e.target);
         if (src && tgt) {
-          const w = (e.properties?.weight as number) || (e.properties?.contribution_count as number) || 1;
+          const w = e.weight || 1;
           edges.push({ source: src, target: tgt, type: e.type, label: e.label, weight: w });
         }
       }
@@ -278,8 +278,7 @@ export default function MindMapView({ graphData, loading }: Props) {
         const src = nodeMap.get(e.source);
         const tgt = nodeMap.get(e.target);
         if (src && tgt) {
-          const w = (e.properties?.weight as number) || 1;
-          edges.push({ source: src, target: tgt, type: e.type, label: e.label, weight: w });
+          edges.push({ source: src, target: tgt, type: e.type, label: e.label, weight: e.weight || 1 });
         }
       }
     }

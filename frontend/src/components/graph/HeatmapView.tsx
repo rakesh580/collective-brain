@@ -151,7 +151,7 @@ export default function HeatmapView() {
 
   // Computed data
   const { sortedMembers, activeTopics, memberTotals, topicAverages, busFactor, gapTopics, strongTopics } = useMemo(() => {
-    if (!data) return { sortedMembers: [], activeTopics: [], memberTotals: new Map(), topicAverages: new Map(), busFactor: [], gapTopics: [], strongTopics: [] };
+    if (!data) return { sortedMembers: [] as ExpertiseMatrixData["members"], activeTopics: [] as string[], memberTotals: new Map<string, number>(), topicAverages: new Map<string, number>(), busFactor: [] as { topic: string; expert: string }[], gapTopics: [] as string[], strongTopics: [] as string[] };
 
     // Filter active topics (topics with at least one score > 0)
     let active = data.topics.filter((t) => !hiddenTopics.has(t) && data.members.some((m) => (m.scores[t] || 0) > 0));

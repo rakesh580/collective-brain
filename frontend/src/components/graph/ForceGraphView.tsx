@@ -241,10 +241,9 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   };
 
   // Tooltip on hover
-  const handleNodeHover = useCallback((node: any, prevNode: any) => {
+  const handleNodeHover = useCallback((node: any, _prevNode: any) => {
     setHoverNode(node || null);
     if (node && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
       // Convert graph coords to screen - approximate
       const fg = fgRef.current;
       if (fg) {
