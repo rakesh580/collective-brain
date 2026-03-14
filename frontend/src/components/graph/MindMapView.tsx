@@ -27,7 +27,6 @@ interface Props {
 
 const MEMBER_COLOR = "#6366f1";
 const TOPIC_COLOR = "#10b981";
-const CENTER_COLOR = "#8b5cf6";
 const SHARED_BORDER = "#f59e0b";
 
 function bezierPath(x1: number, y1: number, x2: number, y2: number, curvature = 0.3): string {
