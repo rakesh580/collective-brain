@@ -29,10 +29,25 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
 
   // Fallback: use useGoogleLogin with implicit flow (works in iframes)
   const googleLoginImplicit = useGoogleLogin({
+    flow: "implicit",
     onSuccess: (tokenResponse) => {
-      onAccessTokenSuccess(tokenResponse.access_token);
+      if (tokenResponse.access_token) {
+        onAccessTokenSuccess(tokenResponse.access_token);
+      } else {
+        console.error("Google login: no access_token in response", tokenResponse);
+        onError();
+      }
     },
-    onError: () => onError(),
+    onError: (errorResponse) => {
+      console.error("Google login error:", errorResponse);
+      onError();
+    },
+    onNonOAuthError: (error) => {
+      // Fires when popup is closed or blocked — common with redirect_uri_mismatch
+      console.error("Google login non-OAuth error (popup closed or blocked):", error);
+      onError();
+    },
+    scope: "openid email profile",
   });
 
   // Check if GSI button rendered successfully (it won't in iframe contexts)
@@ -519,6 +534,7 @@ export default function LoginPage() {
       await googleLoginWithToken(accessToken);
       navigate("/");
     } catch (err) {
+      console.error("Google auth backend error:", err);
       setError(parseApiError(err));
     } finally {
       setLoading(false);
@@ -678,7 +694,7 @@ export default function LoginPage() {
 
             <SafeGoogleLogin
               onSuccess={handleGoogleSuccess}
-              onError={() => setError("Google sign-in was cancelled or failed")}
+              onError={() => setError("Google sign-in failed. The popup may have been blocked or closed. Please try again.")}
               onAccessTokenSuccess={handleGoogleAccessToken}
             />
 
