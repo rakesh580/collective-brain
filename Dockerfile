@@ -51,6 +51,7 @@ ENV CB_LLM_PROVIDER="mistral"
 ENV CB_MISTRAL_MODEL="Qwen/Qwen2.5-72B-Instruct"
 ENV CB_AGENT_MODE="rag"
 ENV CB_DEV_MODE="0"
+ENV CB_GOOGLE_CLIENT_ID="103835595393-h086ao1jt2nit1opse2qe91cqea5bp36.apps.googleusercontent.com"
 
 # HF Spaces uses port 7860, Render uses 8000
 EXPOSE 7860 8000
