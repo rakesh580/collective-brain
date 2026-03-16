@@ -17,6 +17,14 @@ function GoogleIcon() {
   );
 }
 
+/* ── Detect if running inside an iframe (e.g., HuggingFace Spaces) ── */
+function useIsIframe() {
+  const [isIframe] = useState(() => {
+    try { return window.self !== window.top; } catch { return true; }
+  });
+  return isIframe;
+}
+
 /* ── Google Login wrapper with fallback for iframe contexts ── */
 function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
   onSuccess: (res: any) => void;
@@ -24,13 +32,11 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
   onAccessTokenSuccess: (accessToken: string) => void;
 }) {
   const enabled = useGoogleAuthEnabled();
-  const [gsiRendered, setGsiRendered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const isIframe = useIsIframe();
   // Track whether the user has actually clicked the Google button
-  // so we only show errors for user-initiated login attempts, not GSI init failures
   const userClickedRef = useRef(false);
 
-  // Fallback: use useGoogleLogin with implicit flow (works in iframes)
+  // Implicit flow via popup — works in both iframe and direct contexts
   const googleLoginImplicit = useGoogleLogin({
     flow: "implicit",
     onSuccess: (tokenResponse) => {
@@ -44,7 +50,6 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
     },
     onError: (errorResponse) => {
       console.error("Google login error:", errorResponse);
-      // Only show error if user actually clicked the button
       if (userClickedRef.current) {
         userClickedRef.current = false;
         onError();
@@ -52,7 +57,6 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
     },
     onNonOAuthError: (error) => {
       console.info("Google login non-OAuth event (popup closed/blocked):", error);
-      // Only show error if user actually clicked the button
       if (userClickedRef.current) {
         userClickedRef.current = false;
         onError();
@@ -66,18 +70,6 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
     googleLoginImplicit();
   }, [googleLoginImplicit]);
 
-  // Check if GSI button rendered successfully (it won't in iframe contexts)
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = setTimeout(() => {
-      const iframe = containerRef.current?.querySelector("iframe");
-      if (iframe && iframe.clientHeight > 0) {
-        setGsiRendered(true);
-      }
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [enabled]);
-
   if (!enabled) return null;
 
   return (
@@ -88,26 +80,27 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
         <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
       </div>
 
-      {/* Official GSI button — only visible when it actually renders (direct access, not iframe) */}
-      <div ref={containerRef} className={`flex justify-center ${gsiRendered ? "" : "hidden"}`}>
-        <GoogleLogin
-          onSuccess={onSuccess}
-          onError={() => {
-            // GSI render failure is expected in iframe contexts — silently ignore
-            console.info("GSI button render failed (expected in iframe); using fallback button");
-          }}
-          theme="filled_black"
-          size="large"
-          text="continue_with"
-          shape="pill"
-        />
-      </div>
+      {/* In direct access (not iframe), try the official GSI button first */}
+      {!isIframe && (
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={onSuccess}
+            onError={() => {
+              // GSI render failure — silently ignore, custom button below is always available
+              console.info("GSI button render failed; custom button is available");
+            }}
+            theme="filled_black"
+            size="large"
+            text="continue_with"
+            shape="pill"
+          />
+        </div>
+      )}
 
-      {/* Custom button — shown by default, hidden only if GSI renders successfully */}
-      {!gsiRendered && (
-        <button
-          type="button"
-          onClick={handleGoogleClick}
+      {/* Custom styled button — always available; primary button in iframe context */}
+      <button
+        type="button"
+        onClick={handleGoogleClick}
           className="w-full relative flex items-center justify-center gap-3 py-3.5 px-5 rounded-xl
             text-white font-medium cursor-pointer
             transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/15
@@ -148,7 +141,6 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
             <span className="text-sm tracking-wide">Continue with Google</span>
           </div>
         </button>
-      )}
     </>
   );
 }
