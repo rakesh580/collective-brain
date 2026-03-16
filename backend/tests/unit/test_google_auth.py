@@ -160,7 +160,7 @@ class TestPasswordReset:
         svc.register(db_session, "alice", "alice@test.com", "Str0ngPass!")
         svc.generate_reset_code(db_session, "alice@test.com")
         with pytest.raises(ValueError, match="Invalid verification code"):
-            svc.verify_reset_code(db_session, "alice@test.com", "000000", "NewPass!")
+            svc.verify_reset_code(db_session, "alice@test.com", "00000000", "NewPass!")
 
     def test_expired_code(self, db_session, settings):
         svc = AuthService(settings)

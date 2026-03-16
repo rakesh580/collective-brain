@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
-from app.db.database import get_session
+from app.db.database import create_session
 from app.models.room import ChatRoom, ChatRoomMember, ChatRoomMessage
 from app.models.user import UserRecord
 from app.schemas.requests import (
@@ -43,7 +43,7 @@ AVATAR_COLORS = [
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 def _get_redis(request: Request = None):

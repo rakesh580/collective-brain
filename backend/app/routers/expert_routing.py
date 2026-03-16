@@ -14,7 +14,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from app.db.database import get_session
+from app.db.database import create_session
 from app.models.member import MemberRecord
 from app.models.user import UserRecord
 from app.services.memory_graph import MemoryGraph
@@ -52,10 +52,16 @@ class ExpertRecommendation(BaseModel):
     availability_hint: str = "unknown"
 
 
+class ExpertRecommendationResponse(BaseModel):
+    experts: list[ExpertRecommendation]
+    query: str
+    topics: list[str]
+
+
 # ── Helpers ───────────────────────────────────────────────────────
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 _STOP_WORDS = frozenset({
@@ -88,7 +94,7 @@ def _extract_topics(query: str) -> list[str]:
 
 # ── Endpoints ─────────────────────────────────────────────────────
 
-@router.get("/recommend", response_model=list[ExpertRecommendation])
+@router.get("/recommend", response_model=ExpertRecommendationResponse)
 async def recommend_experts(
     request: Request,
     query: str,
@@ -106,13 +112,13 @@ async def recommend_experts(
 
     topics = _extract_topics(query)
     if not topics:
-        return []
+        return ExpertRecommendationResponse(experts=[], query=query, topics=topics)
 
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
         experts = graph.find_experts_for_topics(topics, top_k=top_k)
-        return [
+        recommendations = [
             ExpertRecommendation(
                 member_id=e["member_id"],
                 name=e["name"],
@@ -123,6 +129,7 @@ async def recommend_experts(
             )
             for e in experts
         ]
+        return ExpertRecommendationResponse(experts=recommendations, query=query, topics=topics)
     finally:
         db.close()
 

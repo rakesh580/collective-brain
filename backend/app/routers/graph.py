@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.schemas.responses import GraphResponse
 from app.services.memory_graph import MemoryGraph
-from app.db.database import get_session
+from app.db.database import create_session
 
 logger = logging.getLogger("collective_brain.graph")
 
@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("/full", response_model=GraphResponse)

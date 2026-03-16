@@ -2,13 +2,13 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
-from app.db.database import get_session
+from app.db.database import create_session
 
 router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("")

@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from app.schemas.requests import QueryRequest
 from app.schemas.responses import QueryResponse
 from app.services.rag_pipeline import RAGPipeline
-from app.db.database import get_session
+from app.db.database import create_session
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ async def query_brain(body: QueryRequest, request: Request):
 
     user = get_current_user(request)
     await _rate_limit_ai(request, user.id)
-    db = next(get_session())
+    db = create_session()
     settings = request.app.state.settings
     import logging as _logging
     _logger = _logging.getLogger(__name__)

@@ -9,13 +9,13 @@ from app.schemas.responses import MemberResponse, MemberDetailResponse, Contribu
 from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.models.artifact import ArtifactRecord
-from app.db.database import get_session
+from app.db.database import create_session
 
 router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("")

@@ -5,13 +5,13 @@ from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.insight import InsightRecord
 from app.models.room import ChatRoom
-from app.db.database import get_session
+from app.db.database import create_session
 
 router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("")

@@ -695,6 +695,18 @@ def get_session() -> Generator[Session, None, None]:
         db.close()
 
 
+def create_session() -> Session:
+    """Create a new database session (non-generator).
+
+    Unlike get_session(), this returns a plain Session that the caller is
+    responsible for closing — typically via a try/finally block.  Use this
+    instead of ``next(get_session())`` to avoid leaking sessions.
+    """
+    if _SessionLocal is None:
+        raise RuntimeError("Database not initialized. Call init_db() first.")
+    return _SessionLocal()
+
+
 def get_engine():
     """Return the SQLAlchemy engine (for health checks)."""
     return _engine

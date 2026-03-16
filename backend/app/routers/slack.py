@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-from app.db.database import get_session
+from app.db.database import create_session
 from app.models.slack_integration import SlackWorkspace, SlackChannelSync
 
 logger = logging.getLogger("collective_brain.slack_router")
@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 # ─── Status Check ─────────────────────────────────────────────
@@ -574,7 +574,34 @@ async def digest_preview(request: Request):
         blocks = format_slack_blocks(digest_data)
         text_version = format_text_digest(digest_data)
 
+        # Build a frontend-compatible DigestPreview object
+        gs = digest_data.get("graph_stats", {})
+        digest_preview = {
+            "period_start": digest_data.get("period_start", ""),
+            "period_end": digest_data.get("period_end", ""),
+            "summary": text_version.split("\n\n")[0] if text_version else "",
+            "highlights": [
+                t["topic"] + f" ({t['count']} mentions)"
+                for t in digest_data.get("top_topics", [])[:5]
+            ],
+            "metrics": {
+                "total_members": gs.get("members", 0),
+                "total_artifacts": gs.get("artifacts", 0),
+                "new_contributions": digest_data.get("total_contributions", 0),
+                "active_members": digest_data.get("active_contributors", 0),
+                "bus_factor_risks": digest_data.get("bus_factor_risk_count", 0),
+            },
+            "top_contributors": [
+                {"name": tc.get("name", ""), "contributions": tc.get("count", 0)}
+                for tc in digest_data.get("top_contributors", [])
+            ],
+            "trending_topics": [
+                t["topic"] for t in digest_data.get("top_topics", [])[:10]
+            ],
+        }
+
         return {
+            "digest": digest_preview,
             "digest_data": digest_data,
             "slack_blocks": blocks,
             "text_preview": text_version,
@@ -622,18 +649,31 @@ async def digest_configure(body: DigestConfigureRequest, request: Request):
 
 @router.get("/digest/config")
 async def digest_get_config(request: Request, workspace_id: str = ""):
-    """Get current digest configuration(s) for a workspace."""
+    """Get current digest configuration(s) for a workspace.
+
+    If workspace_id is omitted, returns the config for the first active workspace.
+    Also returns a single ``config`` key (first result or null) for frontend compatibility.
+    """
     from app.dependencies import get_current_user
     get_current_user(request)
-
-    if not workspace_id:
-        raise HTTPException(status_code=400, detail="workspace_id query parameter is required")
 
     from app.db.database import get_digest_config
 
     db = _get_db()
     try:
+        # If no workspace_id provided, pick the first active workspace
+        if not workspace_id:
+            first_ws = (
+                db.query(SlackWorkspace)
+                .filter(SlackWorkspace.is_active == True)  # noqa: E712
+                .first()
+            )
+            if first_ws:
+                workspace_id = first_ws.id
+            else:
+                return {"configs": [], "config": None}
+
         configs = get_digest_config(db, workspace_id)
-        return {"configs": configs}
+        return {"configs": configs, "config": configs[0] if configs else None}
     finally:
         db.close()

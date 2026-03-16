@@ -4,11 +4,12 @@ from sqlalchemy.orm import Session
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_store import VectorStoreService
 from app.services.llm_service import LLMService
-from app.db.database import get_session
+from app.db.database import create_session
 
 
 def get_db() -> Session:
-    return next(get_session())
+    """Create a new DB session. Caller MUST close it (use try/finally)."""
+    return create_session()
 
 
 def get_embedding_service(request: Request) -> EmbeddingService:

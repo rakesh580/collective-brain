@@ -16,7 +16,7 @@ from app.schemas.requests import (
 from app.schemas.responses import UserResponse, AuthResponse
 from app.services.auth_service import AuthService
 from app.models.user import UserRecord
-from app.db.database import get_session
+from app.db.database import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("/config")
@@ -145,7 +145,7 @@ async def google_access_token_auth(body: GoogleAccessTokenRequest, request: Requ
 
 @router.post("/forgot-password")
 async def forgot_password(body: ForgotPasswordRequest, request: Request):
-    """Generate a 6-digit reset code for password recovery.
+    """Generate an 8-character reset code for password recovery.
 
     The code is stored server-side only. In development, it is logged at
     DEBUG level. In production, integrate an email provider to deliver it.

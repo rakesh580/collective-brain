@@ -271,7 +271,7 @@ class AuthService:
     # Password Reset
     # ------------------------------------------------------------------
     def generate_reset_code(self, db: Session, email: str) -> str:
-        """Generate a 6-digit reset code for the given email.
+        """Generate an 8-character reset code for the given email.
 
         Returns the code (to be sent via email).
         Raises ValueError if no account found.

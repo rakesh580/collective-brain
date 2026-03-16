@@ -5,7 +5,7 @@ from sqlalchemy import func, cast, Date
 from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
-from app.db.database import get_session
+from app.db.database import create_session
 from app.services.team_health_service import (
     compute_health_snapshot,
     save_health_snapshot,
@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("/activity-timeline")

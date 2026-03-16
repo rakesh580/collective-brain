@@ -35,8 +35,8 @@ async def detailed_health(request: Request):
 
     # ── Database ──
     try:
-        from app.db.database import get_session
-        db = next(get_session())
+        from app.db.database import create_session
+        db = create_session()
         try:
             db.execute(text("SELECT 1"))
             checks["database"] = {

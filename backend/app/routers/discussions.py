@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
-from app.db.database import get_session
+from app.db.database import create_session
 from app.models.discussion import DiscussionThread, DiscussionMessage
 from app.models.user import UserRecord
 from app.schemas.requests import (
@@ -34,7 +34,7 @@ def init_redis_from_app(app):
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 def _get_user_info(db, user_id: str) -> dict:

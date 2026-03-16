@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from app.db.database import get_session
+from app.db.database import create_session
 
 logger = logging.getLogger("collective_brain.github_webhooks")
 
@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 def _verify_signature(secret: str, body: bytes, signature: str) -> bool:

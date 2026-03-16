@@ -6,13 +6,13 @@ from sqlalchemy.exc import IntegrityError
 from app.models.conversation import ConversationRecord, MessageRecord, ConversationParticipant
 from app.models.user import UserRecord
 from app.schemas.requests import ShareConversationRequest
-from app.db.database import get_session
+from app.db.database import create_session
 
 router = APIRouter()
 
 
 def _get_db():
-    return next(get_session())
+    return create_session()
 
 
 @router.get("")
