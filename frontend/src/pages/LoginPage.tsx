@@ -26,11 +26,15 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
   const enabled = useGoogleAuthEnabled();
   const [gsiRendered, setGsiRendered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Track whether the user has actually clicked the Google button
+  // so we only show errors for user-initiated login attempts, not GSI init failures
+  const userClickedRef = useRef(false);
 
   // Fallback: use useGoogleLogin with implicit flow (works in iframes)
   const googleLoginImplicit = useGoogleLogin({
     flow: "implicit",
     onSuccess: (tokenResponse) => {
+      userClickedRef.current = false;
       if (tokenResponse.access_token) {
         onAccessTokenSuccess(tokenResponse.access_token);
       } else {
@@ -40,15 +44,27 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
     },
     onError: (errorResponse) => {
       console.error("Google login error:", errorResponse);
-      onError();
+      // Only show error if user actually clicked the button
+      if (userClickedRef.current) {
+        userClickedRef.current = false;
+        onError();
+      }
     },
     onNonOAuthError: (error) => {
-      // Fires when popup is closed or blocked — common with redirect_uri_mismatch
-      console.error("Google login non-OAuth error (popup closed or blocked):", error);
-      onError();
+      console.info("Google login non-OAuth event (popup closed/blocked):", error);
+      // Only show error if user actually clicked the button
+      if (userClickedRef.current) {
+        userClickedRef.current = false;
+        onError();
+      }
     },
     scope: "openid email profile",
   });
+
+  const handleGoogleClick = useCallback(() => {
+    userClickedRef.current = true;
+    googleLoginImplicit();
+  }, [googleLoginImplicit]);
 
   // Check if GSI button rendered successfully (it won't in iframe contexts)
   useEffect(() => {
@@ -78,7 +94,6 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
           onSuccess={onSuccess}
           onError={() => {
             // GSI render failure is expected in iframe contexts — silently ignore
-            // since the custom fallback button is shown instead
             console.info("GSI button render failed (expected in iframe); using fallback button");
           }}
           theme="filled_black"
@@ -92,7 +107,7 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
       {!gsiRendered && (
         <button
           type="button"
-          onClick={() => googleLoginImplicit()}
+          onClick={handleGoogleClick}
           className="w-full relative flex items-center justify-center gap-3 py-3.5 px-5 rounded-xl
             text-white font-medium cursor-pointer
             transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/15
