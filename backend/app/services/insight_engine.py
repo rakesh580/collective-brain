@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -23,7 +23,7 @@ class InsightEngine:
         self.graph = MemoryGraph(db, room_id=room_id)
 
     async def generate_weekly_summary(self) -> InsightRecord:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         week_ago = now - timedelta(days=7)
 
         # Gather last week's activity
@@ -80,7 +80,7 @@ class InsightEngine:
                 insight_type=p["type"],
                 title=p["title"],
                 body=p["body"],
-                generated_at=datetime.utcnow(),
+                generated_at=datetime.now(timezone.utc),
                 related_member_ids=p.get("related_members", []),
                 confidence=p.get("confidence", 0.5),
             )
@@ -115,7 +115,7 @@ class InsightEngine:
                         insight_type=li.get("insight_type", "pattern"),
                         title=li.get("title", "Detected Pattern"),
                         body=li.get("body", ""),
-                        generated_at=datetime.utcnow(),
+                        generated_at=datetime.now(timezone.utc),
                         related_member_ids=li.get("related_members", []),
                         confidence=li.get("confidence", 0.5),
                     )

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
 from app.db.database import Base
 
@@ -8,8 +8,8 @@ class ConversationRecord(Base):
 
     id = Column(String, primary_key=True)
     title = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     message_count = Column(Integer, default=0)
     metadata_json = Column(JSON, default=dict)
     owner_user_id = Column(String, ForeignKey("users.id"), nullable=True)
@@ -26,7 +26,7 @@ class MessageRecord(Base):
     content = Column(Text, nullable=False)
     sources = Column(JSON, default=list)  # serialized SourceRef list
     related_members = Column(JSON, default=list)  # serialized RelatedMember list
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     sender_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     sender_name = Column(String, nullable=True)
 
@@ -41,4 +41,4 @@ class ConversationParticipant(Base):
     conversation_id = Column(String, ForeignKey("conversations.id"), index=True)
     user_id = Column(String, ForeignKey("users.id"), index=True)
     role = Column(String, default="participant")  # "owner" or "participant"
-    joined_at = Column(DateTime, default=datetime.utcnow)
+    joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

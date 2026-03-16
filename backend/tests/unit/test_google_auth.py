@@ -1,6 +1,6 @@
 """Unit tests for Google OAuth and password reset in AuthService."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -108,7 +108,7 @@ class TestAuthenticateErrors:
         user = UserRecord(
             id=str(uuid4()), username="guser", email="g@test.com",
             password_hash=None, auth_provider="google", is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db_session.add(user)
         db_session.commit()
@@ -167,7 +167,7 @@ class TestPasswordReset:
         svc.register(db_session, "alice", "alice@test.com", "Str0ngPass!")
         code = svc.generate_reset_code(db_session, "alice@test.com")
         user = db_session.query(UserRecord).filter(UserRecord.email == "alice@test.com").first()
-        user.reset_code_expires = datetime.utcnow() - timedelta(minutes=1)
+        user.reset_code_expires = datetime.now(timezone.utc) - timedelta(minutes=1)
         db_session.commit()
         with pytest.raises(ValueError, match="expired"):
             svc.verify_reset_code(db_session, "alice@test.com", code, "NewPass!")

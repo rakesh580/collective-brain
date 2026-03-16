@@ -28,24 +28,24 @@ function getSourceBadgeStyle(sourceType: string): string {
 
 export default function FreshnessAlerts() {
   const [report, setReport] = useState<FreshnessReport | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = () => {
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     api
       .getFreshnessReport()
       .then(setReport)
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">

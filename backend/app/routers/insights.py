@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request
 
 from app.schemas.responses import (
@@ -90,7 +90,7 @@ async def get_weekly_summary(request: Request, room_id: str | None = None):
     db = _get_db()
     try:
         # Check for cached weekly summary
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         week_ago = now - timedelta(days=7)
         cache_query = (
             db.query(InsightRecord)

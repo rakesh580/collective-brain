@@ -23,7 +23,7 @@ export default function RoomsPage() {
   const [tab, setTab] = useState<Tab>("my-rooms");
   const [rooms, setRooms] = useState<Room[]>([]);
   const [discoverRooms, setDiscoverRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
@@ -39,7 +39,7 @@ export default function RoomsPage() {
       .catch((err) => {
         if (err.name !== "AbortError") console.error("Failed to load rooms:", err);
       })
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -157,7 +157,7 @@ export default function RoomsPage() {
           )}
 
           {/* Room List */}
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="skeleton h-24 rounded-xl" />
@@ -378,7 +378,7 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
   const [isPublic, setIsPublic] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -411,7 +411,7 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
 
   const handleCreate = async () => {
     if (!name.trim()) return;
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     try {
       const room = await api.createRoom({
@@ -424,7 +424,7 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -579,10 +579,10 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
           </button>
           <button
             onClick={handleCreate}
-            disabled={!name.trim() || loading}
+            disabled={!name.trim() || isLoading}
             className="px-5 py-2 text-sm font-medium bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 transition-all btn-press shadow-md shadow-indigo-500/20"
           >
-            {loading ? "Creating..." : "Create Room"}
+            {isLoading ? "Creating..." : "Create Room"}
           </button>
         </div>
       </div>

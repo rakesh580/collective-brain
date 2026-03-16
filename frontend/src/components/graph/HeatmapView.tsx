@@ -81,7 +81,7 @@ export default function HeatmapView() {
   const navigate = useNavigate();
   const isDark = useIsDark();
   const [data, setData] = useState<ExpertiseMatrixData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [hoveredCell, setHoveredCell] = useState<{ member: string; topic: string } | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function HeatmapView() {
   const [showGaps, setShowGaps] = useState(true);
 
   useEffect(() => {
-    api.getExpertiseMatrix().then(setData).finally(() => setLoading(false));
+    api.getExpertiseMatrix().then(setData).finally(() => setIsLoading(false));
   }, []);
 
   // Toggle sort direction
@@ -223,7 +223,7 @@ export default function HeatmapView() {
     return { sortedMembers: sorted, activeTopics: sortedTopics, memberTotals: totals, topicAverages: avgMap, busFactor: bus, gapTopics: gaps, strongTopics: strong };
   }, [data, sortBy, sortDir, sortByTopic, searchTerm, hiddenTopics]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">

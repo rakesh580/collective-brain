@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request
 from sqlalchemy import func, cast, Date
 
@@ -28,7 +28,7 @@ async def get_activity_timeline(request: Request, days: int = 30, room_id: str |
 
     db = _get_db()
     try:
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         # Use SQL GROUP BY date for aggregation
         query = (
@@ -47,7 +47,7 @@ async def get_activity_timeline(request: Request, days: int = 30, room_id: str |
         # Fill in missing days
         timeline = []
         current = cutoff.date()
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         total = 0
         while current <= today:
             day_str = current.strftime("%Y-%m-%d")
@@ -185,7 +185,7 @@ async def get_member_activity(request: Request, days: int = 30, room_id: str | N
 
     db = _get_db()
     try:
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         # SQL GROUP BY member_id for counts
         query = (
@@ -234,7 +234,7 @@ async def get_topic_trends(request: Request, days: int = 30, room_id: str | None
 
     db = _get_db()
     try:
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         query = db.query(ContributionRecord.topics).filter(
             ContributionRecord.timestamp >= cutoff
         )

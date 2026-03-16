@@ -1,4 +1,22 @@
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+def _validate_password_complexity(password: str) -> str:
+    if not re.search(r"[A-Z]", password):
+        raise ValueError(
+            "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
+        )
+    if not re.search(r"[a-z]", password):
+        raise ValueError(
+            "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
+        )
+    if not re.search(r"\d", password):
+        raise ValueError(
+            "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
+        )
+    return password
 
 
 class QueryRequest(BaseModel):
@@ -47,6 +65,11 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     display_name: str | None = Field(None, max_length=100)
 
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _validate_password_complexity(v)
+
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1)
@@ -70,10 +93,20 @@ class ResetPasswordRequest(BaseModel):
     code: str = Field(..., min_length=8, max_length=8)
     new_password: str = Field(..., min_length=8, max_length=100)
 
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _validate_password_complexity(v)
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 
 class RefreshTokenRequest(BaseModel):

@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -67,7 +67,7 @@ def compute_health_snapshot(db: Session) -> dict:
 
     # ── 4. Active member % (last 30 days) ──
     contribs = mg._query_contributions()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cutoff_30d = now - timedelta(days=30)
     member_last_active: dict[str, datetime] = {}
     for c in contribs:
@@ -135,7 +135,7 @@ def save_health_snapshot(db: Session) -> dict:
     """Persist a health snapshot with timestamp."""
     snapshot = compute_health_snapshot(db)
     snapshot_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     risk_summary = json.dumps(snapshot.get("top_risk") or {})
 
@@ -171,7 +171,7 @@ def save_health_snapshot(db: Session) -> dict:
 
 def get_health_trends(db: Session, period_days: int = 90) -> dict:
     """Return historical snapshots for charting."""
-    cutoff = datetime.utcnow() - timedelta(days=period_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
 
     rows = db.execute(
         text(

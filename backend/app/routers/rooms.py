@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -148,8 +148,8 @@ async def create_room(body: CreateRoomRequest, request: Request):
             created_by_user_id=user.id,
             avatar_color=avatar_color,
             is_public=body.is_public if body.is_public is not None else False,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(room)
 
@@ -159,7 +159,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
             room_id=room.id,
             user_id=user.id,
             role="admin",
-            joined_at=datetime.utcnow(),
+            joined_at=datetime.now(timezone.utc),
         )
         db.add(admin_member)
 
@@ -174,7 +174,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
                     room_id=room.id,
                     user_id=uid,
                     role="member",
-                    joined_at=datetime.utcnow(),
+                    joined_at=datetime.now(timezone.utc),
                 )
                 db.add(member)
 
@@ -186,7 +186,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
             sender_name="System",
             message_type="system",
             content=f"{user.display_name or user.username} created the room",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(sys_msg)
         room.message_count = 1
@@ -404,7 +404,7 @@ async def join_room(room_id: str, request: Request):
             room_id=room_id,
             user_id=user.id,
             role="member",
-            joined_at=datetime.utcnow(),
+            joined_at=datetime.now(timezone.utc),
         )
         db.add(member)
 
@@ -416,11 +416,11 @@ async def join_room(room_id: str, request: Request):
             sender_name="System",
             message_type="system",
             content=f"{user.display_name or user.username} joined the room",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(sys_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.utcnow()
+        room.last_message_at = datetime.now(timezone.utc)
         db.commit()
 
         await _broadcast(room_id, {
@@ -490,7 +490,7 @@ async def get_room(room_id: str, request: Request):
         )
 
         # Update last_read_at
-        membership.last_read_at = datetime.utcnow()
+        membership.last_read_at = datetime.now(timezone.utc)
         db.commit()
 
         return {
@@ -541,7 +541,7 @@ async def update_room(room_id: str, body: UpdateRoomRequest, request: Request):
             room.description = body.description
         if body.is_public is not None:
             room.is_public = body.is_public
-        room.updated_at = datetime.utcnow()
+        room.updated_at = datetime.now(timezone.utc)
         db.commit()
 
         return {"status": "updated"}
@@ -595,7 +595,7 @@ async def add_members(room_id: str, body: AddRoomMembersRequest, request: Reques
                 room_id=room_id,
                 user_id=uid,
                 role="member",
-                joined_at=datetime.utcnow(),
+                joined_at=datetime.now(timezone.utc),
             )
             db.add(member)
             added.append(u.display_name or u.username)
@@ -609,11 +609,11 @@ async def add_members(room_id: str, body: AddRoomMembersRequest, request: Reques
                 sender_name="System",
                 message_type="system",
                 content=f"{user.display_name or user.username} added {', '.join(added)}",
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             db.add(sys_msg)
             room.message_count = (room.message_count or 0) + 1
-            room.last_message_at = datetime.utcnow()
+            room.last_message_at = datetime.now(timezone.utc)
             db.commit()
 
             await _broadcast(room_id, {
@@ -677,11 +677,11 @@ async def remove_member(room_id: str, user_id: str, request: Request):
             sender_name="System",
             message_type="system",
             content=f"{target_info['display_name'] or target_info['username']} {action}",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(sys_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.utcnow()
+        room.last_message_at = datetime.now(timezone.utc)
         db.commit()
 
         await _broadcast(room_id, {
@@ -725,12 +725,12 @@ async def send_message(room_id: str, body: RoomMessageRequest, request: Request)
             message_type="user",
             content=body.content,
             parent_message_id=body.parent_message_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.utcnow()
-        room.updated_at = datetime.utcnow()
+        room.last_message_at = datetime.now(timezone.utc)
+        room.updated_at = datetime.now(timezone.utc)
         db.commit()
 
         msg_dict = _msg_to_dict(msg)
@@ -785,11 +785,11 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             sender_name=user.display_name or user.username,
             message_type="user",
             content=body.question,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(user_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.utcnow()
+        room.last_message_at = datetime.now(timezone.utc)
         db.commit()
 
         # Broadcast user's question
@@ -886,11 +886,11 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             content=result.answer,
             sources=[s.model_dump() for s in result.sources] if result.sources else [],
             related_members=[m.model_dump() for m in result.related_members] if result.related_members else [],
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(ai_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.utcnow()
+        room.last_message_at = datetime.now(timezone.utc)
         db.commit()
 
         ai_msg_dict = _msg_to_dict(ai_msg)
@@ -921,7 +921,7 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
                 sender_name="System",
                 message_type="system",
                 content="AI agent encountered an error. Please try again.",
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             db.add(error_msg)
             room.message_count = (room.message_count or 0) + 1
@@ -1162,11 +1162,11 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                                 message_type="user",
                                 content=content,
                                 parent_message_id=data.get("parent_message_id"),
-                                created_at=datetime.utcnow(),
+                                created_at=datetime.now(timezone.utc),
                             )
                             db.add(msg)
                             room.message_count = (room.message_count or 0) + 1
-                            room.last_message_at = datetime.utcnow()
+                            room.last_message_at = datetime.now(timezone.utc)
                             db.commit()
 
                             await _broadcast(room_id, {

@@ -17,7 +17,7 @@ import math
 import time
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import networkx as nx
 from sqlalchemy.orm import Session
@@ -71,7 +71,7 @@ def _temporal_decay(
     """Exponential decay weight: 1.0 for *now*, 0.5 at half-life, etc."""
     if timestamp is None:
         return 0.5
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     age_days = max(0, (now - timestamp).total_seconds() / 86400)
     return math.exp(-0.693 * age_days / half_life_days)
 
@@ -115,7 +115,7 @@ class MemoryGraph:
 
     def _build_nx_graph(self) -> nx.Graph:
         """Build a full NetworkX graph from DB data."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         G = nx.Graph()
 
         members = self._query_members()
@@ -641,7 +641,7 @@ class MemoryGraph:
                 })
 
         # Stale expertise: members inactive >90 days
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         stale_threshold = now - timedelta(days=90)
         contribs = self._query_contributions()
         member_last_active: dict[str, datetime] = {}
@@ -940,7 +940,7 @@ class MemoryGraph:
                 if prev is None or c.timestamp > prev:
                     member_last_active[c.member_id] = c.timestamp
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         scored: list[dict] = []
 
         for mid, mdata in member_nodes.items():

@@ -550,8 +550,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setErrorRaw] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   // Track whether user has interacted — suppress any errors that fire before interaction
   const hasInteractedRef = useRef(false);
   const pageReadyRef = useRef(false);
@@ -566,7 +566,7 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => setMounted(true), 100);
+    setTimeout(() => setIsMounted(true), 100);
     // Mark page as "ready" after 3 seconds — any Google error after this is likely real
     const readyTimer = setTimeout(() => { pageReadyRef.current = true; }, 3000);
     // Track first user interaction
@@ -583,34 +583,34 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setIsLoading(true);
     try {
       await login(username, password);
       navigate("/");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     if (!credentialResponse.credential) return;
     setError(null);
-    setLoading(true);
+    setIsLoading(true);
     try {
       await googleLogin(credentialResponse.credential);
       navigate("/");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleGoogleAccessToken = async (accessToken: string) => {
     setError(null);
-    setLoading(true);
+    setIsLoading(true);
     try {
       await googleLoginWithToken(accessToken);
       navigate("/");
@@ -618,7 +618,7 @@ export default function LoginPage() {
       console.error("Google auth backend error:", err);
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -637,7 +637,7 @@ export default function LoginPage() {
       {/* Main content */}
       <div
         className={`w-full max-w-md relative z-10 transition-all duration-1000 ${
-          mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          isMounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
         }`}
       >
         {/* Brain logo with rings */}
@@ -749,7 +749,7 @@ export default function LoginPage() {
             {/* Animated sign-in button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="w-full relative flex items-center justify-center gap-2 py-3 text-white text-sm font-semibold rounded-xl
                 transition-all duration-300 disabled:opacity-50 btn-press overflow-hidden group/btn"
               style={{
@@ -765,12 +765,12 @@ export default function LoginPage() {
                   animation: "shimmer 2s infinite",
                 }}
               />
-              {loading ? (
+              {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <LogIn size={16} className="relative z-10" />
               )}
-              <span className="relative z-10">{loading ? "Signing in..." : "Sign In"}</span>
+              <span className="relative z-10">{isLoading ? "Signing in..." : "Sign In"}</span>
             </button>
 
             <SafeGoogleLogin
@@ -794,7 +794,7 @@ export default function LoginPage() {
         {/* Stats ribbon */}
         <div
           className={`mt-6 flex justify-center gap-8 text-center transition-all duration-1000 delay-500 ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            isMounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
           {[

@@ -312,7 +312,7 @@ def save_digest_config(
 ) -> dict:
     """Insert or update a digest configuration and return it as a dict."""
     import uuid
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Check if config already exists for this workspace + channel
     existing = db.execute(
@@ -345,7 +345,7 @@ def save_digest_config(
         db.commit()
     else:
         config_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         db.execute(
             text(
                 "INSERT INTO slack_digest_config "
@@ -408,9 +408,9 @@ def get_digest_config(db: Session, workspace_id: str) -> list[dict]:
 
 def update_digest_last_sent(db: Session, config_id: str) -> bool:
     """Update the last_sent_at timestamp for a digest config. Returns True if updated."""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = db.execute(
         text(
             "UPDATE slack_digest_config SET last_sent_at = :now WHERE id = :id"
@@ -431,10 +431,10 @@ def create_help_request(
     """Insert a new help request and return it as a dict."""
     import json
     import uuid
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     request_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     topics_json = json.dumps(topics or [])
 
     db.execute(
@@ -521,9 +521,9 @@ def get_help_requests(
 
 def update_help_request_status(db: Session, request_id: str, new_status: str) -> bool:
     """Update the status of a help request. Returns True if a row was updated."""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    resolved_at = datetime.utcnow() if new_status == "resolved" else None
+    resolved_at = datetime.now(timezone.utc) if new_status == "resolved" else None
     result = db.execute(
         text(
             "UPDATE help_requests SET status = :status, resolved_at = :resolved_at "
@@ -569,9 +569,9 @@ def save_health_snapshot_record(
 ) -> dict:
     """Insert a health snapshot record and return it as a dict."""
     import json
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone as _tz
 
-    now = _dt.utcnow()
+    now = _dt.now(_tz.utc)
     db.execute(
         text(
             "INSERT INTO health_snapshots "
@@ -610,9 +610,9 @@ def save_health_snapshot_record(
 def get_health_snapshots(db: Session, days: int = 90) -> list[dict]:
     """Fetch health snapshots from the last N days."""
     import json
-    from datetime import datetime as _dt, timedelta as _td
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
 
-    cutoff = _dt.utcnow() - _td(days=days)
+    cutoff = _dt.now(_tz.utc) - _td(days=days)
     rows = db.execute(
         text(
             "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "

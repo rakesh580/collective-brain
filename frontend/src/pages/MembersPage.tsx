@@ -28,13 +28,13 @@ const MEMBERS_PAGE_SIZE = 50;
 function MemberList() {
   const [members, setMembers] = useState<Member[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const loadMembers = useCallback(() => {
-    setLoading(true);
+    setIsLoading(true);
     api
       .getMembers(undefined, MEMBERS_PAGE_SIZE, 0)
       .then((res) => {
@@ -42,7 +42,7 @@ function MemberList() {
         setTotal(res.total);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load members"))
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
   }, []);
 
   const loadMore = useCallback(() => {
@@ -61,7 +61,7 @@ function MemberList() {
     loadMembers();
   }, [loadMembers]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-4">
         <div className="skeleton h-8 w-48" />
@@ -158,19 +158,19 @@ function MemberDetailView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [member, setMember] = useState<MemberDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
 
   const loadMember = useCallback(() => {
     if (id) {
-      setLoading(true);
+      setIsLoading(true);
       api
         .getMember(id)
         .then(setMember)
         .catch((err) => setError(err instanceof Error ? err.message : "Failed to load member"))
-        .finally(() => setLoading(false));
+        .finally(() => setIsLoading(false));
     }
   }, [id]);
 
@@ -178,7 +178,7 @@ function MemberDetailView() {
     loadMember();
   }, [loadMember]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 max-w-3xl space-y-4">
         <div className="skeleton h-5 w-24" />

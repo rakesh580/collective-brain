@@ -1,7 +1,7 @@
 """Weekly Slack Digest Bot — compiles and sends team knowledge digests."""
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import httpx
@@ -24,7 +24,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
 
     Returns a DigestData dict with all metrics, highlights, and risks.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
 
     # ── Recent contributions (last 7 days) ────────────────────

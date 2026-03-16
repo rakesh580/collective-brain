@@ -129,6 +129,7 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     auth_provider: str | None = None
+    role: str = "member"
     skills: list[str] = []
     role_title: str | None = None
     bio: str | None = None

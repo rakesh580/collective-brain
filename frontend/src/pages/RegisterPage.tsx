@@ -64,7 +64,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -79,28 +79,28 @@ export default function RegisterPage() {
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
     try {
       await register(username, email, password, displayName || undefined);
       navigate("/");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     if (!credentialResponse.credential) return;
     setError(null);
-    setLoading(true);
+    setIsLoading(true);
     try {
       await googleLogin(credentialResponse.credential);
       navigate("/");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -206,15 +206,15 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isLoading}
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium rounded-lg hover:from-indigo-500 hover:to-violet-500 transition-all disabled:opacity-50 btn-press shadow-lg shadow-indigo-500/25"
           >
-            {loading ? (
+            {isLoading ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <UserPlus size={16} />
             )}
-            {loading ? "Creating account..." : "Create Account"}
+            {isLoading ? "Creating account..." : "Create Account"}
           </button>
 
           <SafeGoogleLogin

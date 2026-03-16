@@ -14,7 +14,7 @@ export default function SlackIntegration() {
   const [workspaces, setWorkspaces] = useState<SlackWorkspace[]>([]);
   const [channels, setChannels] = useState<SlackChannel[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export default function SlackIntegration() {
   }
 
   async function handleInstall() {
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     try {
       const data = await api.slackInstall();
@@ -81,7 +81,7 @@ export default function SlackIntegration() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to start Slack installation");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
@@ -103,20 +103,20 @@ export default function SlackIntegration() {
 
   async function loadChannels(workspaceId: string) {
     setSelectedWorkspace(workspaceId);
-    setLoading(true);
+    setIsLoading(true);
     try {
       const data = await api.slackChannels(workspaceId);
       setChannels(data.channels);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load channels");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
   async function handleSync(channelId: string) {
     if (!selectedWorkspace) return;
-    setLoading(true);
+    setIsLoading(true);
     try {
       const result = await api.slackSyncChannel(selectedWorkspace, channelId);
       setSuccess(`Channel synced: ${result.channel_name || channelId}`);
@@ -125,7 +125,7 @@ export default function SlackIntegration() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to sync channel");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
@@ -237,11 +237,11 @@ export default function SlackIntegration() {
         {configured && (
           <button
             onClick={handleInstall}
-            disabled={loading}
+            disabled={isLoading}
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
             <ExternalLink size={12} />
-            {loading ? "Loading..." : "Add to Slack"}
+            {isLoading ? "Loading..." : "Add to Slack"}
           </button>
         )}
       </div>

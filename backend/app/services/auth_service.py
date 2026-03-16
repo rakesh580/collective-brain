@@ -1,7 +1,7 @@
 import logging
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from passlib.context import CryptContext
@@ -28,12 +28,12 @@ class AuthService:
         return pwd_context.verify(plain, hashed)
 
     def create_token(self, user_id: str) -> str:
-        expire = datetime.utcnow() + timedelta(minutes=self.expire_minutes)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=self.expire_minutes)
         payload = {"sub": user_id, "type": "access", "exp": expire}
         return jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
     def create_refresh_token(self, user_id: str) -> str:
-        expire = datetime.utcnow() + timedelta(days=7)
+        expire = datetime.now(timezone.utc) + timedelta(days=7)
         payload = {"sub": user_id, "type": "refresh", "exp": expire}
         return jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
@@ -85,7 +85,7 @@ class AuthService:
             display_name=display_name or username,
             auth_provider="local",
             is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(user)
         db.commit()
@@ -118,7 +118,7 @@ class AuthService:
             )
         if not self.verify_password(password, user.password_hash):
             raise ValueError("Incorrect password")
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.commit()
         return user
 
@@ -158,7 +158,7 @@ class AuthService:
         if user:
             if not user.is_active:
                 raise ValueError("This account has been deactivated")
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -173,7 +173,7 @@ class AuthService:
             user.auth_provider = (
                 "google+local" if user.password_hash else "google"
             )
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -197,8 +197,8 @@ class AuthService:
             google_id=google_sub,
             auth_provider="google",
             is_active=True,
-            created_at=datetime.utcnow(),
-            last_login=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            last_login=datetime.now(timezone.utc),
         )
         db.add(user)
         db.commit()
@@ -244,7 +244,7 @@ class AuthService:
         if user:
             if not user.is_active:
                 raise ValueError("This account has been deactivated")
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -259,7 +259,7 @@ class AuthService:
             user.auth_provider = (
                 "google+local" if user.password_hash else "google"
             )
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -283,8 +283,8 @@ class AuthService:
             google_id=google_sub,
             auth_provider="google",
             is_active=True,
-            created_at=datetime.utcnow(),
-            last_login=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            last_login=datetime.now(timezone.utc),
         )
         db.add(user)
         db.commit()
@@ -313,7 +313,7 @@ class AuthService:
         import secrets as _secrets
         code = "".join(_secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
         user.reset_code = pwd_context.hash(code)
-        user.reset_code_expires = datetime.utcnow() + timedelta(minutes=15)
+        user.reset_code_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
         db.commit()
         return code
 
@@ -329,7 +329,7 @@ class AuthService:
             raise ValueError("No account found with that email address")
         if not user.reset_code or not pwd_context.verify(code, user.reset_code):
             raise ValueError("Invalid verification code")
-        if user.reset_code_expires and user.reset_code_expires < datetime.utcnow():
+        if user.reset_code_expires and user.reset_code_expires < datetime.now(timezone.utc):
             raise ValueError("Verification code has expired")
 
         user.password_hash = self.hash_password(new_password)

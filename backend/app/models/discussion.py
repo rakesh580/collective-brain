@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from app.db.database import Base
 
@@ -13,8 +13,8 @@ class DiscussionThread(Base):
     context_type = Column(String, nullable=True)  # "member", "insight", or None (standalone)
     context_id = Column(String, nullable=True)  # ID of the related member/insight
     room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class DiscussionMessage(Base):
@@ -24,6 +24,6 @@ class DiscussionMessage(Base):
     thread_id = Column(String, ForeignKey("discussion_threads.id"), index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     edited_at = Column(DateTime, nullable=True)
     parent_message_id = Column(String, ForeignKey("discussion_messages.id"), nullable=True)

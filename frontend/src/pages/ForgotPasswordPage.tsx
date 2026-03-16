@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const inputClass =
     "w-full bg-slate-800/50 border border-slate-600/50 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setIsLoading(true);
     try {
       const res = await api.authForgotPassword(email);
       if (res.code) setDevCode(res.code);
@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
     } catch (err) {
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
     try {
       const res = await api.authResetPassword(email, code, newPassword);
       // Auto-login with the new token
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
     } catch (err) {
       setError(parseApiError(err));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -133,15 +133,15 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium rounded-lg hover:from-indigo-500 hover:to-violet-500 transition-all disabled:opacity-50 btn-press shadow-lg shadow-indigo-500/25"
               >
-                {loading ? (
+                {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Mail size={16} />
                 )}
-                {loading ? "Sending..." : "Send Verification Code"}
+                {isLoading ? "Sending..." : "Send Verification Code"}
               </button>
             </form>
           )}
@@ -197,15 +197,15 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium rounded-lg hover:from-indigo-500 hover:to-violet-500 transition-all disabled:opacity-50 btn-press shadow-lg shadow-indigo-500/25"
               >
-                {loading ? (
+                {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <KeyRound size={16} />
                 )}
-                {loading ? "Resetting..." : "Reset Password"}
+                {isLoading ? "Resetting..." : "Reset Password"}
               </button>
             </form>
           )}

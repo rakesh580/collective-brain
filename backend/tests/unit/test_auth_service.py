@@ -1,7 +1,7 @@
 """Unit tests for AuthService — JWT, password hashing, registration, authentication."""
 
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -112,7 +112,7 @@ class TestRegistration:
     def test_register_sets_created_at(self, db_session, auth_service):
         user = auth_service.register(db_session, "newuser", "n@test.com", "Pass123!")
         assert user.created_at is not None
-        assert (datetime.utcnow() - user.created_at).total_seconds() < 5
+        assert (datetime.now(timezone.utc) - user.created_at).total_seconds() < 5
 
 
 class TestAuthentication:

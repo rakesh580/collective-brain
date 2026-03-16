@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, Boolean
 from app.db.database import Base
 
@@ -13,8 +13,8 @@ class ChatRoom(Base):
     avatar_color = Column(String, default="from-indigo-500 to-violet-500")
     is_archived = Column(Boolean, default=False)
     is_public = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_message_at = Column(DateTime, nullable=True)
     message_count = Column(Integer, default=0)
 
@@ -26,7 +26,7 @@ class ChatRoomMember(Base):
     room_id = Column(String, ForeignKey("chat_rooms.id"), index=True)
     user_id = Column(String, ForeignKey("users.id"), index=True)
     role = Column(String, default="member")  # "admin" or "member"
-    joined_at = Column(DateTime, default=datetime.utcnow)
+    joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_read_at = Column(DateTime, nullable=True)
 
 
@@ -41,6 +41,6 @@ class ChatRoomMessage(Base):
     content = Column(Text, nullable=False)
     sources = Column(JSON, default=list)  # AI message sources
     related_members = Column(JSON, default=list)  # AI message related members
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     edited_at = Column(DateTime, nullable=True)
     parent_message_id = Column(String, ForeignKey("chat_room_messages.id"), nullable=True)

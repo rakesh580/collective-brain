@@ -3,7 +3,7 @@
 import os
 import shutil
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -259,7 +259,7 @@ def seed_members(db_session):
             email=f"{name}@company.com",
             expertise_tags=["python", "fastapi"] if name == "alice" else ["react", "typescript"],
             total_contributions=10,
-            last_active=datetime.utcnow() - timedelta(days=5),
+            last_active=datetime.now(timezone.utc) - timedelta(days=5),
         )
         db_session.add(m)
         members.append(m)
@@ -294,7 +294,7 @@ def seed_artifacts(db_session, seed_members):
                 member_id=member_id,
                 artifact_id=a.id,
                 contribution_type="git_content",
-                timestamp=datetime.utcnow() - timedelta(days=i * 10),
+                timestamp=datetime.now(timezone.utc) - timedelta(days=i * 10),
                 description=f"Commit {i} by {member_id}",
                 topics=["python", "api"],
             )

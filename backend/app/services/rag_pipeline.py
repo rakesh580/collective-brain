@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.services.llm_service import LLMService
@@ -109,8 +109,8 @@ class RAGPipeline:
             conv = ConversationRecord(
                 id=conv_id,
                 title=(question.strip()[:100] or "Untitled"),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
                 owner_user_id=owner_user_id,
                 room_id=getattr(self, "room_id", None),
             )
@@ -121,7 +121,7 @@ class RAGPipeline:
         self, conv_id: str, user_content: str, response_text: str, results: dict,
         sender_user_id: str | None = None, sender_name: str | None = None,
     ):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         user_msg = MessageRecord(
             id=str(uuid4()),
             conversation_id=conv_id,

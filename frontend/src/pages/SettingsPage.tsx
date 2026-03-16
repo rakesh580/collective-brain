@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const { user, updateUser } = useAuth();
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Profile state
@@ -95,13 +95,13 @@ export default function SettingsPage() {
   };
 
   const load = () => {
-    setLoading(true);
+    setIsLoading(true);
     Promise.all([api.health(), api.getArtifacts()])
       .then(([h, a]) => {
         setHealth(h);
         setArtifacts(a);
       })
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
   };
 
   useEffect(load, []);
@@ -122,7 +122,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         <div className="skeleton h-8 w-32" />

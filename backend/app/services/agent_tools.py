@@ -6,7 +6,7 @@ exposing them for the LLM to call autonomously.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from langchain_core.tools import tool
@@ -187,7 +187,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         if not member:
             return f"No member found matching '{member_name}'."
 
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         q = db.query(ContributionRecord).filter(
             ContributionRecord.member_id == member.id,
             ContributionRecord.timestamp >= since,
@@ -287,7 +287,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         """Get the team-wide recent activity summary for the specified number of days.
         Shows all contributions across the team, grouped by type.
         Use this for an overview of what the whole team has been doing."""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         q = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= since)
         if room_id:
             q = q.filter(ContributionRecord.room_id == room_id)

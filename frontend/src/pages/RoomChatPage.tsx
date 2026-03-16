@@ -788,7 +788,7 @@ function AddMembersModal({
 }) {
   const [users, setUsers] = useState<User[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -822,14 +822,14 @@ function AddMembersModal({
 
   const handleAdd = async () => {
     if (selected.size === 0) return;
-    setLoading(true);
+    setIsLoading(true);
     try {
       await api.addRoomMembers(roomId, Array.from(selected));
       onClose();
     } catch {
       // ignore
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -896,10 +896,10 @@ function AddMembersModal({
           {selected.size > 0 && (
             <button
               onClick={handleAdd}
-              disabled={loading}
+              disabled={isLoading}
               className="px-5 py-2 text-sm font-medium bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 transition-all btn-press shadow-md shadow-indigo-500/20"
             >
-              {loading ? "Adding..." : `Add ${selected.size}`}
+              {isLoading ? "Adding..." : `Add ${selected.size}`}
             </button>
           )}
         </div>

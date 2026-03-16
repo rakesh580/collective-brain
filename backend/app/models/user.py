@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON, Text
 from app.db.database import Base
 
@@ -14,12 +14,13 @@ class UserRecord(Base):
     avatar_url = Column(String, nullable=True)
     linked_member_id = Column(String, ForeignKey("members.id"), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime, nullable=True)
     google_id = Column(String, unique=True, nullable=True, index=True)
     auth_provider = Column(String, nullable=True, default="local")
     reset_code = Column(String, nullable=True)
     reset_code_expires = Column(DateTime, nullable=True)
+    role = Column(String, nullable=False, default="member")  # "admin", "member", "viewer"
     skills = Column(JSON, default=list)
     role_title = Column(String, nullable=True)
     bio = Column(Text, nullable=True)

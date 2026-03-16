@@ -1,8 +1,8 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.schemas.requests import MemberAliasUpdate, MemberCreateRequest, MemberUpdateRequest
 from app.schemas.responses import MemberResponse, MemberDetailResponse, ContributionResponse
@@ -10,6 +10,7 @@ from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.models.artifact import ArtifactRecord
 from app.db.database import create_session
+from app.dependencies import require_role
 
 router = APIRouter()
 
@@ -100,9 +101,7 @@ async def get_member(member_id: str, request: Request, room_id: str | None = Non
 
 
 @router.put("/{member_id}/aliases", response_model=MemberResponse)
-async def update_aliases(member_id: str, body: MemberAliasUpdate, request: Request):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def update_aliases(member_id: str, body: MemberAliasUpdate, request: Request, user=Depends(require_role("admin", "member"))):
 
     db = _get_db()
     try:
@@ -151,9 +150,7 @@ async def get_contributions(member_id: str, request: Request, room_id: str | Non
 
 
 @router.post("", response_model=MemberResponse, status_code=201)
-async def create_member(body: MemberCreateRequest, request: Request):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def create_member(body: MemberCreateRequest, request: Request, user=Depends(require_role("admin", "member"))):
 
     db = _get_db()
     try:
@@ -162,7 +159,7 @@ async def create_member(body: MemberCreateRequest, request: Request):
         # Ensure unique ID
         if db.query(MemberRecord).filter(MemberRecord.id == member_id).first():
             member_id = f"{slug}-{uuid4().hex[:6]}"
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         member = MemberRecord(
             id=member_id,
             name=body.name,
@@ -185,9 +182,7 @@ async def create_member(body: MemberCreateRequest, request: Request):
 
 
 @router.put("/{member_id}", response_model=MemberResponse)
-async def update_member(member_id: str, body: MemberUpdateRequest, request: Request):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def update_member(member_id: str, body: MemberUpdateRequest, request: Request, user=Depends(require_role("admin", "member"))):
 
     db = _get_db()
     try:
@@ -212,9 +207,7 @@ async def update_member(member_id: str, body: MemberUpdateRequest, request: Requ
 
 
 @router.delete("/{member_id}")
-async def delete_member(member_id: str, request: Request):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def delete_member(member_id: str, request: Request, user=Depends(require_role("admin"))):
 
     db = _get_db()
     try:

@@ -13,7 +13,7 @@ export default function ShareModal({ conversationId, onClose, isOpen }: Props) {
   const [users, setUsers] = useState<User[]>([]);
   const [participants, setParticipants] = useState<ConversationParticipant[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function ShareModal({ conversationId, onClose, isOpen }: Props) {
 
   const handleShare = async () => {
     if (selected.size === 0) return;
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     try {
       await api.shareConversation(conversationId, Array.from(selected));
@@ -62,7 +62,7 @@ export default function ShareModal({ conversationId, onClose, isOpen }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to share");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -149,10 +149,10 @@ export default function ShareModal({ conversationId, onClose, isOpen }: Props) {
           {selected.size > 0 && (
             <button
               onClick={handleShare}
-              disabled={loading}
+              disabled={isLoading}
               className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 transition-all btn-press shadow-md shadow-indigo-500/20"
             >
-              {loading ? "Sharing..." : `Share with ${selected.size}`}
+              {isLoading ? "Sharing..." : `Share with ${selected.size}`}
             </button>
           )}
         </div>

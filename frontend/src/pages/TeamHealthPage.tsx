@@ -96,13 +96,13 @@ export default function TeamHealthPage() {
   const [snapshot, setSnapshot] = useState<HealthSnapshot | null>(null);
   const [trends, setTrends] = useState<HealthSnapshotRecord[]>([]);
   const [predictions, setPredictions] = useState<HealthPrediction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodOption>(90);
 
   const fetchData = useCallback(() => {
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     Promise.all([
       api.getHealthSnapshot(),
@@ -115,7 +115,7 @@ export default function TeamHealthPage() {
         setPredictions(predData.predictions);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load health data"))
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
   }, [period]);
 
   useEffect(() => {
@@ -123,18 +123,18 @@ export default function TeamHealthPage() {
   }, [fetchData]);
 
   const handleSaveSnapshot = async () => {
-    setSaving(true);
+    setIsSaving(true);
     try {
       await api.saveHealthSnapshot();
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save snapshot");
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-6 max-w-6xl">
         <div className="flex items-center gap-2">
@@ -255,11 +255,11 @@ export default function TeamHealthPage() {
         </div>
         <button
           onClick={handleSaveSnapshot}
-          disabled={saving}
+          disabled={isSaving}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50"
         >
           <Save size={14} />
-          {saving ? "Saving..." : "Save Snapshot"}
+          {isSaving ? "Saving..." : "Save Snapshot"}
         </button>
       </div>
 

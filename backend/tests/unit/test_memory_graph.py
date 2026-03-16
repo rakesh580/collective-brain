@@ -1,6 +1,6 @@
 """Unit tests for MemoryGraph — graph building, subgraphs, pattern detection."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -108,7 +108,7 @@ class TestPatternDetection:
             name="Lone Dev",
             expertise_tags=["niche-topic"],
             total_contributions=10,
-            last_active=datetime.utcnow(),
+            last_active=datetime.now(timezone.utc),
         )
         db_session.add(member)
 
@@ -127,7 +127,7 @@ class TestPatternDetection:
             member_id="lone-dev",
             artifact_id="solo-art",
             contribution_type="git_content",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             description="solo work",
             topics=["niche-topic"],
         )
@@ -150,7 +150,7 @@ class TestPatternDetection:
             name="Stale Dev",
             expertise_tags=["old-tech"],
             total_contributions=10,
-            last_active=datetime.utcnow() - timedelta(days=120),
+            last_active=datetime.now(timezone.utc) - timedelta(days=120),
         )
         db_session.add(member)
 
@@ -161,7 +161,7 @@ class TestPatternDetection:
             member_id="stale-dev",
             artifact_id=None,
             contribution_type="git_content",
-            timestamp=datetime.utcnow() - timedelta(days=120),
+            timestamp=datetime.now(timezone.utc) - timedelta(days=120),
             description="old work",
             topics=["old-tech"],
         )

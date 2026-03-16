@@ -57,7 +57,7 @@ function timeAgo(dateStr: string | null): string {
 export default function GitHubIntegration() {
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [events, setEvents] = useState<GitHubEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
 
@@ -68,7 +68,7 @@ export default function GitHubIntegration() {
     ]).then(([setupData, eventsData]) => {
       if (setupData) setSetup(setupData);
       if (eventsData) setEvents(eventsData.events);
-    }).finally(() => setLoading(false));
+    }).finally(() => setIsLoading(false));
   }, []);
 
   const copyUrl = () => {
@@ -85,7 +85,7 @@ export default function GitHubIntegration() {
       .finally(() => setEventsLoading(false));
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="w-6 h-6 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />

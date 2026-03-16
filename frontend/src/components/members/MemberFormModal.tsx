@@ -22,7 +22,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
   const [tags, setTags] = useState<string[]>([]);
   const [strengths, setStrengths] = useState("");
   const [weaknesses, setWeaknesses] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
       setError("Name is required");
       return;
     }
-    setSaving(true);
+    setIsSaving(true);
     setError(null);
     try {
       await onSave({
@@ -86,7 +86,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
@@ -204,10 +204,10 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={isSaving}
             className="px-5 py-2 text-sm font-medium bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg hover:from-indigo-500 hover:to-violet-500 transition-all disabled:opacity-50 btn-press shadow-md shadow-indigo-500/20"
           >
-            {saving ? "Saving..." : member ? "Save Changes" : "Add Member"}
+            {isSaving ? "Saving..." : member ? "Save Changes" : "Add Member"}
           </button>
         </div>
       </div>

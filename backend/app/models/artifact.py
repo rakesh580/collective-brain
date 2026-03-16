@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey
 from app.db.database import Base
 
@@ -10,7 +10,7 @@ class ArtifactRecord(Base):
     source_type = Column(String, nullable=False)
     source_path = Column(String, nullable=False)
     title = Column(String, nullable=True)
-    ingested_at = Column(DateTime, default=datetime.utcnow)
+    ingested_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     chunk_count = Column(Integer, default=0)
     member_ids = Column(JSON, default=list)
     metadata_json = Column(JSON, default=dict)

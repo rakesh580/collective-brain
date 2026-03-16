@@ -61,14 +61,14 @@ export default function SourceUploader({ onComplete, roomId }: Props) {
   const [sourceType, setSourceType] = useState<SourceType>("markdown");
   const [path, setPath] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const config = sourceConfigs[sourceType];
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
 
     try {
@@ -109,12 +109,12 @@ export default function SourceUploader({ onComplete, roomId }: Props) {
         setError(raw);
       }
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const isDisabled =
-    loading || (config.inputType === "path" ? !path : files.length === 0);
+    isLoading || (config.inputType === "path" ? !path : files.length === 0);
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 p-6">
@@ -177,7 +177,7 @@ export default function SourceUploader({ onComplete, roomId }: Props) {
         disabled={isDisabled}
         className="mt-4 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
       >
-        {loading ? "Ingesting..." : "Ingest"}
+        {isLoading ? "Ingesting..." : "Ingest"}
       </button>
     </form>
   );

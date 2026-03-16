@@ -6,7 +6,7 @@ that reasons about which tools to use and synthesizes multi-step results.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from langchain_core.messages import HumanMessage, AIMessage
@@ -165,8 +165,8 @@ class AgentPipeline:
         conv = ConversationRecord(
             id=conv_id,
             title=title,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
             message_count=0,
             owner_user_id=owner_user_id,
             room_id=getattr(self, "_room_id", None),
@@ -207,7 +207,7 @@ class AgentPipeline:
         sender_name: str | None = None,
     ):
         """Save the user question and agent response to DB."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Save user message
         user_msg = MessageRecord(

@@ -89,13 +89,13 @@ export default function GraphPage() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [patterns, setPatterns] = useState<Insight[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [showInsights, setShowInsights] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(() => {
-    setLoading(true);
+    setIsLoading(true);
     Promise.all([
       api.getFullGraph(),
       api.getGraphStats().catch(() => null),
@@ -107,7 +107,7 @@ export default function GraphPage() {
         setPatterns(pats as Insight[]);
       })
       .finally(() => {
-        setLoading(false);
+        setIsLoading(false);
         setRefreshing(false);
       });
   }, []);
@@ -265,8 +265,8 @@ export default function GraphPage() {
       <div className="flex-1 overflow-hidden flex">
         {/* Graph view */}
         <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900">
-          {activeView === "force" && <ForceGraphView graphData={graphData} loading={loading} />}
-          {activeView === "mindmap" && <MindMapView graphData={graphData} loading={loading} />}
+          {activeView === "force" && <ForceGraphView graphData={graphData} loading={isLoading} />}
+          {activeView === "mindmap" && <MindMapView graphData={graphData} loading={isLoading} />}
           {activeView === "heatmap" && <HeatmapView />}
         </div>
 

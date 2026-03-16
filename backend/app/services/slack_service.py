@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import httpx
@@ -100,7 +100,7 @@ class SlackService:
             bot_token=bot_token,
             bot_user_id=bot_user_id,
             installed_by_user_id=installed_by_user_id,
-            installed_at=datetime.utcnow(),
+            installed_at=datetime.now(timezone.utc),
         )
         db.add(workspace)
         db.commit()

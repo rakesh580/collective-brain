@@ -49,7 +49,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [timeline, setTimeline] = useState<ActivityTimeline | null>(null);
   const [topics, setTopics] = useState<TopicTrends | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("cb_onboarding_done");
@@ -67,14 +67,14 @@ export default function DashboardPage() {
         setTopics(tp);
       })
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
   }, []);
 
   const memberCount = useCountUp(data?.total_members || 0);
   const artifactCount = useCountUp(data?.total_artifacts || 0);
   const chunkCount = useCountUp(data?.total_chunks || 0);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         <div className="skeleton h-10 w-72" />

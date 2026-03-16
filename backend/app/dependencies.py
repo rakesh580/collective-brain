@@ -67,3 +67,23 @@ def get_optional_user(request: Request):
         return get_current_user(request)
     except HTTPException:
         return None
+
+
+def require_role(*allowed_roles: str):
+    """Dependency factory that checks the current user has one of the allowed roles.
+
+    Usage in a route:
+        @router.delete("/thing/{id}")
+        async def delete_thing(request: Request, user=Depends(require_role("admin"))):
+            ...
+    """
+    def checker(request: Request):
+        user = get_current_user(request)
+        user_role = getattr(user, "role", None) or "member"
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
+        return user
+    return checker

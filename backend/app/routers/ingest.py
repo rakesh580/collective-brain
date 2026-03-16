@@ -1,6 +1,6 @@
 import os
 from uuid import uuid4
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.schemas.requests import MarkdownIngestRequest, GitIngestRequest
@@ -9,6 +9,7 @@ from app.models.artifact import ArtifactRecord
 from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.db.database import create_session
+from app.dependencies import require_role
 
 router = APIRouter()
 
@@ -295,9 +296,7 @@ async def get_task_status(task_id: str, request: Request):
 
 
 @router.post("/markdown", response_model=IngestionResponse)
-async def ingest_markdown(body: MarkdownIngestRequest, request: Request):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def ingest_markdown(body: MarkdownIngestRequest, request: Request, user=Depends(require_role("admin", "member"))):
 
     resolved_path = _validate_local_path(body.directory_path)
     if not os.path.isdir(resolved_path):
@@ -309,9 +308,7 @@ async def ingest_markdown(body: MarkdownIngestRequest, request: Request):
 
 
 @router.post("/git", response_model=IngestionResponse)
-async def ingest_git(body: GitIngestRequest, request: Request):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(require_role("admin", "member"))):
 
     import tempfile
     from git import Repo as GitRepo
@@ -371,10 +368,8 @@ async def ingest_git(body: GitIngestRequest, request: Request):
 
 
 @router.post("/markdown-upload", response_model=IngestionResponse)
-async def ingest_markdown_upload(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None):
+async def ingest_markdown_upload(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
     """Upload .md, .txt, or .zip files to ingest as markdown docs."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
 
     import tempfile
     import zipfile
@@ -421,9 +416,7 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
 
 
 @router.post("/slack", response_model=IngestionResponse)
-async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
 
     import tempfile, zipfile, os
     from app.ingestion.slack_connector import SlackConnector
@@ -450,9 +443,7 @@ async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: 
 
 
 @router.post("/discord", response_model=IngestionResponse)
-async def ingest_discord(request: Request, file: UploadFile = File(...), room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def ingest_discord(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
 
     import tempfile, os
     from app.ingestion.discord_connector import DiscordConnector
@@ -469,9 +460,7 @@ async def ingest_discord(request: Request, file: UploadFile = File(...), room_id
 
 
 @router.post("/tasks", response_model=IngestionResponse)
-async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
+async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
 
     import tempfile, os
     from app.ingestion.task_connector import TaskConnector
@@ -488,10 +477,8 @@ async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: 
 
 
 @router.post("/documents", response_model=IngestionResponse)
-async def ingest_documents(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None):
+async def ingest_documents(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
     """Upload PDF, DOCX, or TXT files to ingest as documents."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
 
     import tempfile
 

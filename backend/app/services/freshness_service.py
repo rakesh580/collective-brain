@@ -5,7 +5,7 @@ classifies them as fresh/aging/stale, and generates freshness reports.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ def compute_artifact_freshness(db: Session) -> list[dict]:
       5. Classify: fresh / aging / stale
       6. Return list with freshness metadata
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     artifacts = db.query(ArtifactRecord).all()
     contributions = db.query(ContributionRecord).all()
 

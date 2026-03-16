@@ -1,5 +1,5 @@
 """Slack integration models for workspace connections and channel syncing."""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Boolean, JSON, ForeignKey
 from app.db.database import Base
 
@@ -12,7 +12,7 @@ class SlackWorkspace(Base):
     bot_token = Column(Text, nullable=False)  # encrypted in production
     bot_user_id = Column(String)
     installed_by_user_id = Column(String, ForeignKey("users.id"))
-    installed_at = Column(DateTime, default=datetime.utcnow)
+    installed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = Column(Boolean, default=True)
     metadata_json = Column(JSON, default=dict)
 
@@ -29,5 +29,5 @@ class SlackChannelSync(Base):
     is_active = Column(Boolean, default=True)
     last_synced_at = Column(DateTime, nullable=True)
     last_message_ts = Column(String, nullable=True)  # Slack message timestamp for pagination
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     metadata_json = Column(JSON, default=dict)

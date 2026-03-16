@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Float, JSON, ForeignKey
 from app.db.database import Base
 
@@ -10,7 +10,7 @@ class ContributionRecord(Base):
     member_id = Column(String, ForeignKey("members.id"))
     artifact_id = Column(String, ForeignKey("artifacts.id"))
     contribution_type = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     description = Column(Text)
     topics = Column(JSON, default=list)
     sentiment = Column(Float, nullable=True)

@@ -25,7 +25,7 @@ interface Props {
 
 export default function TeamSidebar({ onAskAbout }: Props) {
   const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
@@ -37,7 +37,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
       .catch((err) => {
         if (err.name !== "AbortError") console.error("Failed to load team members:", err);
       })
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -73,7 +73,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
       )}
 
       <div className="flex-1 overflow-auto px-2 py-1 space-y-0.5">
-        {loading && (
+        {isLoading && (
           <div className="space-y-2 p-2">
             {[1, 2, 3].map((i) => (
               <div key={i} className="skeleton h-10 rounded-lg" />
@@ -81,7 +81,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!isLoading && filtered.length === 0 && (
           <p className="text-xs text-slate-400 text-center py-4">
             {search ? "No matches" : "No team members yet"}
           </p>

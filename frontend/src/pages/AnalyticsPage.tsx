@@ -18,12 +18,12 @@ export default function AnalyticsPage() {
   const [contribTypes, setContribTypes] = useState<ContributionTypes | null>(null);
   const [memberActivity, setMemberActivity] = useState<MemberActivity | null>(null);
   const [topicTrends, setTopicTrends] = useState<TopicTrends | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
 
   useEffect(() => {
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     Promise.all([
       api.getActivityTimeline(days),
@@ -40,10 +40,10 @@ export default function AnalyticsPage() {
         setTopicTrends(tp);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load analytics"))
-      .finally(() => setLoading(false));
+      .finally(() => setIsLoading(false));
   }, [days]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         <div className="skeleton h-8 w-32" />

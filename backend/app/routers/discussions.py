@@ -1,7 +1,7 @@
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -107,8 +107,8 @@ async def create_thread(body: CreateThreadRequest, request: Request):
             context_type=body.context_type,
             context_id=body.context_id,
             room_id=body.room_id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(thread)
         db.commit()
@@ -269,10 +269,10 @@ async def add_message(
             user_id=user.id,
             content=body.content,
             parent_message_id=body.parent_message_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(msg)
-        thread.updated_at = datetime.utcnow()
+        thread.updated_at = datetime.now(timezone.utc)
         db.commit()
 
         msg_dict = _msg_to_dict(msg, db)
@@ -311,7 +311,7 @@ async def edit_message(
             raise HTTPException(status_code=403, detail="Can only edit your own messages")
 
         msg.content = body.content
-        msg.edited_at = datetime.utcnow()
+        msg.edited_at = datetime.now(timezone.utc)
         db.commit()
 
         msg_dict = _msg_to_dict(msg, db)
