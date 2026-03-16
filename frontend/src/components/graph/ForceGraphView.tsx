@@ -72,7 +72,6 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   const [search, setSearch] = useState("");
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(new Set(["member", "topic", "artifact"]));
   const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
-  const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
   const [focusMode, setFocusMode] = useState(false);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [showPhysics, setShowPhysics] = useState(false);
@@ -122,24 +121,20 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   useEffect(() => {
     if (!filteredData || !search.trim()) {
       setHighlightNodes(new Set());
-      setHighlightLinks(new Set());
       return;
     }
     const q = search.toLowerCase();
     const matched = new Set<string>();
-    const matchedLinks = new Set<string>();
     for (const n of filteredData.nodes) {
       if (n.label.toLowerCase().includes(q) || n.type.toLowerCase().includes(q)) {
         matched.add(n.id);
         for (const e of nodeEdgeMap.get(n.id) || []) {
-          matchedLinks.add(`${e.source}-${e.target}`);
           matched.add(e.source);
           matched.add(e.target);
         }
       }
     }
     setHighlightNodes(matched);
-    setHighlightLinks(matchedLinks);
   }, [search, filteredData, nodeEdgeMap]);
 
   const handleNodeClick = useCallback(
@@ -149,14 +144,11 @@ export default function ForceGraphView({ graphData, loading }: Props) {
         const found = graphData.nodes.find((n) => n.id === nodeId);
         setSelectedNode(found || null);
         const hl = new Set<string>([nodeId]);
-        const hlLinks = new Set<string>();
         for (const e of nodeEdgeMap.get(nodeId) || []) {
           hl.add(e.source);
           hl.add(e.target);
-          hlLinks.add(`${e.source}-${e.target}`);
         }
         setHighlightNodes(hl);
-        setHighlightLinks(hlLinks);
       }
     },
     [graphData, nodeEdgeMap]
@@ -175,7 +167,6 @@ export default function ForceGraphView({ graphData, loading }: Props) {
 
   const clearHighlight = () => {
     setHighlightNodes(new Set());
-    setHighlightLinks(new Set());
     setSelectedNode(null);
     setSearch("");
     if (focusMode) {
@@ -197,15 +188,15 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   const reagraphNodes = useMemo(() => {
     if (!filteredData) return [];
     return filteredData.nodes.map((n) => {
-      const pr = n.properties?.pagerank || 0;
-      const memberCount = n.properties?.member_count || 0;
+      const pr = Number(n.properties?.pagerank) || 0;
+      const mc = Number(n.properties?.member_count) || 0;
       let size = 7;
       if (n.type === "member") {
         size = Math.max(7, Math.min(20, 7 + pr * 400));
       } else if (n.type === "topic") {
-        size = Math.max(5, Math.min(14, 5 + memberCount * 1.5));
+        size = Math.max(5, Math.min(14, 5 + mc * 1.5));
       } else {
-        size = Math.max(4, Math.min(10, 4 + memberCount));
+        size = Math.max(4, Math.min(10, 4 + mc));
       }
       return {
         id: n.id,
@@ -527,7 +518,6 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             layoutType="forceDirected2d"
             layoutOverrides={{
               linkDistance,
-              chargeStrength,
               nodeStrength: chargeStrength,
             }}
             labelType="auto"
