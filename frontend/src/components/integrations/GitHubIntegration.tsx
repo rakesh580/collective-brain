@@ -163,7 +163,7 @@ export default function GitHubIntegration() {
           <ol className="space-y-2">
             {setup.instructions.map((step, i) => (
               <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
-                <span className="shrink-0 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xs font-bold mt-0.5">
                   {i + 1}
                 </span>
                 <span>{step.replace(/^\d+\.\s*/, "")}</span>
@@ -193,7 +193,7 @@ export default function GitHubIntegration() {
                   <GitBranch className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
                   <div>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{name}</span>
-                    {desc && <p className="text-[10px] text-slate-500 dark:text-slate-400">{desc}</p>}
+                    {desc && <p className="text-2xs text-slate-500 dark:text-slate-400">{desc}</p>}
                   </div>
                 </div>
               );
@@ -219,7 +219,7 @@ export default function GitHubIntegration() {
           <div className="text-center py-6">
             <GitBranch className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
             <p className="text-xs text-slate-500 dark:text-slate-400">No GitHub events received yet.</p>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Events will appear here once your webhook is configured.</p>
+            <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Events will appear here once your webhook is configured.</p>
           </div>
         ) : (
           <div className="space-y-1.5 max-h-72 overflow-y-auto">
@@ -228,11 +228,11 @@ export default function GitHubIntegration() {
                 {eventTypeIcon(ev.type)}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">{ev.title}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                  <p className="text-2xs text-slate-400 dark:text-slate-500">
                     {eventTypeLabel(ev.type)} · {ev.chunk_count} chunks · {ev.member_ids.length} members
                   </p>
                 </div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">
+                <span className="text-2xs text-slate-400 dark:text-slate-500 shrink-0">
                   {timeAgo(ev.ingested_at)}
                 </span>
               </div>

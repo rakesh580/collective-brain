@@ -76,6 +76,10 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=100)
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 class ProfileUpdateRequest(BaseModel):
     display_name: str | None = Field(None, max_length=100)
     avatar_url: str | None = Field(None, max_length=500)

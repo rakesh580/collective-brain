@@ -53,7 +53,7 @@ export default function MemberSummaryCard({ member }: Props) {
           {member.expertise_tags.slice(0, 4).map((tag) => (
             <span
               key={tag}
-              className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full"
+              className="text-2xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full"
             >
               {tag}
             </span>

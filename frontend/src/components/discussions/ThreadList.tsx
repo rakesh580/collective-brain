@@ -30,7 +30,7 @@ export default function ThreadList({ threads, selectedId, onSelect }: Props) {
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
             <span
-              className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${
+              className={`text-2xs font-medium px-1.5 py-0.5 rounded-full shrink-0 ${
                 t.status === "open"
                   ? "bg-green-100 text-green-700"
                   : "bg-slate-100 text-slate-500"
@@ -47,7 +47,7 @@ export default function ThreadList({ threads, selectedId, onSelect }: Props) {
               {t.message_count} msg{t.message_count !== 1 ? "s" : ""}
             </span>
             {t.context_type && (
-              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+              <span className="text-2xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
                 {t.context_type}
               </span>
             )}

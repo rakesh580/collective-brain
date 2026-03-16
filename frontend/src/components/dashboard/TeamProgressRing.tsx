@@ -59,7 +59,7 @@ export default function TeamProgressRing({
       <div className="text-center">
         <p className="text-xs font-medium text-slate-700 dark:text-slate-300">{label}</p>
         {sublabel && (
-          <p className="text-[10px] text-slate-400">{sublabel}</p>
+          <p className="text-2xs text-slate-400">{sublabel}</p>
         )}
       </div>
     </div>

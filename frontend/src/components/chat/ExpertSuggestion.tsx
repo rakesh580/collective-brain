@@ -115,7 +115,7 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
                         {expert.name}
                       </p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      <p className="text-2xs text-slate-500 dark:text-slate-400">
                         {expert.availability_hint}
                       </p>
                     </div>
@@ -125,10 +125,10 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                 {/* Match score bar */}
                 <div className="mb-2">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    <span className="text-2xs font-medium text-slate-500 dark:text-slate-400">
                       Match
                     </span>
-                    <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                    <span className="text-2xs font-semibold text-indigo-600 dark:text-indigo-400">
                       {scorePercent}%
                     </span>
                   </div>
@@ -145,13 +145,13 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                   {expert.expertise_topics.slice(0, 3).map((topic) => (
                     <span
                       key={topic}
-                      className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                      className="text-2xs font-medium px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                     >
                       {topic}
                     </span>
                   ))}
                   {expert.expertise_topics.length > 3 && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 self-center">
+                    <span className="text-2xs text-slate-400 dark:text-slate-500 self-center">
                       +{expert.expertise_topics.length - 3}
                     </span>
                   )}
@@ -160,7 +160,7 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                 {/* Last active */}
                 <div className="flex items-center gap-1 mb-3">
                   <Clock size={10} className="text-slate-400 dark:text-slate-500" />
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  <span className="text-2xs text-slate-500 dark:text-slate-400">
                     Active {timeAgo(expert.last_active)}
                   </span>
                 </div>

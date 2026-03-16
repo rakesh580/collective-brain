@@ -29,16 +29,40 @@ class AuthService:
 
     def create_token(self, user_id: str) -> str:
         expire = datetime.utcnow() + timedelta(minutes=self.expire_minutes)
-        payload = {"sub": user_id, "exp": expire}
+        payload = {"sub": user_id, "type": "access", "exp": expire}
+        return jwt.encode(payload, self.secret, algorithm=self.algorithm)
+
+    def create_refresh_token(self, user_id: str) -> str:
+        expire = datetime.utcnow() + timedelta(days=7)
+        payload = {"sub": user_id, "type": "refresh", "exp": expire}
         return jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
     def decode_token(self, token: str) -> str | None:
-        """Returns user_id or None if invalid."""
+        """Returns user_id or None if invalid. Rejects refresh tokens."""
         try:
             payload = jwt.decode(token, self.secret, algorithms=[self.algorithm])
+            if payload.get("type") == "refresh":
+                return None
             return payload.get("sub")
         except JWTError:
             return None
+
+    def refresh_access_token(self, refresh_token: str) -> tuple[str, str] | None:
+        """Validate a refresh token and return new (access_token, refresh_token) pair.
+
+        Returns None if the refresh token is invalid or expired.
+        Implements refresh token rotation: each refresh produces a new refresh token.
+        """
+        try:
+            payload = jwt.decode(refresh_token, self.secret, algorithms=[self.algorithm])
+        except JWTError:
+            return None
+        if payload.get("type") != "refresh":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return self.create_token(user_id), self.create_refresh_token(user_id)
 
     def register(
         self,

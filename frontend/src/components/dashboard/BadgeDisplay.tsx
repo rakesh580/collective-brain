@@ -111,7 +111,7 @@ export default function BadgeDisplay(props: Props) {
                 <p className={`text-xs font-medium ${badge.earned ? "text-slate-700 dark:text-slate-200" : "text-slate-400"}`}>
                   {badge.label}
                 </p>
-                <p className="text-[10px] text-slate-400">{badge.description}</p>
+                <p className="text-2xs text-slate-400">{badge.description}</p>
               </div>
             </div>
           );

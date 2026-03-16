@@ -95,7 +95,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
               className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
             >
               <div
-                className={`w-8 h-8 bg-gradient-to-br ${getAvatarColor(m.name)} rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0`}
+                className={`w-8 h-8 bg-gradient-to-br ${getAvatarColor(m.name)} rounded-full flex items-center justify-center text-2xs font-bold text-white shrink-0`}
               >
                 {initials}
               </div>
@@ -107,7 +107,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
                   {m.name}
                 </button>
                 {m.expertise_tags.length > 0 && (
-                  <p className="text-[10px] text-slate-400 truncate">
+                  <p className="text-2xs text-slate-400 truncate">
                     {m.expertise_tags.slice(0, 3).join(", ")}
                   </p>
                 )}

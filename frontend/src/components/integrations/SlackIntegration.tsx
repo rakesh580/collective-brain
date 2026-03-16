@@ -280,7 +280,7 @@ export default function SlackIntegration() {
                 <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
                   <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 underline hover:no-underline">api.slack.com/apps</a> and click &quot;Create New App&quot;</li>
                   <li>Choose &quot;From scratch&quot;, name it &quot;Collective Brain&quot;, pick your workspace</li>
-                  <li>Under <strong>OAuth &amp; Permissions</strong>, add Bot Token Scopes: <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:history</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:read</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">chat:write</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">commands</code>, <code className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">users:read</code></li>
+                  <li>Under <strong>OAuth &amp; Permissions</strong>, add Bot Token Scopes: <code className="text-2xs bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:history</code>, <code className="text-2xs bg-slate-100 dark:bg-slate-700 px-1 rounded">channels:read</code>, <code className="text-2xs bg-slate-100 dark:bg-slate-700 px-1 rounded">chat:write</code>, <code className="text-2xs bg-slate-100 dark:bg-slate-700 px-1 rounded">commands</code>, <code className="text-2xs bg-slate-100 dark:bg-slate-700 px-1 rounded">users:read</code></li>
                   <li>Copy <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Signing Secret</strong> from &quot;Basic Information&quot;</li>
                   <li>Set the env vars above and restart the backend</li>
                 </ol>
@@ -546,7 +546,7 @@ export default function SlackIntegration() {
                 <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
                   Digest Preview
                 </h5>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                <span className="text-2xs text-slate-400 dark:text-slate-500">
                   {new Date(digestPreview.period_start).toLocaleDateString()} — {new Date(digestPreview.period_end).toLocaleDateString()}
                 </span>
               </div>
@@ -585,7 +585,7 @@ export default function SlackIntegration() {
                     className="p-2 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/30 rounded-lg text-center"
                   >
                     <p className="text-lg font-bold text-slate-700 dark:text-slate-200">{value}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</p>
                   </div>
                 ))}
               </div>
@@ -613,7 +613,7 @@ export default function SlackIntegration() {
                     {digestPreview.trending_topics.map((t, i) => (
                       <span
                         key={i}
-                        className="px-2 py-0.5 text-[10px] font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full"
+                        className="px-2 py-0.5 text-2xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full"
                       >
                         {t}
                       </span>

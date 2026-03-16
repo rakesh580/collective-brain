@@ -1,5 +1,41 @@
 @import "tailwindcss";
 
+/* ─── Custom utilities ─── */
+@utility text-2xs {
+  font-size: 0.625rem; /* 10px */
+  line-height: 0.875rem; /* 14px */
+}
+
+/* ─── Graph color tokens ─── */
+:root {
+  --graph-member: #6366f1;
+  --graph-topic: #10b981;
+  --graph-artifact: #f59e0b;
+  --graph-edge-contributed: #f59e0b;
+  --graph-edge-knows: #a5b4fc;
+  --graph-edge-expertise: #34d399;
+  --graph-edge-collaborated: #fbbf24;
+  --graph-edge-declared-skill: #c4b5fd;
+  --graph-edge-covers-topic: #94a3b8;
+  --graph-edge-default: #cbd5e1;
+  --graph-community-0: #6366f1;
+  --graph-community-1: #10b981;
+  --graph-community-2: #f59e0b;
+  --graph-community-3: #ef4444;
+  --graph-community-4: #8b5cf6;
+  --graph-community-5: #06b6d4;
+  --graph-community-6: #ec4899;
+  --graph-community-7: #14b8a6;
+  --graph-community-8: #f97316;
+  --graph-community-9: #84cc16;
+  --graph-node-fallback: #94a3b8;
+  --graph-badge: #f59e0b;
+  --graph-label-light: #1e293b;
+  --graph-label-dark: #e2e8f0;
+  --graph-label-dim-light: #94a3b8;
+  --graph-label-dim-dark: #64748b;
+}
+
 /* ─── Base ─── */
 body {
   margin: 0;

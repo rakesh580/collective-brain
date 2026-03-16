@@ -44,7 +44,7 @@ function PatternCard({ pattern }: { pattern: Insight }) {
           </p>
           <div className="flex items-center gap-2 mt-1.5">
             <span
-              className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+              className={`text-2xs font-medium px-1.5 py-0.5 rounded-full ${
                 isRisk
                   ? "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
                   : "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400"
@@ -60,7 +60,7 @@ function PatternCard({ pattern }: { pattern: Insight }) {
                   style={{ width: `${pattern.confidence * 100}%` }}
                 />
               </div>
-              <span className="text-[10px] text-slate-400 tabular-nums">
+              <span className="text-2xs text-slate-400 tabular-nums">
                 {Math.round(pattern.confidence * 100)}%
               </span>
             </div>
@@ -79,7 +79,7 @@ function QuickStat({ icon: Icon, label, value, color }: {
     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
       <Icon size={14} className={`mx-auto mb-1 ${color}`} />
       <p className="text-lg font-bold text-slate-800 dark:text-white tabular-nums">{value}</p>
-      <p className="text-[10px] text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-2xs text-slate-500 dark:text-slate-400">{label}</p>
     </div>
   );
 }
@@ -300,13 +300,13 @@ export default function GraphPage() {
               {/* Top contributors */}
               {graphStats && graphStats.top_members.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">
+                  <p className="text-2xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">
                     Top Contributors (PageRank)
                   </p>
                   <div className="space-y-1.5">
                     {graphStats.top_members.slice(0, 5).map((m, i) => (
                       <div key={m.id} className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold w-4 ${
+                        <span className={`text-2xs font-bold w-4 ${
                           i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-slate-400"
                         }`}>{i + 1}.</span>
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
@@ -336,7 +336,7 @@ export default function GraphPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Shield size={12} className="text-indigo-500" />
-                      <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Knowledge Health</span>
+                      <span className="text-2xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Knowledge Health</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Zap size={10} className={risks.length > 3 ? "text-red-500" : risks.length > 0 ? "text-amber-500" : "text-emerald-500"} />
@@ -361,7 +361,7 @@ export default function GraphPage() {
             <div className="flex-1 overflow-auto p-4 space-y-4">
               {risks.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-semibold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <p className="text-2xs font-semibold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
                     <AlertTriangle size={10} />
                     Risks ({risks.length})
                   </p>
@@ -374,7 +374,7 @@ export default function GraphPage() {
               )}
               {insights.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <p className="text-2xs font-semibold text-indigo-500 uppercase tracking-wide mb-2 flex items-center gap-1">
                     <TrendingUp size={10} />
                     Patterns ({insights.length})
                   </p>

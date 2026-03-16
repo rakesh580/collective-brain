@@ -53,13 +53,37 @@ function getAuthToken(): string | null {
   return localStorage.getItem("cb_token");
 }
 
-function handle401(res: Response): void {
-  if (res.status === 401) {
-    localStorage.removeItem("cb_token");
-    const authPages = ["/login", "/register", "/forgot-password"];
-    if (!authPages.includes(window.location.pathname)) {
-      window.location.href = "/login";
-    }
+function getRefreshToken(): string | null {
+  return localStorage.getItem("cb_refresh_token");
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem("cb_token", data.token);
+    localStorage.setItem("cb_refresh_token", data.refresh_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearAuthAndRedirect(): void {
+  localStorage.removeItem("cb_token");
+  localStorage.removeItem("cb_refresh_token");
+  const authPages = ["/login", "/register", "/forgot-password"];
+  if (!authPages.includes(window.location.pathname)) {
+    window.location.href = "/login";
   }
 }
 
@@ -76,7 +100,28 @@ async function request<T>(path: string, options?: RequestInit & { signal?: Abort
     ...options,
     headers,
   });
-  handle401(res);
+  if (res.status === 401 && token && path !== "/auth/refresh") {
+    // Deduplicate concurrent refresh attempts
+    if (!refreshPromise) {
+      refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+    }
+    const refreshed = await refreshPromise;
+    if (refreshed) {
+      // Retry the original request with the new token
+      const retryHeaders = { ...headers, Authorization: `Bearer ${localStorage.getItem("cb_token")}` };
+      const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers: retryHeaders });
+      if (!retryRes.ok) {
+        if (retryRes.status === 401) {
+          clearAuthAndRedirect();
+        }
+        const text = await retryRes.text();
+        throw new Error(`API error ${retryRes.status}: ${text}`);
+      }
+      return retryRes.json();
+    }
+    clearAuthAndRedirect();
+    throw new Error("API error 401: Session expired");
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
@@ -125,6 +170,11 @@ export const api = {
     request<{ status: string }>("/auth/change-password", {
       method: "POST",
       body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+  authRefresh: (refreshToken: string) =>
+    request<AuthResponse>("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
     }),
   authProfile: () => request<User>("/auth/me"),
   authUpdateProfile: (data: Partial<User>) =>
@@ -244,7 +294,7 @@ export const api = {
       headers,
       body: form,
     });
-    handle401(res);
+    if (res.status === 401) clearAuthAndRedirect();
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Upload error ${res.status}: ${text}`);
@@ -265,7 +315,7 @@ export const api = {
       headers,
       body: form,
     });
-    handle401(res);
+    if (res.status === 401) clearAuthAndRedirect();
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Upload error ${res.status}: ${text}`);
@@ -284,7 +334,7 @@ export const api = {
       headers,
       body: form,
     });
-    handle401(res);
+    if (res.status === 401) clearAuthAndRedirect();
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Upload error ${res.status}: ${text}`);

@@ -25,7 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       api
         .authProfile()
         .then(setUser)
-        .catch(() => localStorage.removeItem("cb_token"))
+        .catch(() => {
+          localStorage.removeItem("cb_token");
+          localStorage.removeItem("cb_refresh_token");
+        })
         .finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const res = await api.authLogin({ username, password });
     localStorage.setItem("cb_token", res.token);
+    localStorage.setItem("cb_refresh_token", res.refresh_token);
     setUser(res.user);
   }, []);
 
@@ -51,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (username: string, email: string, password: string, displayName?: string) => {
       const res = await api.authRegister({ username, email, password, display_name: displayName });
       localStorage.setItem("cb_token", res.token);
+      localStorage.setItem("cb_refresh_token", res.refresh_token);
       setUser(res.user);
     },
     []
@@ -59,17 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const googleLogin = useCallback(async (credential: string) => {
     const res = await api.authGoogle(credential);
     localStorage.setItem("cb_token", res.token);
+    localStorage.setItem("cb_refresh_token", res.refresh_token);
     setUser(res.user);
   }, []);
 
   const googleLoginWithToken = useCallback(async (accessToken: string) => {
     const res = await api.authGoogleAccessToken(accessToken);
     localStorage.setItem("cb_token", res.token);
+    localStorage.setItem("cb_refresh_token", res.refresh_token);
     setUser(res.user);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("cb_token");
+    localStorage.removeItem("cb_refresh_token");
     setUser(null);
   }, []);
 

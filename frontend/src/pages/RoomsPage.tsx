@@ -549,7 +549,7 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
                       onChange={() => toggleUser(u.id)}
                       className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+                    <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center text-2xs font-bold text-white shrink-0">
                       {(u.display_name || u.username)
                         .split(" ")
                         .map((n) => n[0])

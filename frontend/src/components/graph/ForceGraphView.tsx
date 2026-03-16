@@ -9,48 +9,85 @@ interface Props {
   loading: boolean;
 }
 
+/**
+ * Graph color tokens — single source of truth for canvas-rendered graph colors.
+ * These values mirror the CSS custom properties defined in index.css under :root
+ * (e.g. --graph-member, --graph-topic, etc.) so designers can grep either location.
+ *
+ * Canvas 2D context cannot read CSS variables at paint time without a perf penalty,
+ * so we keep plain hex constants here and keep them in sync with the CSS variables.
+ */
+
 // Community-based color palette (10 distinct colors)
+// CSS vars: --graph-community-0 … --graph-community-9
 const COMMUNITY_COLORS = [
-  "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#84cc16",
+  "#6366f1", // --graph-community-0
+  "#10b981", // --graph-community-1
+  "#f59e0b", // --graph-community-2
+  "#ef4444", // --graph-community-3
+  "#8b5cf6", // --graph-community-4
+  "#06b6d4", // --graph-community-5
+  "#ec4899", // --graph-community-6
+  "#14b8a6", // --graph-community-7
+  "#f97316", // --graph-community-8
+  "#84cc16", // --graph-community-9
 ];
 
+// Node type colors — CSS vars: --graph-member, --graph-topic, --graph-artifact
 const NODE_TYPE_COLORS: Record<string, string> = {
-  member: "#6366f1",
-  topic: "#10b981",
-  artifact: "#f59e0b",
+  member: "#6366f1",   // --graph-member
+  topic: "#10b981",    // --graph-topic
+  artifact: "#f59e0b", // --graph-artifact
 };
 
+// Fallback node color — CSS var: --graph-node-fallback
+const NODE_FALLBACK_COLOR = "#94a3b8";
+
+// Badge accent — CSS var: --graph-badge
+const BADGE_COLOR = "#f59e0b";
+
+// Edge style colors — CSS vars: --graph-edge-*
 const EDGE_STYLES: Record<string, { color: string; dash: number[]; width: number }> = {
-  CONTRIBUTED_TO: { color: "#f59e0b", dash: [], width: 1.2 },
-  KNOWS_ABOUT: { color: "#a5b4fc", dash: [4, 2], width: 1.0 },
-  HAS_EXPERTISE: { color: "#34d399", dash: [], width: 2.0 },
-  COLLABORATED_WITH: { color: "#fbbf24", dash: [2, 2], width: 1.5 },
-  DECLARED_SKILL: { color: "#c4b5fd", dash: [6, 3], width: 1.0 },
-  COVERS_TOPIC: { color: "#94a3b8", dash: [], width: 0.8 },
+  CONTRIBUTED_TO:    { color: "#f59e0b", dash: [],     width: 1.2 }, // --graph-edge-contributed
+  KNOWS_ABOUT:       { color: "#a5b4fc", dash: [4, 2], width: 1.0 }, // --graph-edge-knows
+  HAS_EXPERTISE:     { color: "#34d399", dash: [],     width: 2.0 }, // --graph-edge-expertise
+  COLLABORATED_WITH: { color: "#fbbf24", dash: [2, 2], width: 1.5 }, // --graph-edge-collaborated
+  DECLARED_SKILL:    { color: "#c4b5fd", dash: [6, 3], width: 1.0 }, // --graph-edge-declared-skill
+  COVERS_TOPIC:      { color: "#94a3b8", dash: [],     width: 0.8 }, // --graph-edge-covers-topic
 };
+
+// Default edge color — CSS var: --graph-edge-default
+const EDGE_DEFAULT_COLOR = "#cbd5e1";
 
 const LAYER_CONFIG = [
-  { id: "social", label: "Social Layer", types: ["member"], description: "Team members & collaboration", color: "#6366f1" },
-  { id: "concept", label: "Concept Layer", types: ["topic"], description: "Topics, skills & expertise", color: "#10b981" },
-  { id: "artifact", label: "Artifact Layer", types: ["artifact"], description: "Repos, docs & data sources", color: "#f59e0b" },
+  { id: "social", label: "Social Layer", types: ["member"], description: "Team members & collaboration", color: NODE_TYPE_COLORS.member },
+  { id: "concept", label: "Concept Layer", types: ["topic"], description: "Topics, skills & expertise", color: NODE_TYPE_COLORS.topic },
+  { id: "artifact", label: "Artifact Layer", types: ["artifact"], description: "Repos, docs & data sources", color: NODE_TYPE_COLORS.artifact },
 ];
 
 const EDGE_LEGEND = [
-  { type: "HAS_EXPERTISE", color: "#34d399", label: "Has Expertise", style: "solid" },
-  { type: "KNOWS_ABOUT", color: "#a5b4fc", label: "Knows About", style: "dashed" },
-  { type: "DECLARED_SKILL", color: "#c4b5fd", label: "Declared Skill", style: "dashed" },
-  { type: "COLLABORATED_WITH", color: "#fbbf24", label: "Collaborated", style: "dotted" },
-  { type: "CONTRIBUTED_TO", color: "#f59e0b", label: "Contributed To", style: "solid" },
-  { type: "COVERS_TOPIC", color: "#94a3b8", label: "Covers Topic", style: "solid" },
+  { type: "HAS_EXPERTISE", color: EDGE_STYLES.HAS_EXPERTISE.color, label: "Has Expertise", style: "solid" },
+  { type: "KNOWS_ABOUT", color: EDGE_STYLES.KNOWS_ABOUT.color, label: "Knows About", style: "dashed" },
+  { type: "DECLARED_SKILL", color: EDGE_STYLES.DECLARED_SKILL.color, label: "Declared Skill", style: "dashed" },
+  { type: "COLLABORATED_WITH", color: EDGE_STYLES.COLLABORATED_WITH.color, label: "Collaborated", style: "dotted" },
+  { type: "CONTRIBUTED_TO", color: EDGE_STYLES.CONTRIBUTED_TO.color, label: "Contributed To", style: "solid" },
+  { type: "COVERS_TOPIC", color: EDGE_STYLES.COVERS_TOPIC.color, label: "Covers Topic", style: "solid" },
 ];
+
+// Label colors — CSS vars: --graph-label-light / --graph-label-dark, --graph-label-dim-light / --graph-label-dim-dark
+const LABEL_COLORS = {
+  light: "#1e293b",    // --graph-label-light
+  dark: "#e2e8f0",     // --graph-label-dark
+  dimLight: "#94a3b8", // --graph-label-dim-light
+  dimDark: "#64748b",  // --graph-label-dim-dark
+};
 
 function getCommunityColor(node: any): string {
   const community = node.community;
   if (community !== undefined && community !== null) {
     return COMMUNITY_COLORS[community % COMMUNITY_COLORS.length];
   }
-  return NODE_TYPE_COLORS[node.type] || "#94a3b8";
+  return NODE_TYPE_COLORS[node.type] || NODE_FALLBACK_COLOR;
 }
 
 function useIsDark() {
@@ -206,7 +243,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
 
   const linkColor = useCallback(
     (link: any) => {
-      const style = EDGE_STYLES[link.type] || { color: "#cbd5e1" };
+      const style = EDGE_STYLES[link.type] || { color: EDGE_DEFAULT_COLOR };
       const base = style.color;
       if (highlightLinks.size > 0) {
         const srcId = typeof link.source === "object" ? link.source.id : link.source;
@@ -259,8 +296,8 @@ export default function ForceGraphView({ graphData, loading }: Props) {
     }
   }, []);
 
-  const labelColor = isDark ? "#e2e8f0" : "#1e293b";
-  const dimLabelColor = isDark ? "#64748b" : "#94a3b8";
+  const labelColor = isDark ? LABEL_COLORS.dark : LABEL_COLORS.light;
+  const dimLabelColor = isDark ? LABEL_COLORS.dimDark : LABEL_COLORS.dimLight;
 
   if (loading) {
     return (
@@ -329,7 +366,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
               )}
             </div>
             {search && highlightNodes.size > 0 && (
-              <div className="px-3 pb-2 text-[10px] text-indigo-500 font-medium">
+              <div className="px-3 pb-2 text-2xs text-indigo-500 font-medium">
                 {highlightNodes.size} nodes matched
               </div>
             )}
@@ -337,7 +374,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
 
           {/* Layer filters */}
           <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-700 shadow-lg">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Knowledge Layers</p>
+            <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-2">Knowledge Layers</p>
             <div className="space-y-1.5">
               {LAYER_CONFIG.map((layer) => {
                 const isActive = layer.types.every((t) => visibleLayers.has(t));
@@ -356,9 +393,9 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                     />
                     <div className="flex-1 min-w-0">
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{layer.label}</span>
-                      <p className="text-[10px] text-slate-400 leading-tight">{layer.description}</p>
+                      <p className="text-2xs text-slate-400 leading-tight">{layer.description}</p>
                     </div>
-                    <span className="text-[10px] font-mono text-slate-400 tabular-nums">{count}</span>
+                    <span className="text-2xs font-mono text-slate-400 tabular-nums">{count}</span>
                   </button>
                 );
               })}
@@ -366,14 +403,14 @@ export default function ForceGraphView({ graphData, loading }: Props) {
 
             {/* Edge legend */}
             <div className="border-t border-slate-100 dark:border-slate-700 mt-2.5 pt-2.5">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Relationships</p>
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Relationships</p>
               {EDGE_LEGEND.map((item) => (
                 <div key={item.type} className="flex items-center gap-2 px-2 py-0.5">
                   <div className="w-5 h-0 shrink-0 border-t-2" style={{
                     borderColor: item.color,
                     borderStyle: item.style === "dashed" ? "dashed" : item.style === "dotted" ? "dotted" : "solid",
                   }} />
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.label}</span>
+                  <span className="text-2xs text-slate-500 dark:text-slate-400">{item.label}</span>
                 </div>
               ))}
             </div>
@@ -383,15 +420,15 @@ export default function ForceGraphView({ graphData, loading }: Props) {
           <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
             <button
               onClick={() => setShowPhysics(!showPhysics)}
-              className="flex items-center justify-between w-full px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300"
+              className="flex items-center justify-between w-full px-3 py-2 text-2xs font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300"
             >
               <span>Physics</span>
-              <span className="text-[10px]">{showPhysics ? "▲" : "▼"}</span>
+              <span className="text-2xs">{showPhysics ? "▲" : "▼"}</span>
             </button>
             {showPhysics && (
               <div className="px-3 pb-3 space-y-2.5">
                 <div>
-                  <div className="flex justify-between text-[10px] text-slate-500 mb-0.5">
+                  <div className="flex justify-between text-2xs text-slate-500 mb-0.5">
                     <span>Link Distance</span>
                     <span className="font-mono">{linkDistance}</span>
                   </div>
@@ -401,7 +438,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                   />
                 </div>
                 <div>
-                  <div className="flex justify-between text-[10px] text-slate-500 mb-0.5">
+                  <div className="flex justify-between text-2xs text-slate-500 mb-0.5">
                     <span>Repulsion</span>
                     <span className="font-mono">{Math.abs(chargeStrength)}</span>
                   </div>
@@ -412,7 +449,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                 </div>
                 <button
                   onClick={() => { setLinkDistance(120); setChargeStrength(-120); }}
-                  className="w-full text-[10px] text-indigo-500 hover:text-indigo-600 font-medium"
+                  className="w-full text-2xs text-indigo-500 hover:text-indigo-600 font-medium"
                 >
                   Reset defaults
                 </button>
@@ -444,10 +481,10 @@ export default function ForceGraphView({ graphData, loading }: Props) {
 
         {/* Node/edge count + focus mode badge */}
         <div className="absolute top-4 right-4 z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-700 shadow-lg">
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+          <p className="text-2xs text-slate-500 dark:text-slate-400 font-medium">
             {fgData.nodes.length} nodes &middot; {fgData.links.length} edges
           </p>
-          <p className="text-[9px] text-slate-400 mt-0.5">Double-click to focus</p>
+          <p className="text-2xs text-slate-400 mt-0.5">Double-click to focus</p>
         </div>
 
         {/* Hover tooltip */}
@@ -460,7 +497,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             }}
           >
             <p className="font-bold text-sm">{tooltip.node.label}</p>
-            <p className="text-slate-400 text-[10px] capitalize">{tooltip.node.type}</p>
+            <p className="text-slate-400 text-2xs capitalize">{tooltip.node.type}</p>
             {tooltip.node.pagerank > 0 && (
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="text-slate-400">PageRank:</span>
@@ -635,7 +672,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                 if ((node.member_count || 0) > 1) {
                   const bx = node.x + size - 2;
                   const by = node.y - size + 2;
-                  ctx.fillStyle = "#f59e0b";
+                  ctx.fillStyle = BADGE_COLOR;
                   ctx.beginPath();
                   ctx.arc(bx, by, 5, 0, 2 * Math.PI);
                   ctx.fill();
@@ -719,7 +756,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             <div className="flex items-center gap-2">
               <div
                 className={`w-5 h-5 ${selectedNode.type === "topic" ? "rotate-45" : ""} rounded-sm`}
-                style={{ backgroundColor: NODE_TYPE_COLORS[selectedNode.type] || "#94a3b8" }}
+                style={{ backgroundColor: NODE_TYPE_COLORS[selectedNode.type] || NODE_FALLBACK_COLOR }}
               />
               <div>
                 <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{selectedNode.type}</h3>
@@ -734,7 +771,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             <div className="flex gap-1.5 mb-4">
               <button
                 onClick={() => { setFocusMode(true); setFocusNodeId(selectedNode.id); }}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-2xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 Focus
@@ -746,7 +783,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                 if (key === "community" || key === "pagerank" || key === "betweenness") {
                   return (
                     <div key={key}>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{key}</span>
+                      <span className="text-2xs font-bold text-slate-400 uppercase tracking-wide">{key}</span>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-sm font-mono text-slate-700 dark:text-slate-300">
                           {typeof value === "number" ? value.toFixed(4) : String(value)}
@@ -762,7 +799,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                 }
                 return (
                   <div key={key}>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{key.replace(/_/g, " ")}</span>
+                    <span className="text-2xs font-bold text-slate-400 uppercase tracking-wide">{key.replace(/_/g, " ")}</span>
                     {Array.isArray(value) ? (
                       <div className="flex gap-1 flex-wrap mt-1">
                         {(value as string[]).map((v) => (
@@ -778,7 +815,7 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             </div>
             {connectedNodes.length > 0 && (
               <div>
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
+                <h4 className="text-2xs font-bold text-slate-400 uppercase tracking-wide mb-2">
                   Connections ({connectedNodes.length})
                 </h4>
                 <div className="space-y-1 max-h-60 overflow-auto">
@@ -795,12 +832,12 @@ export default function ForceGraphView({ graphData, loading }: Props) {
                       >
                         <div
                           className={`w-2.5 h-2.5 shrink-0 ${cn.type === "topic" ? "rotate-45" : "rounded-full"}`}
-                          style={{ backgroundColor: NODE_TYPE_COLORS[cn.type] || "#94a3b8" }}
+                          style={{ backgroundColor: NODE_TYPE_COLORS[cn.type] || NODE_FALLBACK_COLOR }}
                         />
                         <div className="flex-1 min-w-0">
                           <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate block">{cn.label}</span>
                           {edge && (
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-2xs text-slate-400">
                               {edge.type.replace(/_/g, " ").toLowerCase()}
                               {edge.weight > 0 ? ` (${edge.weight.toFixed(1)})` : ""}
                             </span>

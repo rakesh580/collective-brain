@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 
 from app.db.database import create_session
 from app.models.discussion import DiscussionThread, DiscussionMessage
@@ -144,7 +145,28 @@ async def list_threads(
 
     db = _get_db()
     try:
-        query = db.query(DiscussionThread)
+        # Subquery: message count per thread
+        msg_count_sq = (
+            select(
+                DiscussionMessage.thread_id,
+                func.count(DiscussionMessage.id).label("msg_count"),
+            )
+            .group_by(DiscussionMessage.thread_id)
+            .subquery()
+        )
+
+        # Build base query with JOIN for author info and message count
+        query = (
+            db.query(
+                DiscussionThread,
+                UserRecord.username.label("author_username"),
+                UserRecord.display_name.label("author_display_name"),
+                msg_count_sq.c.msg_count,
+            )
+            .join(UserRecord, UserRecord.id == DiscussionThread.created_by_user_id)
+            .outerjoin(msg_count_sq, msg_count_sq.c.thread_id == DiscussionThread.id)
+        )
+
         if room_id:
             query = query.filter(DiscussionThread.room_id == room_id)
         if context_type:
@@ -155,7 +177,7 @@ async def list_threads(
             query = query.filter(DiscussionThread.status == status)
 
         total = query.count()
-        threads = (
+        rows = (
             query.order_by(DiscussionThread.updated_at.desc())
             .offset(offset)
             .limit(limit)
@@ -163,23 +185,17 @@ async def list_threads(
         )
 
         result = []
-        for t in threads:
-            info = _get_user_info(db, t.created_by_user_id)
-            msg_count = (
-                db.query(DiscussionMessage)
-                .filter(DiscussionMessage.thread_id == t.id)
-                .count()
-            )
+        for t, author_username, author_display_name, msg_count in rows:
             result.append({
                 "id": t.id,
                 "title": t.title,
                 "created_by_user_id": t.created_by_user_id,
-                "created_by_username": info["username"],
-                "created_by_display_name": info["display_name"],
+                "created_by_username": author_username or "unknown",
+                "created_by_display_name": author_display_name,
                 "status": t.status,
                 "context_type": t.context_type,
                 "context_id": t.context_id,
-                "message_count": msg_count,
+                "message_count": msg_count or 0,
                 "created_at": t.created_at.isoformat() if t.created_at else None,
                 "updated_at": t.updated_at.isoformat() if t.updated_at else None,
             })

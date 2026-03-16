@@ -90,7 +90,7 @@ export default function ChatPage() {
                   className="flex-1 text-left min-w-0"
                 >
                   <p className="text-xs font-medium truncate">{conv.title}</p>
-                  <p className="text-[10px] opacity-60">
+                  <p className="text-2xs opacity-60">
                     {new Date(conv.updated_at).toLocaleDateString()}
                     {" \u00b7 "}
                     {conv.message_count} msgs
@@ -132,7 +132,7 @@ export default function ChatPage() {
           </div>
           <div className="flex items-center gap-1.5">
             {activeConversation?.visibility && activeConversation.visibility !== "private" && (
-              <span className="text-[10px] font-medium bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+              <span className="text-2xs font-medium bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
                 {activeConversation.visibility === "shared" ? "Shared" : "Team"}
               </span>
             )}

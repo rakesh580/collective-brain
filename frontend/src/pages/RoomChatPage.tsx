@@ -426,7 +426,7 @@ export default function RoomChatPage() {
                           {job.source_type} &middot; {job.chunk_count} chunks
                         </span>
                       </div>
-                      <span className={`text-[10px] capitalize font-medium ${
+                      <span className={`text-2xs capitalize font-medium ${
                         job.status === "completed" ? "text-emerald-600" :
                         job.status === "failed" ? "text-red-600" : "text-amber-600"
                       }`}>{job.status}</span>
@@ -483,7 +483,7 @@ const MessageItem = React.memo(function MessageItem({
       {/* Avatar */}
       {showAvatar ? (
         <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm ${
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-2xs font-bold text-white shrink-0 shadow-sm ${
             isAI
               ? "bg-gradient-to-br from-violet-500 to-purple-600"
               : `bg-gradient-to-br ${getAvatarColor(message.sender_name)}`
@@ -516,7 +516,7 @@ const MessageItem = React.memo(function MessageItem({
             >
               {message.sender_name}
             </span>
-            <span className="text-[10px] text-slate-400">
+            <span className="text-2xs text-slate-400">
               {formatTime(message.created_at)}
             </span>
           </div>
@@ -544,7 +544,7 @@ const MessageItem = React.memo(function MessageItem({
             {message.sources.slice(0, 3).map((s, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 text-[10px] text-violet-500 bg-violet-50 dark:bg-violet-500/10 px-2 py-0.5 rounded-full"
+                className="inline-flex items-center gap-1 text-2xs text-violet-500 bg-violet-50 dark:bg-violet-500/10 px-2 py-0.5 rounded-full"
               >
                 <FileText size={8} />
                 {s.source_ref?.split("/").pop() || "source"}
@@ -561,7 +561,7 @@ const MessageItem = React.memo(function MessageItem({
               {message.related_members.map((m) => (
                 <span
                   key={m.id}
-                  className="inline-flex items-center gap-1 text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full"
+                  className="inline-flex items-center gap-1 text-2xs text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full"
                 >
                   <UserCircle size={8} />
                   {m.name}
@@ -655,7 +655,7 @@ function MembersSidebar({
         {/* Online */}
         {online.length > 0 && (
           <div>
-            <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider px-2 mb-1">
+            <p className="text-2xs font-semibold text-emerald-500 uppercase tracking-wider px-2 mb-1">
               Online — {online.length}
             </p>
             {online.map((m) => (
@@ -674,7 +674,7 @@ function MembersSidebar({
         {/* Offline */}
         {offline.length > 0 && (
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 mb-1">
+            <p className="text-2xs font-semibold text-slate-400 uppercase tracking-wider px-2 mb-1">
               Offline — {offline.length}
             </p>
             {offline.map((m) => (
@@ -713,7 +713,7 @@ const MemberRow = React.memo(function MemberRow({
     <div className="group flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
       <div className="relative shrink-0">
         <div
-          className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(name)} rounded-full flex items-center justify-center text-[9px] font-bold text-white`}
+          className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(name)} rounded-full flex items-center justify-center text-2xs font-bold text-white`}
         >
           {getInitials(name)}
         </div>
@@ -731,11 +731,11 @@ const MemberRow = React.memo(function MemberRow({
             <Crown size={10} className="text-amber-500 shrink-0" />
           )}
           {isCurrentUser && (
-            <span className="text-[9px] text-slate-400">(you)</span>
+            <span className="text-2xs text-slate-400">(you)</span>
           )}
         </div>
         {member.role_title && (
-          <p className="text-[9px] text-slate-400 truncate">{member.role_title}</p>
+          <p className="text-2xs text-slate-400 truncate">{member.role_title}</p>
         )}
         {member.skills && member.skills.length > 0 && (
           <div className="flex flex-wrap gap-0.5 mt-0.5">
@@ -874,7 +874,7 @@ function AddMembersModal({
                   className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div
-                  className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(u.display_name || u.username)} rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0`}
+                  className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(u.display_name || u.username)} rounded-full flex items-center justify-center text-2xs font-bold text-white shrink-0`}
                 >
                   {getInitials(u.display_name || u.username)}
                 </div>

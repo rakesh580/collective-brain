@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 
 from app.db.database import create_session
 from app.models.room import ChatRoom, ChatRoomMember, ChatRoomMessage
@@ -230,8 +231,53 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
             .subquery()
         )
 
-        rooms = (
-            db.query(ChatRoom)
+        # Subquery: member count per room
+        member_count_sq = (
+            select(
+                ChatRoomMember.room_id,
+                func.count(ChatRoomMember.id).label("member_count"),
+            )
+            .group_by(ChatRoomMember.room_id)
+            .subquery()
+        )
+
+        # Subquery: latest message per room (using a correlated subquery for max created_at)
+        latest_msg_time_sq = (
+            select(
+                ChatRoomMessage.room_id,
+                func.max(ChatRoomMessage.created_at).label("max_created_at"),
+            )
+            .group_by(ChatRoomMessage.room_id)
+            .subquery()
+        )
+
+        # Join latest message time back to get the actual message row
+        latest_msg_sq = (
+            select(
+                ChatRoomMessage.room_id,
+                ChatRoomMessage.sender_name,
+                ChatRoomMessage.content,
+            )
+            .join(
+                latest_msg_time_sq,
+                (ChatRoomMessage.room_id == latest_msg_time_sq.c.room_id)
+                & (ChatRoomMessage.created_at == latest_msg_time_sq.c.max_created_at),
+            )
+            .subquery()
+        )
+
+        # Single query: rooms + creator info + member count + last message
+        rows = (
+            db.query(
+                ChatRoom,
+                UserRecord.username.label("creator_username"),
+                member_count_sq.c.member_count,
+                latest_msg_sq.c.sender_name.label("last_sender"),
+                latest_msg_sq.c.content.label("last_content"),
+            )
+            .join(UserRecord, UserRecord.id == ChatRoom.created_by_user_id)
+            .outerjoin(member_count_sq, member_count_sq.c.room_id == ChatRoom.id)
+            .outerjoin(latest_msg_sq, latest_msg_sq.c.room_id == ChatRoom.id)
             .filter(ChatRoom.id.in_(user_room_ids))
             .filter(ChatRoom.is_archived == False)  # noqa: E712
             .order_by(ChatRoom.last_message_at.desc().nullslast(), ChatRoom.created_at.desc())
@@ -241,37 +287,22 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
         )
 
         result = []
-        for room in rooms:
-            info = _get_user_info(db, room.created_by_user_id)
-            member_count = (
-                db.query(ChatRoomMember)
-                .filter(ChatRoomMember.room_id == room.id)
-                .count()
-            )
-
-            # Get last message preview
-            last_msg = (
-                db.query(ChatRoomMessage)
-                .filter(ChatRoomMessage.room_id == room.id)
-                .order_by(ChatRoomMessage.created_at.desc())
-                .first()
-            )
+        for room, creator_username, member_count, last_sender, last_content in rows:
+            last_preview = None
+            if last_sender and last_content:
+                last_preview = f"{last_sender}: {last_content[:80]}"
 
             result.append({
                 "id": room.id,
                 "name": room.name,
                 "description": room.description,
                 "created_by_user_id": room.created_by_user_id,
-                "created_by_username": info["username"],
+                "created_by_username": creator_username or "unknown",
                 "avatar_color": room.avatar_color,
-                "member_count": member_count,
+                "member_count": member_count or 0,
                 "message_count": room.message_count or 0,
                 "last_message_at": room.last_message_at.isoformat() if room.last_message_at else None,
-                "last_message_preview": (
-                    f"{last_msg.sender_name}: {last_msg.content[:80]}"
-                    if last_msg
-                    else None
-                ),
+                "last_message_preview": last_preview,
                 "created_at": room.created_at.isoformat() if room.created_at else None,
             })
 

@@ -176,7 +176,7 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
             {alert.title}
           </span>
           <span
-            className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${getSourceBadgeStyle(alert.source_type)}`}
+            className={`flex-shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded ${getSourceBadgeStyle(alert.source_type)}`}
           >
             {alert.source_type.replace("_content", "")}
           </span>
@@ -202,8 +202,8 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
       {/* Staleness bar */}
       <div className="mb-2">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-slate-400">Staleness Score</span>
-          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+          <span className="text-2xs text-slate-400">Staleness Score</span>
+          <span className="text-2xs font-medium text-slate-500 dark:text-slate-400">
             {alert.staleness_score}
           </span>
         </div>
@@ -231,7 +231,7 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
           {alert.responsible_members.map((name) => (
             <span
               key={name}
-              className="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded"
+              className="text-2xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded"
             >
               {name}
             </span>

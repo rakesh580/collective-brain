@@ -124,7 +124,7 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
     <>
       <div className="flex items-center gap-4 my-5">
         <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
-        <span className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-medium">or</span>
+        <span className="text-2xs text-slate-500 uppercase tracking-[0.2em] font-medium">or</span>
         <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
       </div>
 
@@ -806,7 +806,7 @@ export default function LoginPage() {
               <div className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">
                 {stat.value}
               </div>
-              <div className="text-[10px] text-slate-600 mt-0.5">{stat.label}</div>
+              <div className="text-2xs text-slate-600 mt-0.5">{stat.label}</div>
             </div>
           ))}
         </div>

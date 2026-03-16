@@ -53,7 +53,7 @@ export default function ThreadDetail({ threadId }: Props) {
             by {thread.created_by_display_name || thread.created_by_username}
           </span>
           <span
-            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+            className={`text-2xs font-medium px-1.5 py-0.5 rounded-full ${
               thread.status === "open"
                 ? "bg-green-100 text-green-700"
                 : "bg-slate-100 text-slate-500"
@@ -62,7 +62,7 @@ export default function ThreadDetail({ threadId }: Props) {
             {thread.status}
           </span>
           {thread.context_type && (
-            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
+            <span className="text-2xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
               {thread.context_type}: {thread.context_id}
             </span>
           )}

@@ -12,6 +12,7 @@ from app.schemas.requests import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
     ChangePasswordRequest,
+    RefreshTokenRequest,
 )
 from app.schemas.responses import UserResponse, AuthResponse
 from app.services.auth_service import AuthService
@@ -66,7 +67,8 @@ async def register(body: RegisterRequest, request: Request):
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
         token = auth_svc.create_token(user.id)
-        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+        refresh_token = auth_svc.create_refresh_token(user.id)
+        return AuthResponse(token=token, refresh_token=refresh_token, user=UserResponse.model_validate(user))
     finally:
         db.close()
 
@@ -84,7 +86,8 @@ async def login(body: LoginRequest, request: Request):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         token = auth_svc.create_token(user.id)
-        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+        refresh_token = auth_svc.create_refresh_token(user.id)
+        return AuthResponse(token=token, refresh_token=refresh_token, user=UserResponse.model_validate(user))
     finally:
         db.close()
 
@@ -111,7 +114,8 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
         except ValueError as e:
             raise HTTPException(status_code=401, detail=str(e))
         token = auth_svc.create_token(user.id)
-        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+        refresh_token = auth_svc.create_refresh_token(user.id)
+        return AuthResponse(token=token, refresh_token=refresh_token, user=UserResponse.model_validate(user))
     finally:
         db.close()
 
@@ -138,7 +142,8 @@ async def google_access_token_auth(body: GoogleAccessTokenRequest, request: Requ
         except ValueError as e:
             raise HTTPException(status_code=401, detail=str(e))
         token = auth_svc.create_token(user.id)
-        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+        refresh_token = auth_svc.create_refresh_token(user.id)
+        return AuthResponse(token=token, refresh_token=refresh_token, user=UserResponse.model_validate(user))
     finally:
         db.close()
 
@@ -186,7 +191,37 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         token = auth_svc.create_token(user.id)
-        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+        refresh_token = auth_svc.create_refresh_token(user.id)
+        return AuthResponse(token=token, refresh_token=refresh_token, user=UserResponse.model_validate(user))
+    finally:
+        db.close()
+
+
+@router.post("/refresh", response_model=AuthResponse)
+async def refresh_token(body: RefreshTokenRequest, request: Request):
+    """Exchange a valid refresh token for a new access + refresh token pair."""
+    await _rate_limit(request, "auth:refresh", max_requests=30, window=60)
+    auth_svc = AuthService(request.app.state.settings)
+    result = auth_svc.refresh_access_token(body.refresh_token)
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+    new_token, new_refresh = result
+    # Fetch user for response
+    db = _get_db()
+    try:
+        from jose import jwt as _jwt
+        payload = _jwt.decode(
+            new_token, auth_svc.secret, algorithms=[auth_svc.algorithm]
+        )
+        user_id = payload.get("sub")
+        user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="User not found or inactive")
+        return AuthResponse(
+            token=new_token,
+            refresh_token=new_refresh,
+            user=UserResponse.model_validate(user),
+        )
     finally:
         db.close()
 

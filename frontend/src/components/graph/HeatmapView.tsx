@@ -270,7 +270,7 @@ export default function HeatmapView() {
 
           {/* Sort buttons */}
           <div className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase">Sort:</span>
+            <span className="text-2xs font-semibold text-slate-400 uppercase">Sort:</span>
             {(["total", "topics", "name"] as SortBy[]).map((s) => (
               <button
                 key={s}
@@ -322,8 +322,8 @@ export default function HeatmapView() {
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Filter Topics</p>
             <div className="flex gap-2">
-              <button onClick={() => setHiddenTopics(new Set())} className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline">Show All</button>
-              <button onClick={() => setHiddenTopics(new Set(data?.topics || []))} className="text-[10px] text-slate-500 hover:underline">Hide All</button>
+              <button onClick={() => setHiddenTopics(new Set())} className="text-2xs text-indigo-600 dark:text-indigo-400 hover:underline">Show All</button>
+              <button onClick={() => setHiddenTopics(new Set(data?.topics || []))} className="text-2xs text-slate-500 hover:underline">Hide All</button>
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -331,7 +331,7 @@ export default function HeatmapView() {
               <button
                 key={topic}
                 onClick={() => toggleTopic(topic)}
-                className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${
+                className={`px-2 py-1 text-2xs font-medium rounded-md transition-all ${
                   hiddenTopics.has(topic)
                     ? "bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 line-through"
                     : "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"
@@ -353,16 +353,16 @@ export default function HeatmapView() {
               <div className="flex items-center gap-1.5 mb-2">
                 <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
                 <span className="text-xs font-bold text-red-700 dark:text-red-400">Bus Factor Risks</span>
-                <span className="ml-auto text-[10px] font-mono font-bold text-red-500 bg-red-100 dark:bg-red-500/20 px-1.5 py-0.5 rounded">{busFactor.length}</span>
+                <span className="ml-auto text-2xs font-mono font-bold text-red-500 bg-red-100 dark:bg-red-500/20 px-1.5 py-0.5 rounded">{busFactor.length}</span>
               </div>
               <div className="space-y-1 max-h-20 overflow-y-auto">
                 {busFactor.slice(0, 5).map((bf) => (
-                  <div key={bf.topic} className="flex items-center justify-between text-[10px]">
+                  <div key={bf.topic} className="flex items-center justify-between text-2xs">
                     <span className="text-red-600 dark:text-red-400 truncate">{bf.topic}</span>
                     <span className="text-red-500 dark:text-red-400 font-medium shrink-0 ml-2">→ {bf.expert}</span>
                   </div>
                 ))}
-                {busFactor.length > 5 && <p className="text-[10px] text-red-400 italic">+{busFactor.length - 5} more</p>}
+                {busFactor.length > 5 && <p className="text-2xs text-red-400 italic">+{busFactor.length - 5} more</p>}
               </div>
             </div>
           )}
@@ -373,13 +373,13 @@ export default function HeatmapView() {
               <div className="flex items-center gap-1.5 mb-2">
                 <Shield className="w-3.5 h-3.5 text-amber-500" />
                 <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Knowledge Gaps</span>
-                <span className="ml-auto text-[10px] font-mono font-bold text-amber-500 bg-amber-100 dark:bg-amber-500/20 px-1.5 py-0.5 rounded">{gapTopics.length}</span>
+                <span className="ml-auto text-2xs font-mono font-bold text-amber-500 bg-amber-100 dark:bg-amber-500/20 px-1.5 py-0.5 rounded">{gapTopics.length}</span>
               </div>
               <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                 {gapTopics.slice(0, 8).map((t) => (
-                  <span key={t} className="text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">{t}</span>
+                  <span key={t} className="text-2xs bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">{t}</span>
                 ))}
-                {gapTopics.length > 8 && <span className="text-[10px] text-amber-400 italic">+{gapTopics.length - 8} more</span>}
+                {gapTopics.length > 8 && <span className="text-2xs text-amber-400 italic">+{gapTopics.length - 8} more</span>}
               </div>
             </div>
           )}
@@ -390,11 +390,11 @@ export default function HeatmapView() {
               <div className="flex items-center gap-1.5 mb-2">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
                 <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Well Covered</span>
-                <span className="ml-auto text-[10px] font-mono font-bold text-emerald-500 bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 rounded">{strongTopics.length}</span>
+                <span className="ml-auto text-2xs font-mono font-bold text-emerald-500 bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 rounded">{strongTopics.length}</span>
               </div>
               <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                 {strongTopics.slice(0, 8).map((t) => (
-                  <span key={t} className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">{t}</span>
+                  <span key={t} className="text-2xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">{t}</span>
                 ))}
               </div>
             </div>
@@ -404,7 +404,7 @@ export default function HeatmapView() {
 
       {/* ── Color legend ── */}
       <div className="flex items-center gap-3 mb-4">
-        <span className="text-[10px] font-semibold text-slate-400 uppercase">Novice</span>
+        <span className="text-2xs font-semibold text-slate-400 uppercase">Novice</span>
         <div className="flex gap-0.5">
           {[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((v) => (
             <div
@@ -414,11 +414,11 @@ export default function HeatmapView() {
             />
           ))}
         </div>
-        <span className="text-[10px] font-semibold text-slate-400 uppercase">Expert</span>
+        <span className="text-2xs font-semibold text-slate-400 uppercase">Expert</span>
         {sortByTopic && (
           <button
             onClick={() => setSortByTopic(null)}
-            className="ml-2 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline"
+            className="ml-2 text-2xs text-indigo-600 dark:text-indigo-400 hover:underline"
           >
             Clear topic sort: {sortByTopic}
           </button>
@@ -461,7 +461,7 @@ export default function HeatmapView() {
                         <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full" title="Knowledge gap" />
                       )}
                       <span
-                        className={`text-[10px] font-medium block max-w-[60px] truncate transition-colors ${
+                        className={`text-2xs font-medium block max-w-[60px] truncate transition-colors ${
                           isSorted ? "text-violet-600 dark:text-violet-400 font-bold" : "text-slate-500 dark:text-slate-400"
                         }`}
                         title={topic}
@@ -484,10 +484,10 @@ export default function HeatmapView() {
                 );
               })}
               {/* Sparkline column */}
-              <th className="px-2 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-l border-slate-200 dark:border-slate-700 min-w-[80px]">
+              <th className="px-2 py-3 text-center text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-l border-slate-200 dark:border-slate-700 min-w-[80px]">
                 Profile
               </th>
-              <th className="sticky right-0 z-20 bg-white dark:bg-slate-800 px-3 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-l border-slate-200 dark:border-slate-700 min-w-[70px]">
+              <th className="sticky right-0 z-20 bg-white dark:bg-slate-800 px-3 py-3 text-center text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-l border-slate-200 dark:border-slate-700 min-w-[70px]">
                 <button onClick={() => handleSort("total")} className="flex items-center gap-0.5 mx-auto hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                   Total
                   {sortBy === "total" && !sortByTopic && (sortDir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
@@ -518,13 +518,13 @@ export default function HeatmapView() {
                         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 shadow-sm"
                         style={{ backgroundColor: getAvatarColor(member.name) }}
                       >
-                        <span className="text-[9px] font-bold text-white">{getInitials(member.name)}</span>
+                        <span className="text-2xs font-bold text-white">{getInitials(member.name)}</span>
                       </div>
                       <div className="text-left">
                         <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors block truncate max-w-[100px]">
                           {member.name}
                         </span>
-                        <span className="text-[9px] text-slate-400 dark:text-slate-500">{topicCount} topics</span>
+                        <span className="text-2xs text-slate-400 dark:text-slate-500">{topicCount} topics</span>
                       </div>
                     </button>
                   </td>
@@ -543,7 +543,7 @@ export default function HeatmapView() {
                         onMouseLeave={() => { setHoveredCell(null); setHoveredCol(null); }}
                       >
                         <div
-                          className={`w-full h-9 rounded-md flex items-center justify-center text-[10px] font-mono font-semibold transition-all relative ${
+                          className={`w-full h-9 rounded-md flex items-center justify-center text-2xs font-mono font-semibold transition-all relative ${
                             isCellHovered ? "ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900 scale-110 z-10" : ""
                           } ${isCrossHair && !isCellHovered ? "ring-1 ring-indigo-300 dark:ring-indigo-700" : ""} ${isColHighlighted && !isCellHovered && !isCrossHair ? "ring-1 ring-indigo-200 dark:ring-indigo-800" : ""}`}
                           style={{
@@ -586,7 +586,7 @@ export default function HeatmapView() {
                 return (
                   <td key={topic} className="px-0.5 py-0.5">
                     <div
-                      className="w-full h-9 rounded-md flex items-center justify-center text-[10px] font-mono font-semibold"
+                      className="w-full h-9 rounded-md flex items-center justify-center text-2xs font-mono font-semibold"
                       style={{
                         backgroundColor: getHeatColor(avg, isDark),
                         color: getTextColor(avg, isDark),
@@ -619,9 +619,9 @@ export default function HeatmapView() {
               <span className="font-semibold text-indigo-600 dark:text-indigo-400">{hoveredCell.topic}</span>
               {": "}
               <span className="font-mono font-bold">{Math.round(score * 100)}%</span>
-              {score > 0.7 && <span className="ml-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Expert</span>}
-              {score > 0 && score <= 0.3 && <span className="ml-1.5 text-[10px] text-amber-600 dark:text-amber-400 font-medium">Novice</span>}
-              {isBus && <span className="ml-1.5 text-[10px] text-red-600 dark:text-red-400 font-medium">⚠ Sole Expert</span>}
+              {score > 0.7 && <span className="ml-1.5 text-2xs text-emerald-600 dark:text-emerald-400 font-medium">Expert</span>}
+              {score > 0 && score <= 0.3 && <span className="ml-1.5 text-2xs text-amber-600 dark:text-amber-400 font-medium">Novice</span>}
+              {isBus && <span className="ml-1.5 text-2xs text-red-600 dark:text-red-400 font-medium">⚠ Sole Expert</span>}
             </span>
           </div>
         );

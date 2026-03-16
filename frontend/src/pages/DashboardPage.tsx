@@ -277,7 +277,7 @@ export default function DashboardPage() {
                   className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-full font-medium"
                 >
                   {t.topic}
-                  <span className="text-[10px] bg-indigo-200 dark:bg-indigo-500/30 text-indigo-800 dark:text-indigo-200 rounded-full px-1.5">
+                  <span className="text-2xs bg-indigo-200 dark:bg-indigo-500/30 text-indigo-800 dark:text-indigo-200 rounded-full px-1.5">
                     {t.count}
                   </span>
                 </span>
