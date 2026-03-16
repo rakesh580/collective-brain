@@ -34,15 +34,12 @@ function openGoogleOAuthPopup(clientId: string): Promise<string> {
     const redirectUri = window.location.origin;
     const scope = "openid email profile";
     const state = Math.random().toString(36).substring(2);
-    const nonce = Math.random().toString(36).substring(2);
-
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("response_type", "token");
     authUrl.searchParams.set("scope", scope);
     authUrl.searchParams.set("state", state);
-    authUrl.searchParams.set("nonce", nonce);
     authUrl.searchParams.set("prompt", "select_account");
 
     const width = 500, height = 600;
