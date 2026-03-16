@@ -57,6 +57,10 @@ class GoogleAuthRequest(BaseModel):
     credential: str = Field(..., min_length=1, description="Google ID token (JWT)")
 
 
+class GoogleAccessTokenRequest(BaseModel):
+    access_token: str = Field(..., min_length=1, description="Google OAuth2 access token")
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 

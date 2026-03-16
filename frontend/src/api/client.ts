@@ -106,6 +106,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ credential }),
     }),
+  authGoogleAccessToken: (accessToken: string) =>
+    request<AuthResponse>("/auth/google-token", {
+      method: "POST",
+      body: JSON.stringify({ access_token: accessToken }),
+    }),
   authForgotPassword: (email: string) =>
     request<{ message: string; code?: string }>("/auth/forgot-password", {
       method: "POST",

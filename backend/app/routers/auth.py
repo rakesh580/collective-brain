@@ -8,6 +8,7 @@ from app.schemas.requests import (
     LoginRequest,
     ProfileUpdateRequest,
     GoogleAuthRequest,
+    GoogleAccessTokenRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
     ChangePasswordRequest,
@@ -106,6 +107,33 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
         try:
             user = auth_svc.google_authenticate(
                 db, body.credential, settings.google_client_id
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+        token = auth_svc.create_token(user.id)
+        return AuthResponse(token=token, user=UserResponse.model_validate(user))
+    finally:
+        db.close()
+
+
+@router.post("/google-token", response_model=AuthResponse)
+async def google_access_token_auth(body: GoogleAccessTokenRequest, request: Request):
+    """Authenticate with a Google access token (for iframe/popup OAuth flow)."""
+    await _rate_limit(request, "auth:google", max_requests=10, window=60)
+
+    settings = request.app.state.settings
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=501,
+            detail="Google Sign-In is not configured on this server",
+        )
+
+    db = _get_db()
+    try:
+        auth_svc = AuthService(settings)
+        try:
+            user = auth_svc.google_authenticate_access_token(
+                db, body.access_token
             )
         except ValueError as e:
             raise HTTPException(status_code=401, detail=str(e))

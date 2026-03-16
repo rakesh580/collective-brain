@@ -182,6 +182,92 @@ class AuthService:
         return user
 
     # ------------------------------------------------------------------
+    # Google OAuth — access token flow (for iframe/popup contexts)
+    # ------------------------------------------------------------------
+    def google_authenticate_access_token(
+        self,
+        db: Session,
+        access_token: str,
+    ) -> UserRecord:
+        """Exchange a Google access token for user info, then find or create the user."""
+        import httpx
+
+        try:
+            resp = httpx.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            userinfo = resp.json()
+        except Exception as e:
+            raise ValueError(f"Failed to verify Google access token: {e}")
+
+        google_sub = userinfo.get("sub")
+        email = userinfo.get("email")
+        email_verified = userinfo.get("email_verified", False)
+        name = userinfo.get("name", "")
+        picture = userinfo.get("picture")
+
+        if not google_sub or not email:
+            raise ValueError("Invalid Google user info response")
+        if not email_verified:
+            raise ValueError("Google account email is not verified")
+
+        # Reuse the same find-or-create logic as ID token flow
+        # 1. Returning Google user
+        user = db.query(UserRecord).filter(UserRecord.google_id == google_sub).first()
+        if user:
+            if not user.is_active:
+                raise ValueError("This account has been deactivated")
+            user.last_login = datetime.utcnow()
+            if picture and not user.avatar_url:
+                user.avatar_url = picture
+            db.commit()
+            return user
+
+        # 2. Existing user with same email — link Google account
+        user = db.query(UserRecord).filter(UserRecord.email == email).first()
+        if user:
+            if not user.is_active:
+                raise ValueError("This account has been deactivated")
+            user.google_id = google_sub
+            user.auth_provider = (
+                "google+local" if user.password_hash else "google"
+            )
+            user.last_login = datetime.utcnow()
+            if picture and not user.avatar_url:
+                user.avatar_url = picture
+            db.commit()
+            return user
+
+        # 3. Brand new user
+        base_username = email.split("@")[0].replace(".", "").replace("+", "")[:30]
+        username = base_username
+        suffix = 1
+        while db.query(UserRecord).filter(UserRecord.username == username).first():
+            username = f"{base_username}{suffix}"
+            suffix += 1
+
+        user = UserRecord(
+            id=str(uuid4()),
+            username=username,
+            email=email,
+            password_hash=None,
+            display_name=name or username,
+            avatar_url=picture,
+            google_id=google_sub,
+            auth_provider="google",
+            is_active=True,
+            created_at=datetime.utcnow(),
+            last_login=datetime.utcnow(),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    # ------------------------------------------------------------------
     # Password Reset
     # ------------------------------------------------------------------
     def generate_reset_code(self, db: Session, email: str) -> str:

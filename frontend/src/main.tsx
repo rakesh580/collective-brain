@@ -59,6 +59,11 @@ function Root() {
     </QueryClientProvider>
   );
 
+  // Expose client ID for fallback Google Sign-In button (iframe contexts)
+  if (googleClientId) {
+    (window as any).__GOOGLE_CLIENT_ID__ = googleClientId;
+  }
+
   // Only wrap with GoogleOAuthProvider when client ID is available
   if (googleClientId) {
     return (
