@@ -50,10 +50,10 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
   if (!enabled) return null;
 
   const divider = (
-    <div className="flex items-center gap-3 my-4">
-      <div className="flex-1 h-px bg-slate-600/50" />
-      <span className="text-xs text-slate-500 uppercase tracking-wider">or</span>
-      <div className="flex-1 h-px bg-slate-600/50" />
+    <div className="flex items-center gap-4 my-5">
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
+      <span className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-medium">or</span>
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
     </div>
   );
 
@@ -76,10 +76,33 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
         <button
           type="button"
           onClick={() => googleLoginImplicit()}
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-600/50 bg-slate-800/50 hover:bg-slate-700/60 transition-all duration-200 text-slate-200 font-medium cursor-pointer"
+          className="w-full relative flex items-center justify-center gap-3 py-3 px-4 rounded-xl
+            border border-slate-600/40 text-white font-medium cursor-pointer
+            transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-500/10
+            overflow-hidden group/google"
+          style={{
+            background: "linear-gradient(135deg, rgba(30,27,55,0.95) 0%, rgba(40,35,70,0.9) 100%)",
+            boxShadow: "0 2px 12px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.05)",
+          }}
         >
-          <GoogleIcon />
-          Continue with Google
+          {/* Subtle shimmer on hover */}
+          <div
+            className="absolute inset-0 opacity-0 group-hover/google:opacity-100 transition-opacity duration-500"
+            style={{
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)",
+              animation: "shimmer 2s infinite",
+            }}
+          />
+          {/* Glowing border on hover */}
+          <div className="absolute inset-0 rounded-xl opacity-0 group-hover/google:opacity-100 transition-opacity duration-300"
+            style={{ boxShadow: "inset 0 0 0 1px rgba(99,102,241,0.3)" }}
+          />
+          <div className="relative z-10 flex items-center justify-center gap-3">
+            <div className="w-5 h-5 flex items-center justify-center rounded-full bg-white/10 p-0.5">
+              <GoogleIcon />
+            </div>
+            <span className="text-sm">Continue with Google</span>
+          </div>
         </button>
       )}
     </>
