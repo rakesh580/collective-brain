@@ -6,7 +6,7 @@ import { useGoogleAuthEnabled } from "../hooks/useGoogleAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { UserPlus } from "lucide-react";
 
-function SafeGoogleLogin({ onSuccess, onError }: { onSuccess: (res: any) => void; onError: () => void }) {
+function SafeGoogleLogin({ onSuccess }: { onSuccess: (res: any) => void }) {
   const enabled = useGoogleAuthEnabled();
   if (!enabled) return null;
   return (
@@ -219,7 +219,6 @@ export default function RegisterPage() {
 
           <SafeGoogleLogin
             onSuccess={handleGoogleSuccess}
-            onError={() => setError("Google sign-in was cancelled or failed")}
           />
 
           <p className="text-center text-sm text-slate-400 mt-4">
