@@ -57,10 +57,21 @@ async def slack_install(request: Request):
 
     # Generate state token for CSRF protection
     import secrets
+    import time as _time
     state = secrets.token_urlsafe(32)
-    # Store state in a simple way (in production, use Redis/DB)
-    request.app.state._slack_oauth_states = getattr(request.app.state, "_slack_oauth_states", {})
-    request.app.state._slack_oauth_states[state] = True
+
+    # Store state with expiry — use Redis if available, else in-memory with TTL
+    redis = getattr(request.app.state, "redis", None)
+    if redis and redis.is_connected:
+        await redis.cache_set(f"slack_oauth_state:{state}", True, ttl_seconds=600)
+    else:
+        _states = getattr(request.app.state, "_slack_oauth_states", {})
+        # Clean up expired states (older than 10 minutes)
+        now = _time.time()
+        request.app.state._slack_oauth_states = {
+            k: v for k, v in _states.items() if now - v < 600
+        }
+        request.app.state._slack_oauth_states[state] = now
 
     url = slack.get_install_url(redirect_uri, state)
     return {"install_url": url}
@@ -73,11 +84,21 @@ async def slack_oauth_callback(request: Request, code: str, state: str):
     if not settings.slack_client_id:
         raise HTTPException(status_code=400, detail="Slack integration is not configured")
 
-    # Verify state (CSRF protection)
-    oauth_states = getattr(request.app.state, "_slack_oauth_states", {})
-    if state not in oauth_states:
+    # Verify state (CSRF protection) — check Redis first, then in-memory
+    redis = getattr(request.app.state, "redis", None)
+    state_valid = False
+    if redis and redis.is_connected:
+        cached = await redis.cache_get(f"slack_oauth_state:{state}")
+        if cached:
+            state_valid = True
+            await redis.cache_delete(f"slack_oauth_state:{state}")
+    else:
+        oauth_states = getattr(request.app.state, "_slack_oauth_states", {})
+        if state in oauth_states:
+            state_valid = True
+            del oauth_states[state]
+    if not state_valid:
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
-    del oauth_states[state]
 
     from app.services.slack_service import SlackService
     slack = SlackService(settings)

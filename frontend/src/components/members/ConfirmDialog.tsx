@@ -24,14 +24,14 @@ export default function ConfirmDialog({ title, message, onConfirm, onCancel, isO
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+      <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message" className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm">
         {destructive && (
           <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center mb-3">
             <AlertTriangle size={20} className="text-red-500" />
           </div>
         )}
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">{title}</h3>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">{message}</p>
+        <h3 id="confirm-dialog-title" className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">{title}</h3>
+        <p id="confirm-dialog-message" className="text-sm text-slate-600 dark:text-slate-400 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}

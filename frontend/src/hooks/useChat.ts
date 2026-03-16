@@ -15,7 +15,13 @@ export function useChat() {
   // Load conversation history on mount and when user changes
   useEffect(() => {
     if (user) {
-      api.getConversations(10).then((res) => setConversations(res.conversations)).catch(() => {});
+      const controller = new AbortController();
+      api.getConversations(10, 0, undefined, controller.signal)
+        .then((res) => setConversations(res.conversations))
+        .catch((err) => {
+          if (err.name !== "AbortError") console.error("Failed to load conversations:", err);
+        });
+      return () => controller.abort();
     } else {
       setConversations([]);
     }
@@ -48,7 +54,7 @@ export function useChat() {
         };
         setMessages((prev) => [...prev, assistantMsg]);
         // Refresh conversation list
-        api.getConversations(10).then((r) => setConversations(r.conversations)).catch(() => {});
+        api.getConversations(10).then((r) => setConversations(r.conversations)).catch((err) => console.error("Failed to refresh conversations:", err));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to get response");
       } finally {

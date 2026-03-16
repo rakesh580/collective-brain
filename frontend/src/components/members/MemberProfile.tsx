@@ -1,3 +1,4 @@
+import React from "react";
 import type { Member } from "../../types";
 import { Link } from "react-router-dom";
 
@@ -20,7 +21,7 @@ function getAvatarColor(name: string): string {
   return avatarColors[Math.abs(hash) % avatarColors.length];
 }
 
-export default function MemberProfile({ member }: Props) {
+const MemberProfile = React.memo(function MemberProfile({ member }: Props) {
   const topExpertise = Object.entries(member.expertise_scores)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
@@ -85,4 +86,6 @@ export default function MemberProfile({ member }: Props) {
       )}
     </Link>
   );
-}
+});
+
+export default MemberProfile;

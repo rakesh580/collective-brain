@@ -53,6 +53,7 @@ export default function ChatInput({ onSend, disabled }: Props) {
           type="submit"
           disabled={disabled || !input.trim()}
           className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-sm font-medium hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all btn-press shadow-md shadow-indigo-500/20"
+          aria-label={disabled ? "Sending message" : "Send message"}
         >
           {disabled ? (
             <Loader2 size={16} className="animate-spin" />

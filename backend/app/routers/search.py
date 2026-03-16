@@ -26,7 +26,9 @@ async def search(request: Request, q: str, room_id: str | None = None, limit: in
 
     db = _get_db()
     try:
-        pattern = f"%{q}%"
+        # Escape ILIKE special characters to prevent false matches
+        escaped_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_q}%"
         results = {"members": [], "artifacts": [], "insights": [], "rooms": []}
 
         # Search members using SQL ILIKE (name match)

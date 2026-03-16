@@ -37,7 +37,7 @@ COPY --from=frontend-build /app/dist ./static
 # /data  — HuggingFace Spaces persistent volume (survives container restarts)
 # /app/data — fallback for local Docker runs
 RUN mkdir -p /data/chroma_db /app/data/chroma_db \
-    && chmod -R 777 /data /app/data
+    && chmod -R 755 /data /app/data
 
 # Point SQLite + ChromaDB to HF persistent volume by default.
 # These can be overridden via Space settings or .env for other platforms.
@@ -50,7 +50,7 @@ ENV CB_CHROMA_PERSIST_DIR="/data/chroma_db"
 ENV CB_LLM_PROVIDER="mistral"
 ENV CB_MISTRAL_MODEL="Qwen/Qwen2.5-72B-Instruct"
 ENV CB_AGENT_MODE="rag"
-ENV CB_DEV_MODE="1"
+ENV CB_DEV_MODE="0"
 
 # HF Spaces uses port 7860, Render uses 8000
 EXPOSE 7860 8000

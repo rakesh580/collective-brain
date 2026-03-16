@@ -63,7 +63,7 @@ function handle401(res: Response): void {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -94,8 +94,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  authConfig: () =>
-    request<{ google_client_id: string; google_enabled: boolean }>("/auth/config"),
+  authConfig: (signal?: AbortSignal) =>
+    request<{ google_client_id: string; google_enabled: boolean }>("/auth/config", { signal }),
   authLogin: (data: { username: string; password: string }) =>
     request<AuthResponse>("/auth/login", {
       method: "POST",
@@ -127,7 +127,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
-  getUsers: () => request<User[]>("/auth/users"),
+  getUsers: (signal?: AbortSignal) => request<User[]>("/auth/users", { signal }),
 
   // Query
   query: (question: string, conversationId?: string, filters?: Record<string, unknown>, roomId?: string) =>
@@ -137,10 +137,10 @@ export const api = {
     }),
 
   // Members
-  getMembers: (roomId?: string, limit = 50, offset = 0) => {
+  getMembers: (roomId?: string, limit = 50, offset = 0, signal?: AbortSignal) => {
     const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (roomId) p.set("room_id", roomId);
-    return request<MembersListResponse>(`/members?${p}`);
+    return request<MembersListResponse>(`/members?${p}`, { signal });
   },
   getMember: (id: string, roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
@@ -195,7 +195,7 @@ export const api = {
   },
   getTopicGraph: (topic: string, roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
-    return request<GraphData>(`/graph/topic/${topic}${p}`);
+    return request<GraphData>(`/graph/topic/${encodeURIComponent(topic)}${p}`);
   },
   getExpertiseMatrix: (roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
@@ -288,10 +288,10 @@ export const api = {
   },
 
   // Conversations
-  getConversations: (limit = 20, offset = 0, roomId?: string) => {
+  getConversations: (limit = 20, offset = 0, roomId?: string, signal?: AbortSignal) => {
     const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (roomId) p.set("room_id", roomId);
-    return request<ConversationListResponse>(`/conversations?${p}`);
+    return request<ConversationListResponse>(`/conversations?${p}`, { signal });
   },
   getConversation: (id: string) =>
     request<ConversationDetail>(`/conversations/${id}`),
@@ -354,7 +354,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  getThreads: (params?: { context_type?: string; context_id?: string; status?: string; room_id?: string; limit?: number; offset?: number }) => {
+  getThreads: (params?: { context_type?: string; context_id?: string; status?: string; room_id?: string; limit?: number; offset?: number }, signal?: AbortSignal) => {
     const p = new URLSearchParams();
     if (params?.context_type) p.set("context_type", params.context_type);
     if (params?.context_id) p.set("context_id", params.context_id);
@@ -362,7 +362,7 @@ export const api = {
     if (params?.room_id) p.set("room_id", params.room_id);
     if (params?.limit) p.set("limit", String(params.limit));
     if (params?.offset) p.set("offset", String(params.offset));
-    return request<DiscussionThreadListResponse>(`/discussions?${p}`);
+    return request<DiscussionThreadListResponse>(`/discussions?${p}`, { signal });
   },
   getThread: (id: string) =>
     request<DiscussionThreadDetail>(`/discussions/${id}`),
@@ -387,12 +387,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  getRooms: (limit = 50, offset = 0) =>
-    request<RoomListResponse>(`/rooms?limit=${limit}&offset=${offset}`),
-  discoverRooms: (q?: string, limit = 50, offset = 0) => {
+  getRooms: (limit = 50, offset = 0, signal?: AbortSignal) =>
+    request<RoomListResponse>(`/rooms?limit=${limit}&offset=${offset}`, { signal }),
+  discoverRooms: (q?: string, limit = 50, offset = 0, signal?: AbortSignal) => {
     const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (q) p.set("q", q);
-    return request<DiscoverRoomsResponse>(`/rooms/discover?${p}`);
+    return request<DiscoverRoomsResponse>(`/rooms/discover?${p}`, { signal });
   },
   joinRoom: (roomId: string) =>
     request<{ status: string; room_id: string }>(`/rooms/${roomId}/join`, { method: "POST" }),

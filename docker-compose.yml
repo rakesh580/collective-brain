@@ -8,9 +8,9 @@ services:
     environment:
       POSTGRES_DB: collective_brain
       POSTGRES_USER: cb_user
-      POSTGRES_PASSWORD: ${CB_POSTGRES_PASSWORD:-cb_pass_change_me}
+      POSTGRES_PASSWORD: ${CB_POSTGRES_PASSWORD:?Set CB_POSTGRES_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,12 +24,12 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${CB_REDIS_PASSWORD:-changeme_redis}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${CB_REDIS_PASSWORD:-changeme_redis}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -43,15 +43,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      CB_DATABASE_URL: postgresql://cb_user:${CB_POSTGRES_PASSWORD:-cb_pass_change_me}@postgres:5432/collective_brain
-      CB_REDIS_URL: redis://redis:6379/0
+      CB_DATABASE_URL: postgresql://cb_user:${CB_POSTGRES_PASSWORD:?Set CB_POSTGRES_PASSWORD in .env}@postgres:5432/collective_brain
+      CB_REDIS_URL: redis://:${CB_REDIS_PASSWORD:-changeme_redis}@redis:6379/0
       CB_CHROMA_PERSIST_DIR: /app/data/chroma_db
-      CB_JWT_SECRET: ${CB_JWT_SECRET:-change-this-in-production}
+      CB_JWT_SECRET: ${CB_JWT_SECRET:?Set CB_JWT_SECRET in .env}
       CB_LLM_PROVIDER: ${CB_LLM_PROVIDER:-ollama}
       CB_OLLAMA_BASE_URL: ${CB_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       CB_CLAUDE_API_KEY: ${CB_CLAUDE_API_KEY:-}
       CB_MISTRAL_API_KEY: ${CB_MISTRAL_API_KEY:-}
       CB_AGENT_MODE: ${CB_AGENT_MODE:-rag}
+      CB_DEV_MODE: "0"
     volumes:
       - backend_data:/app/data
     depends_on:
@@ -79,13 +80,14 @@ services:
     restart: unless-stopped
     command: celery -A app.worker worker --loglevel=info --concurrency=2
     environment:
-      CB_DATABASE_URL: postgresql://cb_user:${CB_POSTGRES_PASSWORD:-cb_pass_change_me}@postgres:5432/collective_brain
-      CB_REDIS_URL: redis://redis:6379/0
+      CB_DATABASE_URL: postgresql://cb_user:${CB_POSTGRES_PASSWORD:?Set CB_POSTGRES_PASSWORD in .env}@postgres:5432/collective_brain
+      CB_REDIS_URL: redis://:${CB_REDIS_PASSWORD:-changeme_redis}@redis:6379/0
       CB_CHROMA_PERSIST_DIR: /app/data/chroma_db
       CB_LLM_PROVIDER: ${CB_LLM_PROVIDER:-ollama}
       CB_OLLAMA_BASE_URL: ${CB_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       CB_CLAUDE_API_KEY: ${CB_CLAUDE_API_KEY:-}
       CB_MISTRAL_API_KEY: ${CB_MISTRAL_API_KEY:-}
+      CB_DEV_MODE: "0"
     volumes:
       - backend_data:/app/data
     depends_on:

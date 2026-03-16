@@ -49,6 +49,7 @@ export default function Sidebar() {
       <button
         onClick={() => setCollapsed(!collapsed)}
         className="absolute -right-3 top-16 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors z-10"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? <ChevronsRight size={12} /> : <ChevronsLeft size={12} />}
       </button>
@@ -87,6 +88,7 @@ export default function Sidebar() {
           onClick={toggle}
           className={`flex items-center gap-3 ${collapsed ? "justify-center px-2" : "px-3"} py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-800/60 hover:text-white transition-colors w-full`}
           title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
         >
           {isDark ? <Sun size={18} /> : <Moon size={18} />}
           {!collapsed && <span>{isDark ? "Light Mode" : "Dark Mode"}</span>}
@@ -120,6 +122,7 @@ export default function Sidebar() {
                 onClick={logout}
                 className="w-full flex justify-center mt-2 text-slate-500 hover:text-red-400 transition-colors"
                 title="Sign out"
+                aria-label="Sign out"
               >
                 <LogOut size={16} />
               </button>

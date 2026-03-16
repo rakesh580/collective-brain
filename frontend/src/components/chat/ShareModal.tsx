@@ -78,13 +78,13 @@ export default function ShareModal({ conversationId, onClose, isOpen }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+      <div role="dialog" aria-modal="true" aria-labelledby="share-modal-title" className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <UserPlus size={18} className="text-indigo-500" />
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Share Conversation</h3>
+            <h3 id="share-modal-title" className="text-lg font-semibold text-slate-800 dark:text-slate-200">Share Conversation</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Close share dialog">
             <X size={18} />
           </button>
         </div>

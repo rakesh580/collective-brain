@@ -18,15 +18,19 @@ export default function DiscussionsPage() {
   const contextType = searchParams.get("context_type") || undefined;
   const contextId = searchParams.get("context_id") || undefined;
 
-  const loadThreads = () => {
+  const loadThreads = (signal?: AbortSignal) => {
     api
-      .getThreads({ context_type: contextType, context_id: contextId })
+      .getThreads({ context_type: contextType, context_id: contextId }, signal)
       .then((res) => setThreads(res.threads))
-      .catch(() => setError("Failed to load discussions"));
+      .catch((err) => {
+        if (err.name !== "AbortError") setError("Failed to load discussions");
+      });
   };
 
   useEffect(() => {
-    loadThreads();
+    const controller = new AbortController();
+    loadThreads(controller.signal);
+    return () => controller.abort();
   }, [contextType, contextId]);
 
   const handleCreate = async () => {

@@ -8,12 +8,18 @@ Prevents: AI queries and ingestion from blocking the API request cycle.
 
 import asyncio
 import logging
+import time
 import traceback
 from typing import Any, Callable, Awaitable
 from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger("collective_brain.tasks")
+
+# TTL for completed/failed task results (seconds)
+_RESULT_TTL_SECONDS = 3600  # 1 hour
+_MAX_RESULTS = 1000
+_STUCK_TASK_TIMEOUT = 600  # 10 minutes — mark RUNNING tasks as FAILED
 
 
 class TaskStatus(Enum):
@@ -29,6 +35,8 @@ class TaskResult:
     status: TaskStatus
     result: Any = None
     error: str | None = None
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
 
 
 @dataclass
@@ -58,6 +66,8 @@ class TaskQueue:
         for i in range(self._max_concurrent):
             worker = asyncio.create_task(self._worker_loop(f"worker-{i}"))
             self._workers.append(worker)
+        # Start background cleanup task
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         logger.info("Task queue started with %d workers", self._max_concurrent)
 
     async def stop(self):
@@ -73,6 +83,12 @@ class TaskQueue:
             except asyncio.CancelledError:
                 pass
         self._workers.clear()
+        if hasattr(self, "_cleanup_task"):
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
         logger.info("Task queue stopped")
 
     async def enqueue(
@@ -101,6 +117,51 @@ class TaskQueue:
     def get_result(self, task_id: str) -> TaskResult | None:
         """Check task status."""
         return self._results.get(task_id)
+
+    async def _cleanup_loop(self):
+        """Periodically clean up stale results to prevent memory leaks."""
+        while self._running:
+            try:
+                await asyncio.sleep(60)  # Run cleanup every minute
+                self._cleanup_results()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Task cleanup error: %s", e)
+
+    def _cleanup_results(self):
+        """Remove expired results and mark stuck tasks as failed."""
+        now = time.time()
+        to_delete = []
+
+        for task_id, result in self._results.items():
+            # Remove completed/failed results older than TTL
+            if result.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+                if (now - result.updated_at) > _RESULT_TTL_SECONDS:
+                    to_delete.append(task_id)
+            # Mark stuck RUNNING/PENDING tasks as failed
+            elif result.status in (TaskStatus.RUNNING, TaskStatus.PENDING):
+                if (now - result.created_at) > _STUCK_TASK_TIMEOUT:
+                    result.status = TaskStatus.FAILED
+                    result.error = "Task timed out (stuck)"
+                    result.updated_at = now
+                    logger.warning("Task marked as stuck/failed: %s", task_id)
+
+        for task_id in to_delete:
+            del self._results[task_id]
+
+        # Hard cap: if still too many, remove oldest completed/failed
+        if len(self._results) > _MAX_RESULTS:
+            terminal = sorted(
+                [(k, v) for k, v in self._results.items()
+                 if v.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)],
+                key=lambda x: x[1].updated_at,
+            )
+            for k, _ in terminal[: len(self._results) - _MAX_RESULTS]:
+                del self._results[k]
+
+        if to_delete:
+            logger.info("Cleaned up %d stale task results", len(to_delete))
 
     async def _worker_loop(self, worker_name: str):
         """Worker that processes tasks from the queue."""
@@ -150,13 +211,3 @@ class TaskQueue:
                     logger.error("Task callback error for %s: %s", task_id, e)
 
             self._queue.task_done()
-
-            # Prevent result dict from growing unbounded
-            if len(self._results) > 1000:
-                oldest = list(self._results.keys())[:500]
-                for k in oldest:
-                    if self._results[k].status in (
-                        TaskStatus.COMPLETED,
-                        TaskStatus.FAILED,
-                    ):
-                        del self._results[k]

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useRoom } from "../hooks/useRoom";
@@ -160,6 +160,7 @@ export default function RoomChatPage() {
           <button
             onClick={() => navigate("/rooms")}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
+            aria-label="Back to rooms"
           >
             <ArrowLeft size={18} />
           </button>
@@ -193,6 +194,7 @@ export default function RoomChatPage() {
                 : "text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
             title="Ingest data into this room"
+            aria-label="Ingest data into this room"
           >
             <Upload size={16} />
           </button>
@@ -201,6 +203,7 @@ export default function RoomChatPage() {
             onClick={() => setShowAddMembers(true)}
             className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all"
             title="Add members"
+            aria-label="Add members"
           >
             <UserPlus size={16} />
           </button>
@@ -213,6 +216,7 @@ export default function RoomChatPage() {
                 : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
             title="Toggle members"
+            aria-label={showMembers ? "Hide members panel" : "Show members panel"}
           >
             <Users size={16} />
           </button>
@@ -307,6 +311,8 @@ export default function RoomChatPage() {
                   : "text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10"
               }`}
               title={aiMode ? "Switch to chat mode" : "Ask AI (@AI)"}
+              aria-label={aiMode ? "Switch to chat mode" : "Switch to AI mode"}
+              aria-pressed={aiMode}
             >
               <Bot size={18} />
             </button>
@@ -345,6 +351,7 @@ export default function RoomChatPage() {
                   ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/20 hover:from-violet-400 hover:to-purple-500"
                   : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-violet-500"
               } btn-press`}
+              aria-label={isAILoading ? "Sending message" : "Send message"}
             >
               {isAILoading ? (
                 <Loader2 size={18} className="animate-spin" />
@@ -385,6 +392,7 @@ export default function RoomChatPage() {
             <button
               onClick={() => setShowIngest(false)}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+              aria-label="Close ingest panel"
             >
               <X size={14} />
             </button>
@@ -408,11 +416,11 @@ export default function RoomChatPage() {
                     >
                       <div className="flex items-center gap-2">
                         {job.status === "completed" ? (
-                          <CheckCircle size={14} className="text-emerald-500" />
+                          <CheckCircle size={14} className="text-emerald-500" aria-hidden="true" />
                         ) : job.status === "failed" ? (
-                          <XCircle size={14} className="text-red-500" />
+                          <XCircle size={14} className="text-red-500" aria-hidden="true" />
                         ) : (
-                          <Clock size={14} className="text-amber-500" />
+                          <Clock size={14} className="text-amber-500" aria-hidden="true" />
                         )}
                         <span className="text-xs text-slate-700 dark:text-slate-300">
                           {job.source_type} &middot; {job.chunk_count} chunks
@@ -445,7 +453,7 @@ export default function RoomChatPage() {
 
 // ─── Message Item ────────────────────────────────────────────
 
-function MessageItem({
+const MessageItem = React.memo(function MessageItem({
   message,
   isOwn,
   showAvatar,
@@ -564,7 +572,7 @@ function MessageItem({
       </div>
     </div>
   );
-}
+});
 
 // ─── Empty Room State ────────────────────────────────────────
 
@@ -637,6 +645,7 @@ function MembersSidebar({
         <button
           onClick={onClose}
           className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+          aria-label="Close members panel"
         >
           <X size={14} />
         </button>
@@ -685,7 +694,7 @@ function MembersSidebar({
   );
 }
 
-function MemberRow({
+const MemberRow = React.memo(function MemberRow({
   member,
   isCurrentUser,
   isAdmin,
@@ -709,7 +718,7 @@ function MemberRow({
           {getInitials(name)}
         </div>
         {member.is_online && (
-          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-white dark:border-slate-800 rounded-full" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-white dark:border-slate-800 rounded-full" role="status" aria-label={`${name} is online`} />
         )}
       </div>
 
@@ -747,6 +756,7 @@ function MemberRow({
           onClick={() => onAskAbout(name)}
           className="p-1 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-500/10 rounded transition-all"
           title={`Ask AI about ${name}`}
+          aria-label={`Ask AI about ${name}`}
         >
           <Bot size={11} />
         </button>
@@ -755,6 +765,7 @@ function MemberRow({
             onClick={() => onRemove(member.user_id)}
             className="p-1 text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded transition-all"
             title="Remove"
+            aria-label={`Remove ${name} from room`}
           >
             <LogOut size={11} />
           </button>
@@ -762,7 +773,7 @@ function MemberRow({
       </div>
     </div>
   );
-}
+});
 
 // ─── Add Members Modal ───────────────────────────────────────
 
@@ -780,12 +791,16 @@ function AddMembersModal({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     api
-      .getUsers()
+      .getUsers(controller.signal)
       .then((all) =>
         setUsers(all.filter((u) => !existingMemberIds.includes(u.id)))
       )
-      .catch(() => {});
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load users for adding members:", err);
+      });
+    return () => controller.abort();
   }, [existingMemberIds]);
 
   useEffect(() => {
@@ -824,17 +839,18 @@ function AddMembersModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+      <div role="dialog" aria-modal="true" aria-labelledby="add-members-modal-title" className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <UserPlus size={18} className="text-indigo-500" />
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            <h3 id="add-members-modal-title" className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Add Members
             </h3>
           </div>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            aria-label="Close add members dialog"
           >
             <X size={18} />
           </button>

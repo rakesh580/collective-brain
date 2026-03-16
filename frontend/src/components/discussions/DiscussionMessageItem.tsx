@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { DiscussionMessage } from "../../types";
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   onDelete: (messageId: string) => void;
 }
 
-export default function DiscussionMessageItem({ message, isOwn, onEdit, onDelete }: Props) {
+const DiscussionMessageItem = React.memo(function DiscussionMessageItem({ message, isOwn, onEdit, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
 
@@ -91,4 +91,6 @@ export default function DiscussionMessageItem({ message, isOwn, onEdit, onDelete
       </div>
     </div>
   );
-}
+});
+
+export default DiscussionMessageItem;

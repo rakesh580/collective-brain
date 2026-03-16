@@ -30,11 +30,15 @@ export default function TeamSidebar({ onAskAbout }: Props) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const controller = new AbortController();
     api
-      .getMembers()
+      .getMembers(undefined, 50, 0, controller.signal)
       .then((res) => setMembers(res.members))
-      .catch(() => {})
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load team members:", err);
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   const filtered = search
@@ -112,6 +116,7 @@ export default function TeamSidebar({ onAskAbout }: Props) {
                 onClick={() => onAskAbout(m.name)}
                 className="opacity-0 group-hover:opacity-100 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 p-1 rounded-md bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shrink-0"
                 title={`Ask about ${m.name}`}
+                aria-label={`Ask about ${m.name}`}
               >
                 <MessageCircle size={12} />
               </button>

@@ -1,6 +1,8 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import PageShell from "./components/layout/PageShell";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import FeatureErrorBoundary from "./components/FeatureErrorBoundary";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -8,13 +10,34 @@ import DashboardPage from "./pages/DashboardPage";
 import ChatPage from "./pages/ChatPage";
 import IngestPage from "./pages/IngestPage";
 import { MemberList, MemberDetailView } from "./pages/MembersPage";
-import GraphPage from "./pages/GraphPage";
-import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
-import DiscussionsPage from "./pages/DiscussionsPage";
 import RoomsPage from "./pages/RoomsPage";
-import RoomChatPage from "./pages/RoomChatPage";
-import TeamHealthPage from "./pages/TeamHealthPage";
+
+// Lazy-load heavy pages to reduce initial bundle size
+const GraphPage = lazy(() => import("./pages/GraphPage"));
+const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
+const DiscussionsPage = lazy(() => import("./pages/DiscussionsPage"));
+const RoomChatPage = lazy(() => import("./pages/RoomChatPage"));
+const TeamHealthPage = lazy(() => import("./pages/TeamHealthPage"));
+
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" role="status">
+        <span className="sr-only">Loading...</span>
+      </div>
+    </div>
+  );
+}
+
+/** Wrap a page element with error boundary + suspense fallback */
+function guarded(element: React.ReactNode, name: string) {
+  return (
+    <FeatureErrorBoundary featureName={name}>
+      <Suspense fallback={<PageFallback />}>{element}</Suspense>
+    </FeatureErrorBoundary>
+  );
+}
 
 export default function App() {
   return (
@@ -29,18 +52,18 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/ingest" element={<IngestPage />} />
-        <Route path="/members" element={<MemberList />} />
-        <Route path="/members/:id" element={<MemberDetailView />} />
-        <Route path="/graph" element={<GraphPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/health" element={<TeamHealthPage />} />
-        <Route path="/rooms" element={<RoomsPage />} />
-        <Route path="/rooms/:roomId" element={<RoomChatPage />} />
-        <Route path="/discussions" element={<DiscussionsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/" element={guarded(<DashboardPage />, "Dashboard")} />
+        <Route path="/chat" element={guarded(<ChatPage />, "AI Chat")} />
+        <Route path="/ingest" element={guarded(<IngestPage />, "Data Ingestion")} />
+        <Route path="/members" element={guarded(<MemberList />, "Members")} />
+        <Route path="/members/:id" element={guarded(<MemberDetailView />, "Member Detail")} />
+        <Route path="/graph" element={guarded(<GraphPage />, "Knowledge Graph")} />
+        <Route path="/analytics" element={guarded(<AnalyticsPage />, "Analytics")} />
+        <Route path="/health" element={guarded(<TeamHealthPage />, "Team Health")} />
+        <Route path="/rooms" element={guarded(<RoomsPage />, "Rooms")} />
+        <Route path="/rooms/:roomId" element={guarded(<RoomChatPage />, "Room Chat")} />
+        <Route path="/discussions" element={guarded(<DiscussionsPage />, "Discussions")} />
+        <Route path="/settings" element={guarded(<SettingsPage />, "Settings")} />
       </Route>
     </Routes>
   );

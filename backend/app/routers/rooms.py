@@ -1017,6 +1017,15 @@ async def room_websocket(websocket: WebSocket, room_id: str):
         await websocket.close(code=4001, reason="Auth failed")
         return
 
+    # Limit concurrent WebSocket connections per user per room
+    _MAX_WS_PER_USER = 5
+    user_connections_in_room = sum(
+        1 for _, uid, _ in _ws_connections.get(room_id, []) if uid == user_id
+    )
+    if user_connections_in_room >= _MAX_WS_PER_USER:
+        await websocket.close(code=4008, reason="Too many connections")
+        return
+
     # Register connection
     entry = (websocket, user_id, username)
     _ws_connections[room_id].append(entry)
@@ -1098,6 +1107,13 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                     content = data.get("content", "").strip()
                     if not content:
                         continue
+                    # Enforce message length limit
+                    if len(content) > 10000:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Message too long (max 10,000 characters).",
+                        })
+                        continue
 
                     saved = False
                     for attempt in range(2):
@@ -1154,31 +1170,47 @@ async def room_websocket(websocket: WebSocket, room_id: str):
 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        logger.error("Room WS error: user=%s room=%s err=%s", user_id, room_id, e)
     finally:
-        if entry in _ws_connections.get(room_id, []):
-            _ws_connections[room_id].remove(entry)
+        # Always clean up connection state — wrap each step in try/except
+        # to ensure one failure doesn't prevent subsequent cleanup
+        try:
+            if entry in _ws_connections.get(room_id, []):
+                _ws_connections[room_id].remove(entry)
+        except Exception:
+            pass
 
         # Only remove from online if no other connections for this user
-        still_connected = any(
-            uid == user_id for _, uid, _ in _ws_connections.get(room_id, [])
-        )
-        if not still_connected:
-            _online_users[room_id].discard(user_id)
+        try:
+            still_connected = any(
+                uid == user_id for _, uid, _ in _ws_connections.get(room_id, [])
+            )
+            if not still_connected:
+                _online_users[room_id].discard(user_id)
+        except Exception:
+            pass
 
         # Unsubscribe from Redis and clean up if last connection in this room
-        if not _ws_connections.get(room_id):
-            if redis and redis.is_connected:
-                await redis.unsubscribe(channel)
-                logger.info("Unsubscribed from Redis channel: %s", channel)
-            # Clean up empty connection lists to prevent memory leak
-            _ws_connections.pop(room_id, None)
-            _online_users.pop(room_id, None)
+        try:
+            if not _ws_connections.get(room_id):
+                if redis and redis.is_connected:
+                    await redis.unsubscribe(channel)
+                    logger.info("Unsubscribed from Redis channel: %s", channel)
+                # Clean up empty connection lists to prevent memory leak
+                _ws_connections.pop(room_id, None)
+                _online_users.pop(room_id, None)
+        except Exception:
+            pass
 
         logger.info("Room WS disconnected: user=%s room=%s", user_id, room_id)
 
-        await _broadcast(room_id, {
-            "type": "presence",
-            "online_users": _get_online_list(room_id),
-            "user_left": user_id,
-            "username": username,
-        })
+        try:
+            await _broadcast(room_id, {
+                "type": "presence",
+                "online_users": _get_online_list(room_id),
+                "user_left": user_id,
+                "username": username,
+            })
+        except Exception:
+            pass

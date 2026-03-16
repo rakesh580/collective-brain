@@ -223,7 +223,7 @@ export function useRoom(roomId: string | null): UseRoom {
         ws.send(JSON.stringify({ type: "typing_stop" }));
       } else {
         // Fallback to REST
-        api.sendRoomMessage(roomId, content.trim()).catch(() => {});
+        api.sendRoomMessage(roomId, content.trim()).catch((err) => console.error("Failed to send room message via REST fallback:", err));
       }
     },
     [roomId]

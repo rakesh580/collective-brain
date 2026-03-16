@@ -200,8 +200,9 @@ class AuthService:
                 "This account uses Google Sign-In and has no password to reset"
             )
 
-        code = "".join(random.choices(string.digits, k=6))
-        user.reset_code = code
+        import secrets as _secrets
+        code = "".join(_secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        user.reset_code = pwd_context.hash(code)
         user.reset_code_expires = datetime.utcnow() + timedelta(minutes=15)
         db.commit()
         return code
@@ -216,7 +217,7 @@ class AuthService:
         user = db.query(UserRecord).filter(UserRecord.email == email).first()
         if not user:
             raise ValueError("No account found with that email address")
-        if not user.reset_code or user.reset_code != code:
+        if not user.reset_code or not pwd_context.verify(code, user.reset_code):
             raise ValueError("Invalid verification code")
         if user.reset_code_expires and user.reset_code_expires < datetime.utcnow():
             raise ValueError("Verification code has expired")

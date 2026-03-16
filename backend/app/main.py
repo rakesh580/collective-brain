@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import os
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -26,7 +27,8 @@ import logging
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s",
+    defaults={"request_id": "-"},
 )
 logger = logging.getLogger("collective_brain")
 
@@ -96,6 +98,7 @@ async def lifespan(app: FastAPI):
             settings.jwt_secret = _secrets.token_urlsafe(64)
             try:
                 _jwt_path.write_text(settings.jwt_secret)
+                _jwt_path.chmod(0o600)
                 logger.info("Generated and persisted JWT secret to %s", _jwt_path)
             except OSError:
                 logger.warning(
@@ -159,9 +162,62 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=not _on_hf_spaces,  # credentials not allowed with wildcard origin
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
+
+
+# ── Security Headers Middleware ──
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response as StarletteResponse
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: StarletteResponse = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Request ID Tracing Middleware ──
+import contextvars
+
+_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a unique request ID to every request for tracing."""
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
+        _request_id_var.set(request_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
+# Custom logging filter that injects request_id into log records
+class RequestIDFilter(logging.Filter):
+    def filter(self, record):
+        record.request_id = _request_id_var.get("-")
+        return True
+
+
+# Add the filter to all handlers
+for handler in logging.root.handlers:
+    handler.addFilter(RequestIDFilter())
+
+app.add_middleware(RequestIDMiddleware)
 
 
 @app.exception_handler(CircuitBreakerError)
@@ -184,7 +240,7 @@ async def global_exception_handler(request, exc):
     from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "type": type(exc).__name__},
+        content={"detail": "Internal server error"},
     )
 
 

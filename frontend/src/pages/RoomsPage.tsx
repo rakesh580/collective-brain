@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Room, User } from "../types";
@@ -32,21 +32,29 @@ export default function RoomsPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const controller = new AbortController();
     api
-      .getRooms()
+      .getRooms(50, 0, controller.signal)
       .then((data) => setRooms(data.rooms))
-      .catch(() => {})
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load rooms:", err);
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     if (tab === "discover") {
+      const controller = new AbortController();
       setDiscoverLoading(true);
       api
-        .discoverRooms(discoverSearch || undefined)
+        .discoverRooms(discoverSearch || undefined, 50, 0, controller.signal)
         .then((data) => setDiscoverRooms(data.rooms))
-        .catch(() => {})
+        .catch((err) => {
+          if (err.name !== "AbortError") console.error("Failed to discover rooms:", err);
+        })
         .finally(() => setDiscoverLoading(false));
+      return () => controller.abort();
     }
   }, [tab, discoverSearch]);
 
@@ -306,7 +314,7 @@ export default function RoomsPage() {
 
 // ─── Room Card ───────────────────────────────────────────────
 
-function RoomCard({ room, onClick }: { room: Room; onClick: () => void }) {
+const RoomCard = React.memo(function RoomCard({ room, onClick }: { room: Room; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -355,7 +363,7 @@ function RoomCard({ room, onClick }: { room: Room; onClick: () => void }) {
       </div>
     </button>
   );
-}
+});
 
 // ─── Create Room Modal ───────────────────────────────────────
 
@@ -374,10 +382,14 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     api
-      .getUsers()
+      .getUsers(controller.signal)
       .then(setUsers)
-      .catch(() => {});
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load users:", err);
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -422,19 +434,20 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-md">
+      <div role="dialog" aria-modal="true" aria-labelledby="create-room-modal-title" className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-md">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center">
               <Hash size={16} className="text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            <h3 id="create-room-modal-title" className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Create Room
             </h3>
           </div>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            aria-label="Close create room dialog"
           >
             <X size={18} />
           </button>
@@ -498,6 +511,9 @@ function CreateRoomModal({ onClose, onCreate }: CreateRoomModalProps) {
             </div>
             <button
               onClick={() => setIsPublic(!isPublic)}
+              role="switch"
+              aria-checked={isPublic}
+              aria-label={isPublic ? "Public room" : "Private room"}
               className={`relative w-10 h-5.5 rounded-full transition-colors ${
                 isPublic ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
               }`}

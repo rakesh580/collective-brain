@@ -38,7 +38,14 @@ class RedisService:
                     socket_connect_timeout=5,
                     retry_on_timeout=True,
                 )
-                logger.info("Redis connected: %s", redis_url.split("@")[-1])
+                # Safely log Redis host without credentials
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(redis_url)
+                    safe_host = f"{parsed.hostname}:{parsed.port}" if parsed.hostname else "unknown"
+                except Exception:
+                    safe_host = "configured"
+                logger.info("Redis connected: %s", safe_host)
             except Exception as e:
                 logger.warning("Redis unavailable, using in-memory fallback: %s", e)
                 self._redis = None

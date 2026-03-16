@@ -75,8 +75,8 @@ export default function SettingsPage() {
       setPasswordMsg({ type: "error", text: "New passwords do not match." });
       return;
     }
-    if (newPassword.length < 6) {
-      setPasswordMsg({ type: "error", text: "New password must be at least 6 characters." });
+    if (newPassword.length < 8) {
+      setPasswordMsg({ type: "error", text: "New password must be at least 8 characters." });
       return;
     }
     setPasswordSaving(true);

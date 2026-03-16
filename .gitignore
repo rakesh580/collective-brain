@@ -24,6 +24,20 @@ frontend/dist/
 # Environment & secrets
 .env
 *.env.local
+.env.production
+.env.staging
+.env.development
+
+# Credentials & keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+credentials.json
+service-account*.json
 
 # IDE
 .DS_Store

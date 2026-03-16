@@ -39,16 +39,19 @@ export default function MarkdownContent({ content, className }: Props) {
           );
         },
         pre: ({ children }) => <>{children}</>,
-        a: ({ href, children }) => (
-          <a
-            href={href}
-            className="text-indigo-600 dark:text-indigo-400 underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {children}
-          </a>
-        ),
+        a: ({ href, children }) => {
+          const safeHref = href && (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:")) ? href : undefined;
+          return (
+            <a
+              href={safeHref}
+              className="text-indigo-600 dark:text-indigo-400 underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {children}
+            </a>
+          );
+        },
         blockquote: ({ children }) => (
           <blockquote className="border-l-2 border-indigo-300 dark:border-indigo-600 pl-3 italic text-slate-600 dark:text-slate-400 mb-1.5">
             {children}

@@ -33,11 +33,11 @@ export default function IngestPage() {
               >
                 <div className="flex items-center gap-3">
                   {job.status === "completed" ? (
-                    <CheckCircle size={16} className="text-emerald-500" />
+                    <CheckCircle size={16} className="text-emerald-500" aria-hidden="true" />
                   ) : job.status === "failed" ? (
-                    <XCircle size={16} className="text-red-500" />
+                    <XCircle size={16} className="text-red-500" aria-hidden="true" />
                   ) : (
-                    <Clock size={16} className="text-amber-500" />
+                    <Clock size={16} className="text-amber-500" aria-hidden="true" />
                   )}
                   <div>
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">

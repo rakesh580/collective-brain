@@ -67,6 +67,7 @@ export default function ChatPage() {
             <button
               onClick={() => setShowHistory(false)}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              aria-label="Close history panel"
             >
               <X size={14} />
             </button>
@@ -101,6 +102,7 @@ export default function ChatPage() {
                     deleteConversation(conv.id);
                   }}
                   className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all p-1 rounded"
+                  aria-label={`Delete conversation: ${conv.title}`}
                 >
                   <Trash2 size={12} />
                 </button>
@@ -119,6 +121,7 @@ export default function ChatPage() {
               onClick={() => setShowHistory(!showHistory)}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
               title="Chat history"
+              aria-label={showHistory ? "Close chat history" : "Open chat history"}
             >
               {showHistory ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
             </button>
@@ -207,9 +210,9 @@ export default function ChatPage() {
           )}
 
           {isLoading && (
-            <div className="flex justify-start mb-4">
+            <div className="flex justify-start mb-4" role="status" aria-label="AI is thinking">
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 shadow-sm">
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5" aria-hidden="true">
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.15s]" />
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.3s]" />

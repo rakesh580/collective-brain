@@ -12,10 +12,10 @@ Features:
   - PageRank, betweenness centrality, community detection
 """
 
+import asyncio
 import math
 import time
 import logging
-import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -33,9 +33,8 @@ logger = logging.getLogger("collective_brain.graph")
 # Half-life for temporal decay (days).
 _HALF_LIFE_DAYS = 180
 
-# Global cached graph with thread-safe access
+# Global cached graph — dict operations are atomic under CPython's GIL
 _graph_cache: dict[str | None, "CachedGraph"] = {}
-_cache_lock = threading.Lock()
 _CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
@@ -52,13 +51,16 @@ class CachedGraph:
 
 
 def invalidate_graph_cache(room_id: str | None = None):
-    """Call after ingestion or member changes to force a rebuild."""
-    with _cache_lock:
-        if room_id in _graph_cache:
-            del _graph_cache[room_id]
-        # Also invalidate the global (None) cache
-        if room_id is not None and None in _graph_cache:
-            del _graph_cache[None]
+    """Call after ingestion or member changes to force a rebuild.
+
+    Safe to call from both sync and async contexts — dict operations
+    on CPython are atomic under the GIL.
+    """
+    if room_id in _graph_cache:
+        _graph_cache.pop(room_id, None)
+    # Also invalidate the global (None) cache
+    if room_id is not None:
+        _graph_cache.pop(None, None)
 
 
 def _temporal_decay(
@@ -98,17 +100,17 @@ class MemoryGraph:
     # ── NetworkX Graph Building ────────────────────────────────
 
     def _get_or_build_nx_graph(self) -> nx.Graph:
-        """Return cached NetworkX graph or build a fresh one."""
-        with _cache_lock:
-            cached = _graph_cache.get(self.room_id)
-            if cached and not cached.is_stale:
-                return cached.G
+        """Return cached NetworkX graph or build a fresh one.
 
-        # Build outside the lock to avoid blocking other requests
+        Uses dict operations that are atomic under CPython's GIL.
+        """
+        cached = _graph_cache.get(self.room_id)
+        if cached and not cached.is_stale:
+            return cached.G
+
+        # Build graph (may take time for large datasets)
         G = self._build_nx_graph()
-
-        with _cache_lock:
-            _graph_cache[self.room_id] = CachedGraph(G, time.time())
+        _graph_cache[self.room_id] = CachedGraph(G, time.time())
         return G
 
     def _build_nx_graph(self) -> nx.Graph:

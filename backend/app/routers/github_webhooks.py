@@ -100,7 +100,11 @@ async def github_webhook(request: Request):
             logger.warning("Invalid GitHub webhook signature")
             raise HTTPException(status_code=401, detail="Invalid signature")
     else:
-        logger.warning("GitHub webhook secret not configured — accepting without verification")
+        logger.warning("GitHub webhook secret not configured — rejecting webhook")
+        raise HTTPException(
+            status_code=403,
+            detail="Webhook secret not configured. Set CB_GITHUB_WEBHOOK_SECRET to enable webhooks.",
+        )
 
     # Parse event type
     event_type = request.headers.get("X-GitHub-Event", "")

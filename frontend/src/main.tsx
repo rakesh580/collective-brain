@@ -30,15 +30,19 @@ function Root() {
   // where VITE_ env vars aren't available at build time)
   useEffect(() => {
     if (googleClientId) return;
+    const controller = new AbortController();
     api
-      .authConfig()
+      .authConfig(controller.signal)
       .then((config) => {
         if (config.google_client_id) {
           setGoogleClientId(config.google_client_id);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to fetch auth config:", err);
+      })
       .finally(() => setReady(true));
+    return () => controller.abort();
   }, [googleClientId]);
 
   if (!ready) return null;

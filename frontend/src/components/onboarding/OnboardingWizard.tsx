@@ -56,6 +56,7 @@ export default function OnboardingWizard({ onDismiss }: Props) {
       <button
         onClick={onDismiss}
         className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors z-10"
+        aria-label="Dismiss onboarding wizard"
       >
         <X size={16} />
       </button>

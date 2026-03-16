@@ -96,12 +96,12 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="member-form-modal-title" className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+          <h3 id="member-form-modal-title" className="text-lg font-semibold text-slate-800 dark:text-slate-200">
             {member ? "Edit Member" : "Add Member"}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Close member form">
             <X size={18} />
           </button>
         </div>
@@ -150,6 +150,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
                     type="button"
                     onClick={() => setTags(tags.filter((t) => t !== tag))}
                     className="text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200"
+                    aria-label={`Remove ${tag} tag`}
                   >
                     x
                   </button>

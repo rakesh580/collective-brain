@@ -178,12 +178,28 @@ async def _read_upload(uploaded: UploadFile, max_bytes: int = _MAX_UPLOAD_BYTES)
     return content
 
 
+_MAX_ZIP_DECOMPRESSED_BYTES = 500 * 1024 * 1024  # 500 MB max decompressed size
+
+
 def _safe_extract_zip(zf, target_dir: str, allowed_extensions: tuple | None = None):
     """Extract ZIP members safely, rejecting any that escape target_dir (ZipSlip)."""
     target = os.path.realpath(target_dir)
+
+    # Check total decompressed size to prevent ZIP bombs
+    total_size = sum(info.file_size for info in zf.infolist() if not info.is_dir())
+    if total_size > _MAX_ZIP_DECOMPRESSED_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ZIP decompressed size ({total_size // (1024*1024)}MB) exceeds limit ({_MAX_ZIP_DECOMPRESSED_BYTES // (1024*1024)}MB).",
+        )
+
     for member in zf.namelist():
         # Skip directories
         if member.endswith("/"):
+            continue
+        # Reject hidden files and system files
+        basename = os.path.basename(member)
+        if basename.startswith(".") or basename.startswith("__"):
             continue
         # Filter by extension if specified
         if allowed_extensions and not member.lower().endswith(allowed_extensions):
@@ -202,10 +218,22 @@ def _safe_extract_zip(zf, target_dir: str, allowed_extensions: tuple | None = No
             dst.write(src.read())
 
 
+import re as _re
+
+_SAFE_FILENAME_RE = _re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._\- ]{0,254}$")
+
+
 def _sanitize_filename(name: str) -> str:
-    """Strip directory components from an uploaded filename."""
+    """Strip directory components and validate filename safety."""
     # Handle both Unix and Windows path separators
-    return os.path.basename(name.replace("\\", "/"))
+    basename = os.path.basename(name.replace("\\", "/"))
+    # Reject hidden files, empty names, and dangerous characters
+    if not basename or basename.startswith("."):
+        basename = "upload_" + basename.lstrip(".")
+    # Replace control characters and problematic chars
+    basename = _re.sub(r"[^\w.\- ]", "_", basename)
+    # Truncate to 255 chars
+    return basename[:255]
 
 
 def _get_allowed_base_dirs() -> list[str]:

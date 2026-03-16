@@ -111,6 +111,7 @@ export default function FreshnessAlerts() {
           onClick={fetchData}
           className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           title="Refresh"
+          aria-label="Refresh freshness data"
         >
           <RefreshCw size={14} className="text-slate-400" />
         </button>
@@ -152,6 +153,7 @@ function SummaryBadge({ status, count }: { status: "fresh" | "aging" | "stale"; 
       <span
         className="w-2 h-2 rounded-full"
         style={{ backgroundColor: config.color }}
+        aria-hidden="true"
       />
       <span className={`text-xs font-medium ${config.text}`}>
         {count} {config.label}
