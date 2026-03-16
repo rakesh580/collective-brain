@@ -239,7 +239,7 @@ async def list_participants(conversation_id: str, request: Request):
                         "joined_at": p.joined_at.isoformat() if p.joined_at else None,
                     }
                 )
-        return result
+        return {"participants": result, "total": len(result)}
     finally:
         db.close()
 

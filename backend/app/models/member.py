@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Float, JSON
+from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
@@ -18,3 +19,10 @@ class MemberRecord(Base):
     last_active = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     total_contributions = Column(Float, default=0)
     metadata_json = Column(JSON, default=dict)
+
+    contributions = relationship(
+        "ContributionRecord",
+        back_populates="member",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

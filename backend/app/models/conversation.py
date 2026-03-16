@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
@@ -12,16 +13,24 @@ class ConversationRecord(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     message_count = Column(Integer, default=0)
     metadata_json = Column(JSON, default=dict)
-    owner_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    owner_user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     visibility = Column(String, default="private")  # "private", "shared", "team"
     room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)
+
+    owner = relationship("UserRecord", back_populates="conversations")
+    messages = relationship(
+        "MessageRecord",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class MessageRecord(Base):
     __tablename__ = "messages"
 
     id = Column(String, primary_key=True)
-    conversation_id = Column(String, ForeignKey("conversations.id"), index=True)
+    conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     role = Column(String, nullable=False)  # "user" or "assistant"
     content = Column(Text, nullable=False)
     sources = Column(JSON, default=list)  # serialized SourceRef list
@@ -29,6 +38,8 @@ class MessageRecord(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     sender_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     sender_name = Column(String, nullable=True)
+
+    conversation = relationship("ConversationRecord", back_populates="messages")
 
 
 class ConversationParticipant(Base):
@@ -38,7 +49,7 @@ class ConversationParticipant(Base):
     )
 
     id = Column(String, primary_key=True)
-    conversation_id = Column(String, ForeignKey("conversations.id"), index=True)
-    user_id = Column(String, ForeignKey("users.id"), index=True)
+    conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     role = Column(String, default="participant")  # "owner" or "participant"
     joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

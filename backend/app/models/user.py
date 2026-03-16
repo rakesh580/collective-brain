@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON, Text
+from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
@@ -24,3 +25,10 @@ class UserRecord(Base):
     skills = Column(JSON, default=list)
     role_title = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
+
+    conversations = relationship(
+        "ConversationRecord",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
@@ -16,14 +17,23 @@ class DiscussionThread(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+    messages = relationship(
+        "DiscussionMessage",
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 class DiscussionMessage(Base):
     __tablename__ = "discussion_messages"
 
     id = Column(String, primary_key=True)
-    thread_id = Column(String, ForeignKey("discussion_threads.id"), index=True)
+    thread_id = Column(String, ForeignKey("discussion_threads.id", ondelete="CASCADE"), index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     edited_at = Column(DateTime, nullable=True)
     parent_message_id = Column(String, ForeignKey("discussion_messages.id"), nullable=True)
+
+    thread = relationship("DiscussionThread", back_populates="messages")

@@ -266,6 +266,14 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
             .subquery()
         )
 
+        # Total count (before pagination)
+        total = (
+            db.query(func.count(ChatRoom.id))
+            .filter(ChatRoom.id.in_(user_room_ids))
+            .filter(ChatRoom.is_archived == False)  # noqa: E712
+            .scalar()
+        )
+
         # Single query: rooms + creator info + member count + last message
         rows = (
             db.query(
@@ -306,7 +314,7 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
                 "created_at": room.created_at.isoformat() if room.created_at else None,
             })
 
-        return {"rooms": result}
+        return {"rooms": result, "total": total}
     finally:
         db.close()
 
