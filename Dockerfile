@@ -9,8 +9,7 @@ COPY frontend/ .
 # All backend routes are under /api prefix to avoid collision with SPA routes
 ENV VITE_API_BASE="/api"
 # Limit Node.js memory for HuggingFace cpu-basic (2GB RAM)
-# Build stage needs more RAM for Three.js/Reagraph bundling (discarded after build)
-ENV NODE_OPTIONS="--max-old-space-size=1024"
+ENV NODE_OPTIONS="--max-old-space-size=512"
 RUN npm run build
 
 # ── Stage 2: Backend + Static Files ─────────────────────────

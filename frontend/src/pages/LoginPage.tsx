@@ -76,7 +76,11 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
       <div ref={containerRef} className={`flex justify-center ${gsiRendered ? "" : "hidden"}`}>
         <GoogleLogin
           onSuccess={onSuccess}
-          onError={onError}
+          onError={() => {
+            // GSI render failure is expected in iframe contexts — silently ignore
+            // since the custom fallback button is shown instead
+            console.info("GSI button render failed (expected in iframe); using fallback button");
+          }}
           theme="filled_black"
           size="large"
           text="continue_with"

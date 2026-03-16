@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { GraphCanvas, darkTheme, lightTheme, type GraphCanvasRef, type InternalGraphNode } from "reagraph";
 import type { GraphData, GraphNode, GraphEdge } from "../../types";
+
+let ForceGraph2D: any = null;
 
 interface Props {
   graphData: GraphData | null;
@@ -45,12 +46,11 @@ const EDGE_LEGEND = [
 ];
 
 function getCommunityColor(node: any): string {
-  const community = node.community ?? node.data?.community;
+  const community = node.community;
   if (community !== undefined && community !== null) {
     return COMMUNITY_COLORS[community % COMMUNITY_COLORS.length];
   }
-  const type = node.type ?? node.data?.type;
-  return NODE_TYPE_COLORS[type] || "#94a3b8";
+  return NODE_TYPE_COLORS[node.type] || "#94a3b8";
 }
 
 function useIsDark() {
@@ -69,17 +69,42 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   const navigate = useNavigate();
   const isDark = useIsDark();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [graphReady, setGraphReady] = useState(false);
   const [search, setSearch] = useState("");
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(new Set(["member", "topic", "artifact"]));
   const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
+  const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
+  const [hoverNode, setHoverNode] = useState<any>(null);
   const [focusMode, setFocusMode] = useState(false);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [showPhysics, setShowPhysics] = useState(false);
   const [linkDistance, setLinkDistance] = useState(120);
   const [chargeStrength, setChargeStrength] = useState(-120);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; node: any } | null>(null);
-  const graphRef = useRef<GraphCanvasRef | null>(null);
+  const fgRef = useRef<any>(null);
+  const hasAutoFit = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    import("react-force-graph-2d").then((mod) => {
+      ForceGraph2D = mod.default;
+      setGraphReady(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    hasAutoFit.current = false;
+  }, [graphData]);
+
+  // Update forces when physics params change
+  useEffect(() => {
+    if (fgRef.current) {
+      const fg = fgRef.current;
+      fg.d3Force("link")?.distance(linkDistance);
+      fg.d3Force("charge")?.strength(chargeStrength);
+      fg.d3ReheatSimulation();
+    }
+  }, [linkDistance, chargeStrength]);
 
   const nodeEdgeMap = useMemo(() => {
     if (!graphData) return new Map<string, GraphEdge[]>();
@@ -121,52 +146,83 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   useEffect(() => {
     if (!filteredData || !search.trim()) {
       setHighlightNodes(new Set());
+      setHighlightLinks(new Set());
       return;
     }
     const q = search.toLowerCase();
     const matched = new Set<string>();
+    const matchedLinks = new Set<string>();
     for (const n of filteredData.nodes) {
       if (n.label.toLowerCase().includes(q) || n.type.toLowerCase().includes(q)) {
         matched.add(n.id);
         for (const e of nodeEdgeMap.get(n.id) || []) {
+          matchedLinks.add(`${e.source}-${e.target}`);
           matched.add(e.source);
           matched.add(e.target);
         }
       }
     }
     setHighlightNodes(matched);
+    setHighlightLinks(matchedLinks);
   }, [search, filteredData, nodeEdgeMap]);
 
   const handleNodeClick = useCallback(
     (node: any) => {
-      const nodeId = node.id;
       if (graphData) {
-        const found = graphData.nodes.find((n) => n.id === nodeId);
+        const found = graphData.nodes.find((n) => n.id === node.id);
         setSelectedNode(found || null);
-        const hl = new Set<string>([nodeId]);
-        for (const e of nodeEdgeMap.get(nodeId) || []) {
+        const hl = new Set<string>([node.id]);
+        const hlLinks = new Set<string>();
+        for (const e of nodeEdgeMap.get(node.id) || []) {
           hl.add(e.source);
           hl.add(e.target);
+          hlLinks.add(`${e.source}-${e.target}`);
         }
         setHighlightNodes(hl);
+        setHighlightLinks(hlLinks);
       }
     },
     [graphData, nodeEdgeMap]
   );
 
   const handleNodeDoubleClick = useCallback((node: any) => {
-    const nodeId = node.id;
-    if (focusMode && focusNodeId === nodeId) {
+    if (focusMode && focusNodeId === node.id) {
       setFocusMode(false);
       setFocusNodeId(null);
     } else {
       setFocusMode(true);
-      setFocusNodeId(nodeId);
+      setFocusNodeId(node.id);
     }
   }, [focusMode, focusNodeId]);
 
+  const nodeColor = useCallback(
+    (node: any) => {
+      const base = getCommunityColor(node);
+      if (highlightNodes.size > 0 && !highlightNodes.has(node.id)) return base + "25";
+      return base;
+    },
+    [highlightNodes]
+  );
+
+  const linkColor = useCallback(
+    (link: any) => {
+      const style = EDGE_STYLES[link.type] || { color: "#cbd5e1" };
+      const base = style.color;
+      if (highlightLinks.size > 0) {
+        const srcId = typeof link.source === "object" ? link.source.id : link.source;
+        const tgtId = typeof link.target === "object" ? link.target.id : link.target;
+        if (!highlightLinks.has(`${srcId}-${tgtId}`) && !highlightLinks.has(`${tgtId}-${srcId}`)) {
+          return base + "15";
+        }
+      }
+      return base;
+    },
+    [highlightLinks]
+  );
+
   const clearHighlight = () => {
     setHighlightNodes(new Set());
+    setHighlightLinks(new Set());
     setSelectedNode(null);
     setSearch("");
     if (focusMode) {
@@ -184,116 +240,27 @@ export default function ForceGraphView({ graphData, loading }: Props) {
     });
   };
 
-  // Build Reagraph-compatible nodes and edges
-  const reagraphNodes = useMemo(() => {
-    if (!filteredData) return [];
-    return filteredData.nodes.map((n) => {
-      const pr = Number(n.properties?.pagerank) || 0;
-      const mc = Number(n.properties?.member_count) || 0;
-      let size = 7;
-      if (n.type === "member") {
-        size = Math.max(7, Math.min(20, 7 + pr * 400));
-      } else if (n.type === "topic") {
-        size = Math.max(5, Math.min(14, 5 + mc * 1.5));
-      } else {
-        size = Math.max(4, Math.min(10, 4 + mc));
+  // Tooltip on hover
+  const handleNodeHover = useCallback((node: any, _prevNode: any) => {
+    setHoverNode(node || null);
+    if (node && containerRef.current) {
+      // Convert graph coords to screen - approximate
+      const fg = fgRef.current;
+      if (fg) {
+        const coords = fg.graph2ScreenCoords(node.x, node.y);
+        setTooltip({
+          x: coords.x,
+          y: coords.y - 20,
+          node,
+        });
       }
-      return {
-        id: n.id,
-        label: n.label,
-        fill: getCommunityColor({ ...n, ...n.properties }),
-        size,
-        data: { ...n.properties, type: n.type, originalNode: n },
-      };
-    });
-  }, [filteredData]);
+    } else {
+      setTooltip(null);
+    }
+  }, []);
 
-  const reagraphEdges = useMemo(() => {
-    if (!filteredData) return [];
-    return filteredData.edges.map((e, i) => {
-      const style = EDGE_STYLES[e.type] || { color: "#cbd5e1", dash: [], width: 0.8 };
-      return {
-        id: `${e.source}-${e.target}-${i}`,
-        source: e.source,
-        target: e.target,
-        label: e.label || e.type.replace(/_/g, " ").toLowerCase(),
-        fill: style.color,
-        size: style.width,
-        data: { type: e.type, weight: e.weight },
-      };
-    });
-  }, [filteredData]);
-
-  // Compute selections and actives for Reagraph
-  const selections = useMemo(() => {
-    if (selectedNode) return [selectedNode.id];
-    return [];
-  }, [selectedNode]);
-
-  const actives = useMemo(() => {
-    if (highlightNodes.size > 0) return Array.from(highlightNodes);
-    return [];
-  }, [highlightNodes]);
-
-  // Custom theme based on dark mode
-  const theme = useMemo(() => {
-    const base = isDark ? darkTheme : lightTheme;
-    return {
-      ...base,
-      canvas: {
-        background: isDark ? "#0f172a" : "#f8fafc",
-        fog: isDark ? "#0f172a" : "#f8fafc",
-      },
-      node: {
-        ...base.node,
-        fill: "#6366f1",
-        activeFill: "#818cf8",
-        opacity: 1,
-        selectedOpacity: 1,
-        inactiveOpacity: 0.15,
-        label: {
-          ...base.node.label,
-          color: isDark ? "#e2e8f0" : "#1e293b",
-          activeColor: isDark ? "#f1f5f9" : "#0f172a",
-          stroke: isDark ? "#0f172a" : "#f8fafc",
-        },
-      },
-      edge: {
-        ...base.edge,
-        fill: "#94a3b8",
-        activeFill: "#6366f1",
-        opacity: 0.6,
-        selectedOpacity: 1,
-        inactiveOpacity: 0.1,
-        label: {
-          ...base.edge.label,
-          color: isDark ? "#94a3b8" : "#64748b",
-          activeColor: isDark ? "#e2e8f0" : "#1e293b",
-          stroke: isDark ? "#0f172a" : "#f8fafc",
-          fontSize: 3,
-        },
-      },
-      ring: {
-        fill: "#6366f1",
-        activeFill: "#818cf8",
-      },
-      arrow: {
-        fill: "#94a3b8",
-        activeFill: "#6366f1",
-      },
-      cluster: {
-        stroke: isDark ? "#334155" : "#cbd5e1",
-        fill: isDark ? "#1e293b" : "#f1f5f9",
-        opacity: 0.2,
-        selectedOpacity: 0.5,
-        inactiveOpacity: 0.05,
-        label: {
-          color: isDark ? "#94a3b8" : "#64748b",
-          stroke: isDark ? "#0f172a" : "#f8fafc",
-        },
-      },
-    };
-  }, [isDark]);
+  const labelColor = isDark ? "#e2e8f0" : "#1e293b";
+  const dimLabelColor = isDark ? "#64748b" : "#94a3b8";
 
   if (loading) {
     return (
@@ -322,6 +289,17 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   const topicCount = graphData.nodes.filter((n) => n.type === "topic").length;
   const artifactCount = graphData.nodes.filter((n) => n.type === "artifact").length;
   const counts: Record<string, number> = { member: memberCount, topic: topicCount, artifact: artifactCount };
+
+  const fgData = filteredData
+    ? {
+        nodes: filteredData.nodes.map((n) => ({
+          id: n.id, label: n.label, type: n.type, size: n.size, ...n.properties,
+        })),
+        links: filteredData.edges.map((e) => ({
+          source: e.source, target: e.target, type: e.type, weight: e.weight, label: e.label,
+        })),
+      }
+    : { nodes: [], links: [] };
 
   const selectedNodeEdges = selectedNode ? (nodeEdgeMap.get(selectedNode.id) || []) : [];
   const connectedNodes = selectedNode
@@ -457,17 +435,17 @@ export default function ForceGraphView({ graphData, loading }: Props) {
 
         {/* Zoom controls */}
         <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-0.5 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
-          <button onClick={() => graphRef.current?.zoomIn()} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-xl text-sm font-bold">+</button>
+          <button onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 300)} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-xl text-sm font-bold">+</button>
           <div className="border-t border-slate-100 dark:border-slate-700" />
-          <button onClick={() => graphRef.current?.zoomOut()} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-bold">&minus;</button>
+          <button onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.3, 300)} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-bold">&minus;</button>
           <div className="border-t border-slate-100 dark:border-slate-700" />
-          <button onClick={() => graphRef.current?.fitNodesInView()} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-xl text-xs font-semibold">Fit</button>
+          <button onClick={() => fgRef.current?.zoomToFit(400, 60)} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-xl text-xs font-semibold">Fit</button>
         </div>
 
-        {/* Node/edge count */}
+        {/* Node/edge count + focus mode badge */}
         <div className="absolute top-4 right-4 z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-700 shadow-lg">
           <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-            {reagraphNodes.length} nodes &middot; {reagraphEdges.length} edges
+            {fgData.nodes.length} nodes &middot; {fgData.links.length} edges
           </p>
           <p className="text-[9px] text-slate-400 mt-0.5">Double-click to focus</p>
         </div>
@@ -482,23 +460,23 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             }}
           >
             <p className="font-bold text-sm">{tooltip.node.label}</p>
-            <p className="text-slate-400 text-[10px] capitalize">{tooltip.node.data?.type || ""}</p>
-            {(tooltip.node.data?.pagerank || 0) > 0 && (
+            <p className="text-slate-400 text-[10px] capitalize">{tooltip.node.type}</p>
+            {tooltip.node.pagerank > 0 && (
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="text-slate-400">PageRank:</span>
-                <span className="font-mono text-indigo-300">{(tooltip.node.data.pagerank * 100).toFixed(1)}</span>
+                <span className="font-mono text-indigo-300">{(tooltip.node.pagerank * 100).toFixed(1)}</span>
               </div>
             )}
-            {(tooltip.node.data?.total_contributions || 0) > 0 && (
+            {tooltip.node.total_contributions > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400">Contributions:</span>
-                <span className="font-mono text-emerald-300">{tooltip.node.data.total_contributions}</span>
+                <span className="font-mono text-emerald-300">{tooltip.node.total_contributions}</span>
               </div>
             )}
-            {(tooltip.node.data?.member_count || 0) > 0 && (
+            {tooltip.node.member_count > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400">Members:</span>
-                <span className="font-mono text-amber-300">{tooltip.node.data.member_count}</span>
+                <span className="font-mono text-amber-300">{tooltip.node.member_count}</span>
               </div>
             )}
             <div className="flex items-center gap-1.5">
@@ -508,55 +486,230 @@ export default function ForceGraphView({ graphData, loading }: Props) {
           </div>
         )}
 
-        {/* Reagraph Canvas */}
-        <div className="w-full h-full">
-          <GraphCanvas
-            ref={graphRef}
-            nodes={reagraphNodes}
-            edges={reagraphEdges}
-            theme={theme}
-            layoutType="forceDirected2d"
-            layoutOverrides={{
-              linkDistance,
-              nodeStrength: chargeStrength,
+        {/* Force Graph */}
+        {graphReady && ForceGraph2D && (
+          <ForceGraph2D
+            ref={fgRef}
+            graphData={fgData}
+            nodeColor={nodeColor}
+            nodeVal={(node: any) => Math.max((node.size || 1) * 2 + 3, 5)}
+            warmupTicks={50}
+            nodeLabel=""
+            linkColor={linkColor}
+            linkWidth={(link: any) => {
+              const srcId = typeof link.source === "object" ? link.source.id : link.source;
+              const tgtId = typeof link.target === "object" ? link.target.id : link.target;
+              const isHighlighted = highlightLinks.has(`${srcId}-${tgtId}`) || highlightLinks.has(`${tgtId}-${srcId}`);
+              const style = EDGE_STYLES[link.type] || { width: 0.8 };
+              return isHighlighted ? style.width * 2.5 : style.width * 0.7;
             }}
-            labelType="auto"
-            edgeLabelPosition="inline"
-            edgeArrowPosition="end"
-            edgeInterpolation="curved"
-            draggable
-            animated
-            sizingType="attribute"
-            sizingAttribute="size"
-            defaultNodeSize={7}
-            minNodeSize={4}
-            maxNodeSize={20}
-            selections={selections}
-            actives={actives}
-            onNodeClick={(node: InternalGraphNode) => {
-              handleNodeClick(node);
+            linkLineDash={(link: any) => {
+              const style = EDGE_STYLES[link.type];
+              return style?.dash.length ? style.dash : null;
             }}
-            onNodeDoubleClick={(node: InternalGraphNode) => {
-              handleNodeDoubleClick(node);
+            linkDirectionalParticles={(link: any) => {
+              const srcId = typeof link.source === "object" ? link.source.id : link.source;
+              const tgtId = typeof link.target === "object" ? link.target.id : link.target;
+              return (highlightLinks.has(`${srcId}-${tgtId}`) || highlightLinks.has(`${tgtId}-${srcId}`)) ? 4 : 0;
             }}
-            onNodePointerOver={(node: InternalGraphNode, event: any) => {
-              const rect = containerRef.current?.getBoundingClientRect();
-              if (rect && event?.nativeEvent) {
-                setTooltip({
-                  x: event.nativeEvent.clientX - rect.left,
-                  y: event.nativeEvent.clientY - rect.top - 20,
-                  node,
-                });
+            linkDirectionalParticleWidth={2.5}
+            linkDirectionalParticleSpeed={0.005}
+            linkDirectionalParticleColor={linkColor}
+            onNodeClick={handleNodeClick}
+            onNodeHover={handleNodeHover}
+            onNodeDblClick={handleNodeDoubleClick}
+            onBackgroundClick={clearHighlight}
+            onBackgroundRightClick={() => { if (focusMode) { setFocusMode(false); setFocusNodeId(null); }}}
+            onEngineStop={() => {
+              if (!hasAutoFit.current && fgRef.current) {
+                fgRef.current.zoomToFit(400, 80);
+                hasAutoFit.current = true;
               }
             }}
-            onNodePointerOut={() => {
-              setTooltip(null);
+            cooldownTicks={120}
+            d3AlphaDecay={0.02}
+            d3VelocityDecay={0.25}
+            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+              // Guard against non-finite coordinates during force simulation init
+              if (!isFinite(node.x) || !isFinite(node.y)) return;
+
+              const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node.id);
+              const isHovered = hoverNode?.id === node.id;
+              const isFocused = focusNodeId === node.id;
+              const color = getCommunityColor(node);
+              const alpha = isHighlighted ? 1 : 0.15;
+
+              ctx.globalAlpha = alpha;
+
+              if (node.type === "member") {
+                const pr = node.pagerank || 0;
+                const baseRadius = 12;
+                const radius = Math.max(baseRadius, Math.min(24, baseRadius + pr * 600));
+
+                // Glow ring for focused/hovered
+                if (isHovered || isFocused) {
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, radius + 6, 0, 2 * Math.PI);
+                  ctx.fillStyle = color + "20";
+                  ctx.fill();
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, radius + 3, 0, 2 * Math.PI);
+                  ctx.fillStyle = color + "35";
+                  ctx.fill();
+                }
+
+                // Gradient fill
+                const grad = ctx.createRadialGradient(
+                  node.x - radius * 0.3, node.y - radius * 0.3, 0,
+                  node.x, node.y, radius
+                );
+                grad.addColorStop(0, color + "ee");
+                grad.addColorStop(1, color);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // White border
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5 / globalScale;
+                ctx.stroke();
+
+                // Initials
+                const initials = node.label.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                const fontSize = Math.max(radius * 0.65, 4);
+                ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(initials, node.x, node.y);
+
+                // Label below
+                const labelSize = Math.max(11 / globalScale, 3);
+                ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "600" : "500"} ${labelSize}px Inter, system-ui, sans-serif`;
+                ctx.textBaseline = "top";
+                ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
+                ctx.fillText(node.label, node.x, node.y + radius + 4 / globalScale);
+
+              } else if (node.type === "topic") {
+                // Topics: Hexagon
+                const baseSize = 8;
+                const size = Math.max(baseSize, Math.min(16, baseSize + (node.member_count || 0) * 2));
+
+                if (isHovered) {
+                  ctx.beginPath();
+                  for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i - Math.PI / 6;
+                    const x = node.x + (size + 5) * Math.cos(angle);
+                    const y = node.y + (size + 5) * Math.sin(angle);
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                  }
+                  ctx.closePath();
+                  ctx.fillStyle = color + "15";
+                  ctx.fill();
+                }
+
+                // Gradient fill
+                const grad = ctx.createRadialGradient(
+                  node.x, node.y - size * 0.2, 0,
+                  node.x, node.y, size
+                );
+                grad.addColorStop(0, color + "dd");
+                grad.addColorStop(1, color);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                  const angle = (Math.PI / 3) * i - Math.PI / 6;
+                  const x = node.x + size * Math.cos(angle);
+                  const y = node.y + size * Math.sin(angle);
+                  i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1.5 / globalScale;
+                ctx.stroke();
+
+                // Member count badge
+                if ((node.member_count || 0) > 1) {
+                  const bx = node.x + size - 2;
+                  const by = node.y - size + 2;
+                  ctx.fillStyle = "#f59e0b";
+                  ctx.beginPath();
+                  ctx.arc(bx, by, 5, 0, 2 * Math.PI);
+                  ctx.fill();
+                  ctx.fillStyle = "#fff";
+                  ctx.font = `bold ${6}px Inter, system-ui, sans-serif`;
+                  ctx.textAlign = "center";
+                  ctx.textBaseline = "middle";
+                  ctx.fillText(String(node.member_count), bx, by);
+                }
+
+                // Label
+                const labelSize = Math.max(9 / globalScale, 2.5);
+                ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "600" : "400"} ${labelSize}px Inter, system-ui, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+                ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
+                ctx.fillText(node.label, node.x, node.y + size + 3 / globalScale);
+
+              } else {
+                // Artifacts: Rounded square with icon
+                const baseSize = 6;
+                const size = Math.max(baseSize, Math.min(12, baseSize + (node.member_count || 0)));
+                const r = 2 / globalScale;
+
+                if (isHovered) {
+                  ctx.fillStyle = color + "15";
+                  ctx.beginPath();
+                  ctx.roundRect(node.x - size - 4, node.y - size - 4, (size + 4) * 2, (size + 4) * 2, r + 2);
+                  ctx.fill();
+                }
+
+                const grad = ctx.createRadialGradient(
+                  node.x, node.y - size * 0.2, 0,
+                  node.x, node.y, size * 1.4
+                );
+                grad.addColorStop(0, color + "dd");
+                grad.addColorStop(1, color);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.roundRect(node.x - size, node.y - size, size * 2, size * 2, r);
+                ctx.fill();
+
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1 / globalScale;
+                ctx.stroke();
+
+                // File icon inside
+                const iconSize = size * 0.6;
+                ctx.fillStyle = "#ffffff80";
+                ctx.fillRect(node.x - iconSize * 0.4, node.y - iconSize * 0.5, iconSize * 0.8, iconSize);
+                ctx.fillRect(node.x - iconSize * 0.5, node.y - iconSize * 0.3, iconSize, iconSize * 0.15);
+                ctx.fillRect(node.x - iconSize * 0.5, node.y + iconSize * 0.05, iconSize, iconSize * 0.15);
+
+                // Label
+                const labelSize = Math.max(8 / globalScale, 2);
+                ctx.font = `400 ${labelSize}px Inter, system-ui, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+                ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
+                const truncLabel = node.label.length > 20 ? node.label.slice(0, 18) + "…" : node.label;
+                ctx.fillText(truncLabel, node.x, node.y + size + 3 / globalScale);
+              }
+
+              ctx.globalAlpha = 1;
             }}
-            onCanvasClick={() => {
-              clearHighlight();
+            nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
+              const radius = node.type === "member" ? 16 : node.type === "topic" ? 12 : 10;
+              ctx.fillStyle = color;
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+              ctx.fill();
             }}
           />
-        </div>
+        )}
       </div>
 
       {/* Node detail panel */}
