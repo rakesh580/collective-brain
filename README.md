@@ -1,3 +1,12 @@
+---
+title: Collective Brain
+emoji: 🧠
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 <div align="center">
 
 # :brain: Collective Brain
