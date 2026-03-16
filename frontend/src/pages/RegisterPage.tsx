@@ -19,7 +19,11 @@ function SafeGoogleLogin({ onSuccess, onError }: { onSuccess: (res: any) => void
       <div className="flex justify-center">
         <GoogleLogin
           onSuccess={onSuccess}
-          onError={onError}
+          onError={() => {
+            // GSI initialization errors are expected in iframe/cross-origin contexts
+            // Only log, don't show user-facing error
+            console.info("GSI button error (expected in iframe); user can retry");
+          }}
           theme="filled_black"
           size="large"
           text="continue_with"

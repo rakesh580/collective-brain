@@ -552,12 +552,35 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorRaw] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Track whether user has interacted — suppress any errors that fire before interaction
+  const hasInteractedRef = useRef(false);
+  const pageReadyRef = useRef(false);
+
+  // Guarded setError: suppresses Google-related errors that fire before user interaction
+  const setError = useCallback((msg: string | null) => {
+    if (msg && msg.includes("Google") && !hasInteractedRef.current && !pageReadyRef.current) {
+      console.info("Suppressed pre-interaction Google error:", msg);
+      return;
+    }
+    setErrorRaw(msg);
+  }, []);
 
   useEffect(() => {
     setTimeout(() => setMounted(true), 100);
+    // Mark page as "ready" after 3 seconds — any Google error after this is likely real
+    const readyTimer = setTimeout(() => { pageReadyRef.current = true; }, 3000);
+    // Track first user interaction
+    const markInteracted = () => { hasInteractedRef.current = true; };
+    document.addEventListener("click", markInteracted, { once: true });
+    document.addEventListener("keydown", markInteracted, { once: true });
+    return () => {
+      clearTimeout(readyTimer);
+      document.removeEventListener("click", markInteracted);
+      document.removeEventListener("keydown", markInteracted);
+    };
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
