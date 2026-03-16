@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GoogleLogin, useGoogleLogin } from "@react-oauth/google";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
 import { useGoogleAuthEnabled } from "../hooks/useGoogleAuth";
 import { LogIn, Brain, Sparkles, Users, Network, Zap } from "lucide-react";
@@ -25,7 +25,78 @@ function useIsIframe() {
   return isIframe;
 }
 
-/* ── Google Login wrapper with fallback for iframe contexts ── */
+/**
+ * Open Google OAuth popup manually — no GSI library dependency.
+ * This avoids all the initTokenClient/error_callback issues in iframe contexts.
+ */
+function openGoogleOAuthPopup(clientId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const redirectUri = window.location.origin;
+    const scope = "openid email profile";
+    const state = Math.random().toString(36).substring(2);
+    const nonce = Math.random().toString(36).substring(2);
+
+    const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("response_type", "token");
+    authUrl.searchParams.set("scope", scope);
+    authUrl.searchParams.set("state", state);
+    authUrl.searchParams.set("nonce", nonce);
+    authUrl.searchParams.set("prompt", "select_account");
+
+    const width = 500, height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    const popup = window.open(
+      authUrl.toString(),
+      "google-auth",
+      `width=${width},height=${height},left=${left},top=${top},popup=yes`
+    );
+
+    if (!popup) {
+      reject(new Error("Popup was blocked by the browser"));
+      return;
+    }
+
+    // Poll the popup for the redirect with the access token
+    const interval = setInterval(() => {
+      try {
+        if (popup.closed) {
+          clearInterval(interval);
+          reject(new Error("Popup was closed"));
+          return;
+        }
+        // When the popup redirects back to our origin, we can read its URL
+        const popupUrl = popup.location.href;
+        if (popupUrl.startsWith(redirectUri)) {
+          clearInterval(interval);
+          popup.close();
+          // Extract access_token from the URL fragment
+          const hash = new URL(popupUrl).hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get("access_token");
+          if (accessToken) {
+            resolve(accessToken);
+          } else {
+            reject(new Error(params.get("error") || "No access token received"));
+          }
+        }
+      } catch {
+        // Cross-origin error — popup hasn't redirected back yet, keep polling
+      }
+    }, 200);
+
+    // Timeout after 2 minutes
+    setTimeout(() => {
+      clearInterval(interval);
+      if (!popup.closed) popup.close();
+      reject(new Error("Authentication timed out"));
+    }, 120000);
+  });
+}
+
+/* ── Google Login wrapper ── */
 function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
   onSuccess: (res: any) => void;
   onError: () => void;
@@ -33,42 +104,22 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
 }) {
   const enabled = useGoogleAuthEnabled();
   const isIframe = useIsIframe();
-  // Track whether the user has actually clicked the Google button
-  const userClickedRef = useRef(false);
 
-  // Implicit flow via popup — works in both iframe and direct contexts
-  const googleLoginImplicit = useGoogleLogin({
-    flow: "implicit",
-    onSuccess: (tokenResponse) => {
-      userClickedRef.current = false;
-      if (tokenResponse.access_token) {
-        onAccessTokenSuccess(tokenResponse.access_token);
-      } else {
-        console.error("Google login: no access_token in response", tokenResponse);
-        onError();
-      }
-    },
-    onError: (errorResponse) => {
-      console.error("Google login error:", errorResponse);
-      if (userClickedRef.current) {
-        userClickedRef.current = false;
-        onError();
-      }
-    },
-    onNonOAuthError: (error) => {
-      console.info("Google login non-OAuth event (popup closed/blocked):", error);
-      if (userClickedRef.current) {
-        userClickedRef.current = false;
-        onError();
-      }
-    },
-    scope: "openid email profile",
-  });
-
-  const handleGoogleClick = useCallback(() => {
-    userClickedRef.current = true;
-    googleLoginImplicit();
-  }, [googleLoginImplicit]);
+  const handleGoogleClick = useCallback(async () => {
+    const clientId = (window as any).__GOOGLE_CLIENT_ID__;
+    if (!clientId) {
+      console.error("Google client ID not available");
+      onError();
+      return;
+    }
+    try {
+      const accessToken = await openGoogleOAuthPopup(clientId);
+      onAccessTokenSuccess(accessToken);
+    } catch (err) {
+      console.error("Google OAuth popup error:", err);
+      onError();
+    }
+  }, [onError, onAccessTokenSuccess]);
 
   if (!enabled) return null;
 
@@ -80,13 +131,12 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
         <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
       </div>
 
-      {/* In direct access (not iframe), try the official GSI button first */}
+      {/* In direct access (not iframe), also show official GSI button */}
       {!isIframe && (
         <div className="flex justify-center">
           <GoogleLogin
             onSuccess={onSuccess}
             onError={() => {
-              // GSI render failure — silently ignore, custom button below is always available
               console.info("GSI button render failed; custom button is available");
             }}
             theme="filled_black"
@@ -97,7 +147,7 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
         </div>
       )}
 
-      {/* Custom styled button — always available; primary button in iframe context */}
+      {/* Custom styled button — works in all contexts via manual OAuth popup */}
       <button
         type="button"
         onClick={handleGoogleClick}
