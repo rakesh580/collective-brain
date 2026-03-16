@@ -24,7 +24,7 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
   onAccessTokenSuccess: (accessToken: string) => void;
 }) {
   const enabled = useGoogleAuthEnabled();
-  const [showFallback, setShowFallback] = useState(false);
+  const [gsiRendered, setGsiRendered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fallback: use useGoogleLogin with implicit flow (works in iframes)
@@ -35,13 +35,13 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
     onError: () => onError(),
   });
 
+  // Check if GSI button rendered successfully (it won't in iframe contexts)
   useEffect(() => {
     if (!enabled) return;
-    // After 2s, check if the GSI button actually rendered (has visible iframe)
     const timer = setTimeout(() => {
       const iframe = containerRef.current?.querySelector("iframe");
-      if (!iframe || iframe.clientHeight === 0) {
-        setShowFallback(true);
+      if (iframe && iframe.clientHeight > 0) {
+        setGsiRendered(true);
       }
     }, 2000);
     return () => clearTimeout(timer);
@@ -49,19 +49,16 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
 
   if (!enabled) return null;
 
-  const divider = (
-    <div className="flex items-center gap-4 my-5">
-      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
-      <span className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-medium">or</span>
-      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
-    </div>
-  );
-
   return (
     <>
-      {divider}
-      {/* Try official Google button first (hidden if it fails to render) */}
-      <div ref={containerRef} className={`flex justify-center ${showFallback ? "hidden" : ""}`}>
+      <div className="flex items-center gap-4 my-5">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
+        <span className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-medium">or</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
+      </div>
+
+      {/* Official GSI button — only visible when it actually renders (direct access, not iframe) */}
+      <div ref={containerRef} className={`flex justify-center ${gsiRendered ? "" : "hidden"}`}>
         <GoogleLogin
           onSuccess={onSuccess}
           onError={onError}
@@ -71,37 +68,50 @@ function SafeGoogleLogin({ onSuccess, onError, onAccessTokenSuccess }: {
           shape="pill"
         />
       </div>
-      {/* Fallback custom button — always works, even in iframes */}
-      {showFallback && (
+
+      {/* Custom button — shown by default, hidden only if GSI renders successfully */}
+      {!gsiRendered && (
         <button
           type="button"
           onClick={() => googleLoginImplicit()}
-          className="w-full relative flex items-center justify-center gap-3 py-3 px-4 rounded-xl
-            border border-slate-600/40 text-white font-medium cursor-pointer
-            transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-500/10
+          className="w-full relative flex items-center justify-center gap-3 py-3.5 px-5 rounded-xl
+            text-white font-medium cursor-pointer
+            transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/15
             overflow-hidden group/google"
           style={{
-            background: "linear-gradient(135deg, rgba(30,27,55,0.95) 0%, rgba(40,35,70,0.9) 100%)",
-            boxShadow: "0 2px 12px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.05)",
+            background: "linear-gradient(135deg, rgba(25,22,50,0.95) 0%, rgba(35,30,65,0.95) 50%, rgba(30,25,55,0.95) 100%)",
+            border: "1px solid rgba(99,102,241,0.2)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
           }}
         >
-          {/* Subtle shimmer on hover */}
+          {/* Animated gradient border glow */}
+          <div
+            className="absolute -inset-[1px] rounded-xl opacity-0 group-hover/google:opacity-100 transition-opacity duration-500 blur-[0.5px]"
+            style={{
+              background: "linear-gradient(135deg, rgba(99,102,241,0.4), rgba(139,92,246,0.3), rgba(99,102,241,0.4))",
+            }}
+          />
+          {/* Inner background to cover the border glow */}
+          <div
+            className="absolute inset-[1px] rounded-[11px]"
+            style={{
+              background: "linear-gradient(135deg, rgba(25,22,50,0.98) 0%, rgba(35,30,65,0.98) 50%, rgba(30,25,55,0.98) 100%)",
+            }}
+          />
+          {/* Shimmer sweep on hover */}
           <div
             className="absolute inset-0 opacity-0 group-hover/google:opacity-100 transition-opacity duration-500"
             style={{
-              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)",
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%)",
               animation: "shimmer 2s infinite",
             }}
           />
-          {/* Glowing border on hover */}
-          <div className="absolute inset-0 rounded-xl opacity-0 group-hover/google:opacity-100 transition-opacity duration-300"
-            style={{ boxShadow: "inset 0 0 0 1px rgba(99,102,241,0.3)" }}
-          />
+          {/* Button content */}
           <div className="relative z-10 flex items-center justify-center gap-3">
-            <div className="w-5 h-5 flex items-center justify-center rounded-full bg-white/10 p-0.5">
+            <div className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.08] backdrop-blur-sm border border-white/[0.06]">
               <GoogleIcon />
             </div>
-            <span className="text-sm">Continue with Google</span>
+            <span className="text-sm tracking-wide">Continue with Google</span>
           </div>
         </button>
       )}
