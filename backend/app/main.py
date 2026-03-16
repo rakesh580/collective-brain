@@ -28,8 +28,17 @@ import logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s",
-    defaults={"request_id": "-"},
 )
+# Inject default request_id into all log records (compatible with Python 3.11)
+_old_factory = logging.getLogRecordFactory()
+
+def _record_factory(*args, **kwargs):
+    record = _old_factory(*args, **kwargs)
+    if not hasattr(record, "request_id"):
+        record.request_id = "-"
+    return record
+
+logging.setLogRecordFactory(_record_factory)
 logger = logging.getLogger("collective_brain")
 
 
