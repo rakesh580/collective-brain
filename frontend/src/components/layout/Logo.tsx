@@ -1,4 +1,9 @@
-export function LogoIcon({ size = 32, className = "" }: { size?: number; className?: string }) {
+export interface LogoIconProps {
+  size?: number;
+  className?: string;
+}
+
+export function LogoIcon({ size = 32, className = "" }: LogoIconProps) {
   return (
     <svg
       width={size}
@@ -79,7 +84,11 @@ export function LogoIcon({ size = 32, className = "" }: { size?: number; classNa
   );
 }
 
-export function LogoFull({ collapsed = false }: { collapsed?: boolean }) {
+export interface LogoFullProps {
+  collapsed?: boolean;
+}
+
+export function LogoFull({ collapsed = false }: LogoFullProps) {
   return (
     <div className="flex items-center gap-2.5">
       <LogoIcon size={36} />

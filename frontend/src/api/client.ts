@@ -47,7 +47,7 @@ import type {
   HealthPrediction,
 } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
 function getAuthToken(): string | null {
   return localStorage.getItem("cb_token");

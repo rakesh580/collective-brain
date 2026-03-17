@@ -77,7 +77,11 @@ function Sparkline({ values, width = 60, height = 20 }: { values: number[]; widt
 }
 
 /* ── Main Component ── */
-export default function HeatmapView() {
+export interface HeatmapViewProps {
+  className?: string;
+}
+
+export default function HeatmapView(_props?: HeatmapViewProps) {
   const navigate = useNavigate();
   const isDark = useIsDark();
   const [data, setData] = useState<ExpertiseMatrixData | null>(null);

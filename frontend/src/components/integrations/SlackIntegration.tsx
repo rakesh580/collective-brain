@@ -9,7 +9,11 @@ import {
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export default function SlackIntegration() {
+export interface SlackIntegrationProps {
+  className?: string;
+}
+
+export default function SlackIntegration(_props?: SlackIntegrationProps) {
   const [configured, setConfigured] = useState<boolean | null>(null); // null = loading
   const [workspaces, setWorkspaces] = useState<SlackWorkspace[]>([]);
   const [channels, setChannels] = useState<SlackChannel[]>([]);

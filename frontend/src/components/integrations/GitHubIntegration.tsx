@@ -54,7 +54,11 @@ function timeAgo(dateStr: string | null): string {
   return `${days}d ago`;
 }
 
-export default function GitHubIntegration() {
+export interface GitHubIntegrationProps {
+  className?: string;
+}
+
+export default function GitHubIntegration(_props?: GitHubIntegrationProps) {
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [events, setEvents] = useState<GitHubEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);

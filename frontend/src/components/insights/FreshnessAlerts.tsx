@@ -26,7 +26,11 @@ function getSourceBadgeStyle(sourceType: string): string {
   return styles[sourceType] || "bg-slate-100 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300";
 }
 
-export default function FreshnessAlerts() {
+export interface FreshnessAlertsProps {
+  className?: string;
+}
+
+export default function FreshnessAlerts(_props?: FreshnessAlertsProps) {
   const [report, setReport] = useState<FreshnessReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

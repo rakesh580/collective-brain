@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     # GitHub Webhook Integration (set via CB_GITHUB_WEBHOOK_SECRET)
     github_webhook_secret: str = ""
 
+    # Logging
+    log_level: str = "INFO"
+
     @property
     def effective_database_url(self) -> str:
         """Return database_url if explicitly set, else sqlite_url as fallback."""

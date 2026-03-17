@@ -3,7 +3,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -25,10 +25,8 @@ from app.routers import (
 
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s",
-)
+from pythonjsonlogger import jsonlogger
+
 # Inject default request_id into all log records (compatible with Python 3.11)
 _old_factory = logging.getLogRecordFactory()
 
@@ -39,6 +37,26 @@ def _record_factory(*args, **kwargs):
     return record
 
 logging.setLogRecordFactory(_record_factory)
+
+# Configure logging: JSON format for production, text for development
+_log_level = os.environ.get("CB_LOG_LEVEL", "INFO").upper()
+_dev_mode = os.environ.get("CB_DEV_MODE", "") == "1"
+
+if _dev_mode:
+    _formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s"
+    )
+else:
+    _formatter = jsonlogger.JsonFormatter(
+        fmt="%(asctime)s %(levelname)s %(name)s %(request_id)s %(message)s",
+        rename_fields={"asctime": "timestamp", "levelname": "level"},
+    )
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_formatter)
+
+logging.basicConfig(level=getattr(logging, _log_level, logging.INFO), handlers=[_handler])
+
 logger = logging.getLogger("collective_brain")
 
 
@@ -202,6 +220,23 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
+# ── Deprecation Header for non-versioned /api/* routes ──
+class DeprecationMiddleware(BaseHTTPMiddleware):
+    """Add Deprecation header to legacy /api/* routes (not /api/v1/*)."""
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: StarletteResponse = await call_next(request)
+        path = request.url.path
+        if path.startswith("/api/") and not path.startswith("/api/v1/"):
+            response.headers["Deprecation"] = "true"
+            response.headers["Sunset"] = "2026-12-31"
+            response.headers["Link"] = '</api/v1/>; rel="successor-version"'
+        return response
+
+
+app.add_middleware(DeprecationMiddleware)
+
+
 # ── Request ID Tracing Middleware ──
 import contextvars
 
@@ -257,23 +292,44 @@ async def global_exception_handler(request, exc):
     )
 
 
-# Routers — all under /api prefix so they don't collide with SPA routes
-app.include_router(health.router, prefix="/api/health", tags=["health"])
-app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
-app.include_router(query.router, prefix="/api", tags=["query"])
-app.include_router(members.router, prefix="/api/members", tags=["members"])
-app.include_router(insights.router, prefix="/api/insights", tags=["insights"])
-app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
-app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
-app.include_router(artifacts.router, prefix="/api/artifacts", tags=["artifacts"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
-app.include_router(search.router, prefix="/api/search", tags=["search"])
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(discussions.router, prefix="/api/discussions", tags=["discussions"])
-app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
-app.include_router(slack.router, prefix="/api/slack", tags=["slack"])
-app.include_router(github_webhooks.router, prefix="/api/github", tags=["github"])
-app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"])
+# ── Versioned API (v1) ──
+# All routers are included under /api/v1 as the preferred prefix.
+api_v1 = APIRouter(prefix="/api/v1")
+api_v1.include_router(health.router, prefix="/health", tags=["health"])
+api_v1.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
+api_v1.include_router(query.router, tags=["query"])
+api_v1.include_router(members.router, prefix="/members", tags=["members"])
+api_v1.include_router(insights.router, prefix="/insights", tags=["insights"])
+api_v1.include_router(graph.router, prefix="/graph", tags=["graph"])
+api_v1.include_router(conversations.router, prefix="/conversations", tags=["conversations"])
+api_v1.include_router(artifacts.router, prefix="/artifacts", tags=["artifacts"])
+api_v1.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_v1.include_router(search.router, prefix="/search", tags=["search"])
+api_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_v1.include_router(discussions.router, prefix="/discussions", tags=["discussions"])
+api_v1.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
+api_v1.include_router(slack.router, prefix="/slack", tags=["slack"])
+api_v1.include_router(github_webhooks.router, prefix="/github", tags=["github"])
+api_v1.include_router(expert_routing.router, prefix="/experts", tags=["experts"])
+app.include_router(api_v1)
+
+# ── Legacy /api/* routes (backward compatibility, deprecated) ──
+app.include_router(health.router, prefix="/api/health", tags=["health"], deprecated=True)
+app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"], deprecated=True)
+app.include_router(query.router, prefix="/api", tags=["query"], deprecated=True)
+app.include_router(members.router, prefix="/api/members", tags=["members"], deprecated=True)
+app.include_router(insights.router, prefix="/api/insights", tags=["insights"], deprecated=True)
+app.include_router(graph.router, prefix="/api/graph", tags=["graph"], deprecated=True)
+app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"], deprecated=True)
+app.include_router(artifacts.router, prefix="/api/artifacts", tags=["artifacts"], deprecated=True)
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"], deprecated=True)
+app.include_router(search.router, prefix="/api/search", tags=["search"], deprecated=True)
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"], deprecated=True)
+app.include_router(discussions.router, prefix="/api/discussions", tags=["discussions"], deprecated=True)
+app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], deprecated=True)
+app.include_router(slack.router, prefix="/api/slack", tags=["slack"], deprecated=True)
+app.include_router(github_webhooks.router, prefix="/api/github", tags=["github"], deprecated=True)
+app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"], deprecated=True)
 
 # ── Serve frontend static files in production ──
 _static_dir = Path(__file__).resolve().parent.parent / "static"
