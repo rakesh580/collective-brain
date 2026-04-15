@@ -46,20 +46,23 @@ def _requires_db():
 
 @pytest.fixture
 def db_session():
-    """Real PostgreSQL session for unit tests that need it."""
+    """Real PostgreSQL session for unit tests — uses nested transaction for isolation."""
     _requires_db()
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     url = os.environ["CB_DATABASE_URL"]
     engine = create_engine(url, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
+    conn = engine.connect()
+    trans = conn.begin()
+    Session = sessionmaker(bind=conn)
     session = Session()
     try:
         yield session
-        session.rollback()  # Roll back after each test — keeps DB clean
     finally:
         session.close()
+        trans.rollback()  # Roll back everything — each test gets clean slate
+        conn.close()
         engine.dispose()
 
 
@@ -80,6 +83,101 @@ def vector_store(db_session):
     from sqlalchemy import text
 
     db_session.execute(text("DELETE FROM knowledge_embeddings"))
+    # Ensure parent artifacts exist for FK references in tests
+    db_session.execute(
+        text(
+            "INSERT INTO artifacts (id, source_type, source_path, title, ingested_at, chunk_count, member_ids) "
+            "VALUES (:id, :st, :sp, :t, now(), 0, '[]') ON CONFLICT (id) DO NOTHING"
+        ),
+        [
+            {"id": "a1", "st": "test", "sp": "/test/a1", "t": "Test Artifact 1"},
+            {"id": "art-1", "st": "test", "sp": "/test/art1", "t": "Test Artifact Art1"},
+            {"id": "art-2", "st": "test", "sp": "/test/art2", "t": "Test Artifact Art2"},
+        ],
+    )
     db_session.commit()
     svc._cached_count = None
     return svc
+
+
+# ── Seed data fixtures ───────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def seed_members(db_session):
+    """Insert test members into the DB for graph/insight tests."""
+    from sqlalchemy import text
+
+    db_session.execute(text("DELETE FROM contributions"))
+    db_session.execute(text("DELETE FROM members"))
+    for m in [
+        {"id": "alice", "name": "Alice", "email": "alice@test.com"},
+        {"id": "bob", "name": "Bob", "email": "bob@test.com"},
+    ]:
+        db_session.execute(
+            text(
+                "INSERT INTO members (id, name, email, aliases, expertise_tags, expertise_scores, strengths, weaknesses) "
+                "VALUES (:id, :name, :email, '[]', '[\"python\",\"api\"]', '{}', '[]', '[]') "
+                "ON CONFLICT (id) DO NOTHING"
+            ),
+            m,
+        )
+    db_session.commit()
+    return ["alice", "bob"]
+
+
+@pytest.fixture
+def seed_artifacts(db_session, seed_members):
+    """Insert test artifacts and contributions for graph/insight tests."""
+    import json
+
+    from sqlalchemy import text
+
+    db_session.execute(text("DELETE FROM artifacts"))
+    for a in [
+        {"id": "a1", "st": "git", "sp": "/repo", "t": "API Code", "mids": json.dumps(["alice", "bob"])},
+        {"id": "a2", "st": "markdown", "sp": "/docs", "t": "Docs", "mids": json.dumps(["alice"])},
+    ]:
+        db_session.execute(
+            text(
+                "INSERT INTO artifacts (id, source_type, source_path, title, ingested_at, chunk_count, member_ids) "
+                "VALUES (:id, :st, :sp, :t, now(), 5, :mids) ON CONFLICT (id) DO NOTHING"
+            ),
+            a,
+        )
+    # Add contributions
+    for c in [
+        {
+            "id": "c1",
+            "mid": "alice",
+            "aid": "a1",
+            "ct": "git_commit",
+            "desc": "Added API endpoints",
+            "topics": json.dumps(["python", "api"]),
+        },
+        {
+            "id": "c2",
+            "mid": "bob",
+            "aid": "a1",
+            "ct": "git_commit",
+            "desc": "Fixed bugs",
+            "topics": json.dumps(["python", "debugging"]),
+        },
+        {
+            "id": "c3",
+            "mid": "alice",
+            "aid": "a2",
+            "ct": "documentation",
+            "desc": "Wrote API docs",
+            "topics": json.dumps(["api", "docs"]),
+        },
+    ]:
+        db_session.execute(
+            text(
+                "INSERT INTO contributions (id, member_id, artifact_id, contribution_type, description, topics, timestamp) "
+                "VALUES (:id, :mid, :aid, :ct, :desc, :topics, now()) ON CONFLICT (id) DO NOTHING"
+            ),
+            c,
+        )
+    db_session.commit()
+    return ["a1", "a2"]

@@ -91,7 +91,7 @@ class TestAuthenticateErrors:
 
     def test_no_account_found(self, db_session, settings):
         svc = AuthService(settings)
-        with pytest.raises(ValueError, match="No account found"):
+        with pytest.raises(ValueError, match="Invalid credentials"):
             svc.authenticate(db_session, "nobody", "pass")
 
     def test_deactivated_account(self, db_session, settings):
@@ -99,7 +99,7 @@ class TestAuthenticateErrors:
         user = svc.register(db_session, "alice", "alice@test.com", "Str0ngPass!")
         user.is_active = False
         db_session.commit()
-        with pytest.raises(ValueError, match="deactivated"):
+        with pytest.raises(ValueError, match="Invalid credentials"):
             svc.authenticate(db_session, "alice", "Str0ngPass!")
 
     def test_oauth_only_user(self, db_session, settings):
@@ -117,13 +117,13 @@ class TestAuthenticateErrors:
         )
         db_session.add(user)
         db_session.commit()
-        with pytest.raises(ValueError, match="Google Sign-In"):
+        with pytest.raises(ValueError, match="Invalid credentials"):
             svc.authenticate(db_session, "guser", "anypass")
 
     def test_wrong_password(self, db_session, settings):
         svc = AuthService(settings)
         svc.register(db_session, "alice", "alice@test.com", "Str0ngPass!")
-        with pytest.raises(ValueError, match="Incorrect password"):
+        with pytest.raises(ValueError, match="Invalid credentials"):
             svc.authenticate(db_session, "alice", "WrongPass!")
 
     def test_correct_password_succeeds(self, db_session, settings):

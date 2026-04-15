@@ -9,6 +9,17 @@ from app.services.rag_pipeline import RAGPipeline
 
 @pytest.fixture()
 def pipeline(mock_llm, mock_embedder, vector_store, db_session):
+    # Ensure test user exists for FK constraint on conversations
+    from sqlalchemy import text
+
+    db_session.execute(
+        text(
+            "INSERT INTO users (id, username, email, password_hash, auth_provider, is_active, created_at) "
+            "VALUES ('user-1', 'testuser', 'test@test.com', 'x', 'local', true, now()) "
+            "ON CONFLICT (id) DO NOTHING"
+        )
+    )
+    db_session.commit()
     return RAGPipeline(
         llm=mock_llm,
         embedder=mock_embedder,
