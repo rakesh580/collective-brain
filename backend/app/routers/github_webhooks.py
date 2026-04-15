@@ -41,7 +41,7 @@ async def github_status(request: Request):
     configured = bool(settings.github_webhook_secret)
     return {
         "configured": configured,
-        "webhook_url": f"/api/github/webhooks",
+        "webhook_url": "/api/github/webhooks",
     }
 
 

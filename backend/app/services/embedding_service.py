@@ -22,8 +22,8 @@ class EmbeddingService:
 
     def embed(self, text: str) -> list[float]:
         """Synchronous single-text embedding with span + metric."""
-        from app.services.telemetry import get_tracer
         from app.services.metrics import EMBEDDING_LATENCY, EMBEDDING_TEXTS_TOTAL
+        from app.services.telemetry import get_tracer
 
         tracer = get_tracer("collective_brain.embedding")
         t0 = time.perf_counter()
@@ -40,8 +40,8 @@ class EmbeddingService:
 
     def embed_batch(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
         """Synchronous batch embedding with span + metric."""
-        from app.services.telemetry import get_tracer
         from app.services.metrics import EMBEDDING_LATENCY, EMBEDDING_TEXTS_TOTAL
+        from app.services.telemetry import get_tracer
 
         tracer = get_tracer("collective_brain.embedding")
         t0 = time.perf_counter()

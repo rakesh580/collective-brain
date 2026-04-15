@@ -1,16 +1,14 @@
 """Organizations router — CRUD, membership management, SSO config, audit log."""
-import re
 import secrets
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_current_user, get_db, require_role
+from app.dependencies import get_current_user, get_db
 from app.models.organization import OrganizationMembership, OrganizationRecord
 from app.models.user import UserRecord
 from app.services.audit_service import AuditService

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
 
+from app.db.database import create_session
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
-from app.db.database import create_session
 
 router = APIRouter()
 

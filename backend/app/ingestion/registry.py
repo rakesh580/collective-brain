@@ -1,8 +1,8 @@
 from app.ingestion.base import BaseConnector
-from app.ingestion.git_connector import GitConnector
-from app.ingestion.slack_connector import SlackConnector
 from app.ingestion.discord_connector import DiscordConnector
+from app.ingestion.git_connector import GitConnector
 from app.ingestion.markdown_connector import MarkdownConnector
+from app.ingestion.slack_connector import SlackConnector
 from app.ingestion.task_connector import TaskConnector
 
 _REGISTRY: dict[str, type[BaseConnector]] = {

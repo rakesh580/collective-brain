@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 
 class TestGoogleAuthEndpoint:
     def test_google_not_configured_returns_501(self, app_client):

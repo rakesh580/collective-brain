@@ -1,9 +1,6 @@
 """Chaos / stress tests — simulate failures in vector DB, Redis, LLM, database."""
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +28,7 @@ class TestVectorDBFailure:
     def test_ingestion_survives_chroma_failure(self, app_client, auth_headers):
         """If ChromaDB fails during ingestion, it should report an error."""
         import io
+
         from app.main import app
 
         original_vs = app.state.vector_store
@@ -100,7 +98,7 @@ class TestLLMFailure:
 
         original_llm = app.state.llm_service
         timeout_llm = AsyncMock()
-        timeout_llm.generate = AsyncMock(side_effect=asyncio.TimeoutError("LLM timeout"))
+        timeout_llm.generate = AsyncMock(side_effect=TimeoutError("LLM timeout"))
 
         app.state.llm_service = timeout_llm
         try:
@@ -211,6 +209,7 @@ class TestEmbeddingFailure:
     def test_ingestion_handles_embedding_failure(self, app_client, auth_headers):
         """If embeddings fail during ingestion, should report error."""
         import io
+
         from app.main import app
 
         original_emb = app.state.embedding_service

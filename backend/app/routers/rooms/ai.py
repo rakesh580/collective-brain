@@ -1,7 +1,7 @@
 """Room AI query endpoint: trigger AI agent responses in a room."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException, Request
@@ -54,11 +54,11 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             sender_name=user.display_name or user.username,
             message_type="user",
             content=body.question,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(user_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.now(timezone.utc)
+        room.last_message_at = datetime.now(UTC)
         db.commit()
 
         # Broadcast user's question
@@ -155,11 +155,11 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             content=result.answer,
             sources=[s.model_dump() for s in result.sources] if result.sources else [],
             related_members=[m.model_dump() for m in result.related_members] if result.related_members else [],
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(ai_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.now(timezone.utc)
+        room.last_message_at = datetime.now(UTC)
         db.commit()
 
         ai_msg_dict = _msg_to_dict(ai_msg)
@@ -190,7 +190,7 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
                 sender_name="System",
                 message_type="system",
                 content="AI agent encountered an error. Please try again.",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db.add(error_msg)
             room.message_count = (room.message_count or 0) + 1

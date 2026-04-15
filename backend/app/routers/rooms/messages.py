@@ -1,6 +1,6 @@
 """Room message endpoints: send and list messages."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException, Request
@@ -41,12 +41,12 @@ async def send_message(room_id: str, body: RoomMessageRequest, request: Request)
             message_type="user",
             content=body.content,
             parent_message_id=body.parent_message_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.now(timezone.utc)
-        room.updated_at = datetime.now(timezone.utc)
+        room.last_message_at = datetime.now(UTC)
+        room.updated_at = datetime.now(UTC)
         db.commit()
 
         msg_dict = _msg_to_dict(msg)

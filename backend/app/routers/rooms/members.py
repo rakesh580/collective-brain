@@ -1,6 +1,6 @@
 """Room member management endpoints: add and remove members."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException, Request
@@ -58,7 +58,7 @@ async def add_members(room_id: str, body: AddRoomMembersRequest, request: Reques
                 room_id=room_id,
                 user_id=uid,
                 role="member",
-                joined_at=datetime.now(timezone.utc),
+                joined_at=datetime.now(UTC),
             )
             db.add(member)
             added.append(u.display_name or u.username)
@@ -72,11 +72,11 @@ async def add_members(room_id: str, body: AddRoomMembersRequest, request: Reques
                 sender_name="System",
                 message_type="system",
                 content=f"{user.display_name or user.username} added {', '.join(added)}",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db.add(sys_msg)
             room.message_count = (room.message_count or 0) + 1
-            room.last_message_at = datetime.now(timezone.utc)
+            room.last_message_at = datetime.now(UTC)
             db.commit()
 
             await _broadcast(room_id, {
@@ -140,11 +140,11 @@ async def remove_member(room_id: str, user_id: str, request: Request):
             sender_name="System",
             message_type="system",
             content=f"{target_info['display_name'] or target_info['username']} {action}",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(sys_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.now(timezone.utc)
+        room.last_message_at = datetime.now(UTC)
         db.commit()
 
         await _broadcast(room_id, {

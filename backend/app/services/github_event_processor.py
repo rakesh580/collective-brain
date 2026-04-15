@@ -1,14 +1,14 @@
 """Process GitHub webhook events into the Collective Brain knowledge graph."""
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from app.ingestion.base import ParsedChunk
 from app.models.artifact import ArtifactRecord
-from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
+from app.models.member import MemberRecord
 from app.services.memory_graph import invalidate_graph_cache
 
 logger = logging.getLogger("collective_brain.github")
@@ -190,7 +190,7 @@ class GitHubEventProcessor:
                 try:
                     ts = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
-                    ts = datetime.now(timezone.utc)
+                    ts = datetime.now(UTC)
 
             # Files changed
             files_added = commit.get("added", [])
@@ -275,7 +275,7 @@ class GitHubEventProcessor:
             try:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except (ValueError, TypeError):
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
 
         # Extract topics from title and labels
         topics: list[str] = []
@@ -357,7 +357,7 @@ class GitHubEventProcessor:
             try:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except (ValueError, TypeError):
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
 
         topics = [label.get("name", "").lower() for label in issue.get("labels", []) if label.get("name")]
 
@@ -419,7 +419,7 @@ class GitHubEventProcessor:
             try:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except (ValueError, TypeError):
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
 
         text = (
             f"[Code Review] {reviewer} reviewed PR #{pr_number} by {pr_author} — {review_state}\n"
@@ -487,7 +487,7 @@ class GitHubEventProcessor:
             try:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except (ValueError, TypeError):
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
 
         entity_type = "PR" if is_pr else "Issue"
         text = f"[Comment on {entity_type} #{issue_number}] by {author}\n\n{body[:500]}"

@@ -14,12 +14,11 @@ from __future__ import annotations
 import logging
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.models.member import MemberRecord
 from app.models.offboarding_report import OffboardingReport
@@ -71,7 +70,7 @@ class OffboardingService:
             id=str(uuid.uuid4()),
             member_id=member_id,
             created_by=created_by,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             unique_expertise=result.unique_expertise,
             sole_contributor_artifact_ids=result.sole_contributor_artifact_ids,
             transfer_recommendations=result.transfer_recommendations,

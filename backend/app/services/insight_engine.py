@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -8,11 +8,10 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger("collective_brain.insights")
 
 from app.models.contribution import ContributionRecord
-from app.models.member import MemberRecord
 from app.models.insight import InsightRecord
 from app.services.llm_service import LLMService
 from app.services.memory_graph import MemoryGraph
-from app.services.prompts import WEEKLY_SUMMARY_PROMPT, INSIGHT_DETECTION_PROMPT
+from app.services.prompts import INSIGHT_DETECTION_PROMPT, WEEKLY_SUMMARY_PROMPT
 
 
 class InsightEngine:
@@ -23,7 +22,7 @@ class InsightEngine:
         self.graph = MemoryGraph(db, room_id=room_id)
 
     async def generate_weekly_summary(self) -> InsightRecord:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         week_ago = now - timedelta(days=7)
 
         # Gather last week's activity
@@ -80,7 +79,7 @@ class InsightEngine:
                 insight_type=p["type"],
                 title=p["title"],
                 body=p["body"],
-                generated_at=datetime.now(timezone.utc),
+                generated_at=datetime.now(UTC),
                 related_member_ids=p.get("related_members", []),
                 confidence=p.get("confidence", 0.5),
             )
@@ -115,7 +114,7 @@ class InsightEngine:
                         insight_type=li.get("insight_type", "pattern"),
                         title=li.get("title", "Detected Pattern"),
                         body=li.get("body", ""),
-                        generated_at=datetime.now(timezone.utc),
+                        generated_at=datetime.now(UTC),
                         related_member_ids=li.get("related_members", []),
                         confidence=li.get("confidence", 0.5),
                     )

@@ -1,6 +1,5 @@
 """Integration tests for auth API endpoints using FastAPI TestClient."""
 
-import pytest
 
 
 class TestRegistration:

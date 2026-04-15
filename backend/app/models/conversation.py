@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base
 
 
@@ -12,8 +14,8 @@ class ConversationRecord(Base):
         String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     message_count = Column(Integer, default=0)
     metadata_json = Column(JSON, default=dict)
     owner_user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
@@ -38,7 +40,7 @@ class MessageRecord(Base):
     content = Column(Text, nullable=False)
     sources = Column(JSON, default=list)  # serialized SourceRef list
     related_members = Column(JSON, default=list)  # serialized RelatedMember list
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     sender_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     sender_name = Column(String, nullable=True)
 
@@ -55,4 +57,4 @@ class ConversationParticipant(Base):
     conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     role = Column(String, default="participant")  # "owner" or "participant"
-    joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    joined_at = Column(DateTime, default=lambda: datetime.now(UTC))

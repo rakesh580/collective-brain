@@ -9,11 +9,13 @@ registration and exposes the same public API as the old rooms.py::
 """
 
 # Import sub-modules so their @router decorators execute and register routes.
-from . import crud  # noqa: F401
-from . import members  # noqa: F401
-from . import messages  # noqa: F401
-from . import ai  # noqa: F401
-from . import websocket  # noqa: F401
+from . import (
+    ai,  # noqa: F401
+    crud,  # noqa: F401
+    members,  # noqa: F401
+    messages,  # noqa: F401
+    websocket,  # noqa: F401
+)
 
 # Re-export public symbols that external code depends on.
 from ._shared import init_redis_from_app, router

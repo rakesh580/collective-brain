@@ -8,6 +8,7 @@ Source input:   dict with keys:
 The connector walks the block tree, concatenates rich-text content, and
 produces one ParsedChunk per logical section (heading → next heading).
 """
+import contextlib
 import logging
 from datetime import datetime
 
@@ -94,10 +95,8 @@ class NotionConnector(BaseConnector):
         last_edited = page.get("last_edited_time")
         timestamp = None
         if last_edited:
-            try:
+            with contextlib.suppress(ValueError):
                 timestamp = datetime.fromisoformat(last_edited.replace("Z", "+00:00"))
-            except ValueError:
-                pass
 
         # Walk blocks
         full_text = self._blocks_to_text(page_id)

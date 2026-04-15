@@ -9,7 +9,7 @@ The python3-saml library handles XML parsing, signature verification, and
 assertion decryption.  We only need to wire it into FastAPI.
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -74,7 +74,7 @@ def _base_url(request: Request) -> str:
 def sp_metadata(org_slug: str, request: Request):
     """Return SP metadata XML — give this URL to your IdP (Okta, Azure AD, etc.)."""
     try:
-        from onelogin.saml2.auth import OneLogin_Saml2_Auth
+        from onelogin.saml2.auth import OneLogin_Saml2_Auth  # noqa: F401
         from onelogin.saml2.settings import OneLogin_Saml2_Settings
     except ImportError:
         raise HTTPException(status_code=501, detail="python3-saml not installed")
@@ -175,7 +175,7 @@ async def saml_acs(
                 saml_provider=org.settings_json.get("sso", {}).get("idp_entity_id"),
                 organization_id=org.id,
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db.add(user)
             db.commit()
@@ -187,7 +187,7 @@ async def saml_acs(
             user.saml_provider = org.settings_json.get("sso", {}).get("idp_entity_id")
             if not user.organization_id:
                 user.organization_id = org.id
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(UTC)
             if user.auth_provider not in ("saml", "saml+local"):
                 user.auth_provider = "saml+local" if user.password_hash else "saml"
             db.commit()

@@ -1,15 +1,15 @@
 """Process Slack events and bridge them to the Collective Brain ingestion pipeline."""
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
-from app.models.slack_integration import SlackWorkspace, SlackChannelSync
-from app.services.slack_service import SlackService
+from app.models.member import MemberRecord
+from app.models.slack_integration import SlackChannelSync, SlackWorkspace
 from app.services.embedding_service import EmbeddingService
+from app.services.slack_service import SlackService
 from app.services.vector_store import VectorStoreService
 
 logger = logging.getLogger("collective_brain.slack_events")
@@ -118,7 +118,7 @@ class SlackEventProcessor:
                     member.last_active = timestamp
 
             # Update sync timestamp
-            sync.last_synced_at = datetime.now(timezone.utc)
+            sync.last_synced_at = datetime.now(UTC)
             sync.last_message_ts = ts
 
             self.db.commit()
@@ -178,7 +178,7 @@ class SlackEventProcessor:
             name=display_name,
             aliases=[display_name.lower()],
             email=email,
-            first_seen=datetime.now(timezone.utc),
+            first_seen=datetime.now(UTC),
             total_contributions=0,
         )
         self.db.add(member)

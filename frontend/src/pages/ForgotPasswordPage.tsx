@@ -21,7 +21,7 @@ function parseApiError(err: unknown): string {
 type Step = "email" | "code" | "done";
 
 export default function ForgotPasswordPage() {
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");

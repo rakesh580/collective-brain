@@ -5,18 +5,15 @@ knowledge graph (expertise scores, PageRank, recency).  Also manages
 help-request records so users can formally ask an expert for assistance.
 """
 
-import json
 import logging
 import re
-import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.db.database import create_session
 from app.models.member import MemberRecord
-from app.models.user import UserRecord
 from app.services.memory_graph import MemoryGraph
 
 logger = logging.getLogger("collective_brain.expert_routing")
@@ -74,7 +71,7 @@ _STOP_WORDS = frozenset({
     "up", "with", "and", "not", "no", "so", "if", "at", "as", "how", "what",
     "who", "whom", "which", "when", "where", "why", "all", "any", "each",
     "need", "help", "know", "talk", "find", "want", "get", "someone",
-    "expert", "person", "question", "about",
+    "expert", "person", "question",
 })
 
 

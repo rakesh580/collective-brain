@@ -1,6 +1,6 @@
 """Room CRUD endpoints: create, list, discover, join, get, update."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException, Request
@@ -39,8 +39,8 @@ async def create_room(body: CreateRoomRequest, request: Request):
             created_by_user_id=user.id,
             avatar_color=avatar_color,
             is_public=body.is_public if body.is_public is not None else False,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         db.add(room)
 
@@ -50,7 +50,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
             room_id=room.id,
             user_id=user.id,
             role="admin",
-            joined_at=datetime.now(timezone.utc),
+            joined_at=datetime.now(UTC),
         )
         db.add(admin_member)
 
@@ -65,7 +65,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
                     room_id=room.id,
                     user_id=uid,
                     role="member",
-                    joined_at=datetime.now(timezone.utc),
+                    joined_at=datetime.now(UTC),
                 )
                 db.add(member)
 
@@ -77,7 +77,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
             sender_name="System",
             message_type="system",
             content=f"{user.display_name or user.username} created the room",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(sys_msg)
         room.message_count = 1
@@ -303,7 +303,7 @@ async def join_room(room_id: str, request: Request):
             room_id=room_id,
             user_id=user.id,
             role="member",
-            joined_at=datetime.now(timezone.utc),
+            joined_at=datetime.now(UTC),
         )
         db.add(member)
 
@@ -315,11 +315,11 @@ async def join_room(room_id: str, request: Request):
             sender_name="System",
             message_type="system",
             content=f"{user.display_name or user.username} joined the room",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(sys_msg)
         room.message_count = (room.message_count or 0) + 1
-        room.last_message_at = datetime.now(timezone.utc)
+        room.last_message_at = datetime.now(UTC)
         db.commit()
 
         await _broadcast(room_id, {
@@ -389,7 +389,7 @@ async def get_room(room_id: str, request: Request):
         )
 
         # Update last_read_at
-        membership.last_read_at = datetime.now(timezone.utc)
+        membership.last_read_at = datetime.now(UTC)
         db.commit()
 
         return {
@@ -440,7 +440,7 @@ async def update_room(room_id: str, body: UpdateRoomRequest, request: Request):
             room.description = body.description
         if body.is_public is not None:
             room.is_public = body.is_public
-        room.updated_at = datetime.now(timezone.utc)
+        room.updated_at = datetime.now(UTC)
         db.commit()
 
         return {"status": "updated"}

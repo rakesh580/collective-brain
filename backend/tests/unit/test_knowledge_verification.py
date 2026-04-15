@@ -1,12 +1,12 @@
 """Unit tests for KnowledgeVerificationService."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
 
-from app.services.knowledge_verification import KnowledgeVerificationService, _ensure_tz
-from app.models.insight import InsightRecord
 from app.models.artifact import ArtifactRecord
+from app.models.insight import InsightRecord
+from app.services.knowledge_verification import KnowledgeVerificationService, _ensure_tz
 
 
 def _make_insight(**kwargs) -> InsightRecord:
@@ -15,7 +15,7 @@ def _make_insight(**kwargs) -> InsightRecord:
         title="Test insight",
         body="Some insight body",
         insight_type="pattern",
-        generated_at=datetime.now(timezone.utc) - timedelta(days=5),
+        generated_at=datetime.now(UTC) - timedelta(days=5),
         source_artifact_ids=[],
         verification_status="pending",
         staleness_days=None,
@@ -34,8 +34,8 @@ def _make_insight(**kwargs) -> InsightRecord:
 def _make_artifact(ingested_days_ago: int, **kwargs) -> ArtifactRecord:
     obj = MagicMock(spec=ArtifactRecord)
     obj.id = kwargs.get("id", "art-1")
-    obj.ingested_at = datetime.now(timezone.utc) - timedelta(days=ingested_days_ago)
-    obj.last_synced_at = kwargs.get("last_synced_at", None)
+    obj.ingested_at = datetime.now(UTC) - timedelta(days=ingested_days_ago)
+    obj.last_synced_at = kwargs.get("last_synced_at")
     return obj
 
 
@@ -44,7 +44,7 @@ class TestVerifyInsightStaleness:
         svc = KnowledgeVerificationService(staleness_threshold_days=30)
         db = MagicMock()
         insight = _make_insight(
-            generated_at=datetime.now(timezone.utc) - timedelta(days=3),
+            generated_at=datetime.now(UTC) - timedelta(days=3),
             source_artifact_ids=[],
         )
         result = svc.verify_insight(db, insight)
@@ -55,7 +55,7 @@ class TestVerifyInsightStaleness:
         svc = KnowledgeVerificationService(staleness_threshold_days=30)
         db = MagicMock()
         insight = _make_insight(
-            generated_at=datetime.now(timezone.utc) - timedelta(days=45),
+            generated_at=datetime.now(UTC) - timedelta(days=45),
             source_artifact_ids=[],
         )
         result = svc.verify_insight(db, insight)
@@ -98,7 +98,7 @@ class TestVerifyInsightStaleness:
         artifact = _make_artifact(
             ingested_days_ago=90,
             id="art-1",
-            last_synced_at=datetime.now(timezone.utc) - timedelta(days=2),
+            last_synced_at=datetime.now(UTC) - timedelta(days=2),
         )
         db.query.return_value.filter.return_value.all.return_value = [artifact]
         insight = _make_insight(source_artifact_ids=["art-1"])
@@ -123,12 +123,12 @@ class TestBulkVerify:
         # Return 2 pending insights: one fresh, one 45 days old
         fresh = _make_insight(
             id="ins-fresh",
-            generated_at=datetime.now(timezone.utc) - timedelta(days=5),
+            generated_at=datetime.now(UTC) - timedelta(days=5),
             source_artifact_ids=[],
         )
         stale = _make_insight(
             id="ins-stale",
-            generated_at=datetime.now(timezone.utc) - timedelta(days=50),
+            generated_at=datetime.now(UTC) - timedelta(days=50),
             source_artifact_ids=[],
         )
         db.query.return_value.filter.return_value.limit.return_value.all.return_value = [
@@ -147,7 +147,7 @@ class TestEnsureTz:
         assert result.tzinfo is not None
 
     def test_aware_datetime_unchanged(self):
-        aware = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        aware = datetime(2025, 1, 1, tzinfo=UTC)
         result = _ensure_tz(aware)
         assert result == aware
 

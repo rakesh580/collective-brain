@@ -1,21 +1,22 @@
 import os
 from uuid import uuid4
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from app.schemas.requests import (
-    MarkdownIngestRequest,
-    GitIngestRequest,
-    NotionIngestRequest,
-    GoogleDocsIngestRequest,
-    ConfluenceIngestRequest,
-)
-from app.schemas.responses import IngestionResponse
-from app.models.artifact import ArtifactRecord
-from app.models.member import MemberRecord
-from app.models.contribution import ContributionRecord
 from app.db.database import create_session
 from app.dependencies import require_role
+from app.models.artifact import ArtifactRecord
+from app.models.contribution import ContributionRecord
+from app.models.member import MemberRecord
+from app.schemas.requests import (
+    ConfluenceIngestRequest,
+    GitIngestRequest,
+    GoogleDocsIngestRequest,
+    MarkdownIngestRequest,
+    NotionIngestRequest,
+)
+from app.schemas.responses import IngestionResponse
 
 router = APIRouter()
 
@@ -58,10 +59,7 @@ def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
 
     # Generate a proper slug ID if none provided
     if not member_id:
-        if name:
-            member_id = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-        else:
-            member_id = str(uuid4())[:8]
+        member_id = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") if name else str(uuid4())[:8]
 
     # Create new
     member = MemberRecord(
@@ -317,6 +315,7 @@ async def ingest_markdown(body: MarkdownIngestRequest, request: Request, user=De
 async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(require_role("admin", "member"))):
 
     import tempfile
+
     from git import Repo as GitRepo
 
     repo_path = body.repo_path.strip()
@@ -402,7 +401,7 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
 
         # Check we have something to ingest
         md_files = []
-        for root, _, fnames in os.walk(doc_dir):
+        for _root, _, fnames in os.walk(doc_dir):
             for fname in fnames:
                 if fname.lower().endswith((".md", ".txt", ".markdown")):
                     md_files.append(fname)
@@ -424,7 +423,10 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
 @router.post("/slack", response_model=IngestionResponse)
 async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
 
-    import tempfile, zipfile, os
+    import os
+    import tempfile
+    import zipfile
+
     from app.ingestion.slack_connector import SlackConnector
     settings = request.app.state.settings
 
@@ -451,7 +453,9 @@ async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: 
 @router.post("/discord", response_model=IngestionResponse)
 async def ingest_discord(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
 
-    import tempfile, os
+    import os
+    import tempfile
+
     from app.ingestion.discord_connector import DiscordConnector
     settings = request.app.state.settings
 
@@ -468,7 +472,9 @@ async def ingest_discord(request: Request, file: UploadFile = File(...), room_id
 @router.post("/tasks", response_model=IngestionResponse)
 async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
 
-    import tempfile, os
+    import os
+    import tempfile
+
     from app.ingestion.task_connector import TaskConnector
     settings = request.app.state.settings
 

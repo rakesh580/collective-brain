@@ -6,18 +6,17 @@ Layers:
   Concept  -- Topic nodes + KNOWS_ABOUT / COVERS_TOPIC / HAS_EXPERTISE / DECLARED_SKILL edges
 """
 
+import logging
 import math
 import time
-import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import networkx as nx
-from sqlalchemy.orm import Session
 
-from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
+from app.models.member import MemberRecord
 from app.models.user import UserRecord
 
 logger = logging.getLogger("collective_brain.graph")
@@ -63,7 +62,7 @@ def _temporal_decay(
     """Exponential decay weight: 1.0 for *now*, 0.5 at half-life, etc."""
     if timestamp is None:
         return 0.5
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     age_days = max(0, (now - timestamp).total_seconds() / 86400)
     return math.exp(-0.693 * age_days / half_life_days)
 
@@ -102,7 +101,7 @@ class GraphBuilderMixin:
 
     def _build_nx_graph(self) -> nx.Graph:
         """Build a full NetworkX graph from DB data."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         G = nx.Graph()
 
         members = self._query_members()

@@ -1,19 +1,17 @@
 """Unit tests for OffboardingService and public KB publish logic."""
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
+from app.models.contribution import ContributionRecord
+from app.models.member import MemberRecord
+from app.models.offboarding_report import OffboardingReport
 from app.services.offboarding_service import (
     OffboardingService,
+    _build_summary,
     _compute_risk,
     _find_candidates,
-    _build_summary,
 )
-from app.models.member import MemberRecord
-from app.models.contribution import ContributionRecord
-from app.models.offboarding_report import OffboardingReport
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

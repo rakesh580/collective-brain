@@ -12,14 +12,14 @@ Outputs: detailed log + summary report.
 """
 
 import asyncio
-import time
 import json
-import random
-import string
-import statistics
 import logging
-import sys
 import os
+import random
+import statistics
+import string
+import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -183,7 +183,7 @@ async def phase1_rest_api(concurrent_users: int, duration_s: int = 30) -> PhaseR
                             result.errors += 1
                         else:
                             result.failures += 1
-                    except Exception as e:
+                    except Exception:
                         elapsed = (time.monotonic() - start) * 1000
                         result.total_requests += 1
                         result.latencies_ms.append(elapsed)
@@ -289,10 +289,10 @@ async def phase2_websocket(num_connections: int) -> PhaseResult:
                         while True:
                             msg = await ws.recv()
                             messages_received += 1
-                except (asyncio.TimeoutError, Exception):
+                except (TimeoutError, Exception):
                     pass
 
-        except Exception as e:
+        except Exception:
             failed += 1
             connect_times.append((time.monotonic() - start) * 1000)
 

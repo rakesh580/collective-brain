@@ -1,21 +1,22 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.schemas.responses import (
-    DashboardResponse,
-    WeeklySummaryResponse,
-    InsightResponse,
-    MemberResponse,
-)
-from app.models.member import MemberRecord
-from app.models.artifact import ArtifactRecord
-from app.models.insight import InsightRecord
-from app.services.insight_engine import InsightEngine
-from app.services.freshness_service import get_freshness_report, get_stale_artifacts
-from app.services.knowledge_verification import KnowledgeVerificationService
 from app.db.database import create_session
 from app.dependencies import get_current_user
+from app.models.artifact import ArtifactRecord
+from app.models.insight import InsightRecord
+from app.models.member import MemberRecord
+from app.schemas.responses import (
+    DashboardResponse,
+    InsightResponse,
+    MemberResponse,
+    WeeklySummaryResponse,
+)
+from app.services.freshness_service import get_freshness_report
+from app.services.insight_engine import InsightEngine
+from app.services.knowledge_verification import KnowledgeVerificationService
 
 router = APIRouter()
 
@@ -107,7 +108,7 @@ async def get_weekly_summary(request: Request, room_id: str | None = None, user=
     db = _get_db()
     try:
         # Check for cached weekly summary
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         week_ago = now - timedelta(days=7)
         cache_query = (
             db.query(InsightRecord)

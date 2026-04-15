@@ -1,7 +1,8 @@
 import os
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
+
 from app.config import Settings
 
 # Exclude locust/stress tests from normal pytest collection — they require

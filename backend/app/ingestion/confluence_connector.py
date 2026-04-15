@@ -10,8 +10,9 @@ Source input:  dict with keys:
 
 Requires: atlassian-python-api
 """
+import contextlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from html.parser import HTMLParser
 
 from app.ingestion.base import BaseConnector, ParsedChunk
@@ -149,10 +150,8 @@ class ConfluenceConnector(BaseConnector):
         when_str = version.get("when")
         timestamp = None
         if when_str:
-            try:
+            with contextlib.suppress(ValueError):
                 timestamp = datetime.fromisoformat(when_str.replace("Z", "+00:00"))
-            except ValueError:
-                pass
 
         topics = extract_topics_from_text(full_text)
         raw_chunks = self._chunker.split(full_text, metadata={"page_id": page_id})

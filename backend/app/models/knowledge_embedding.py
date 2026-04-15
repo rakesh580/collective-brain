@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey, Index
-from sqlalchemy.orm import relationship
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
+
 from app.db.database import Base
 
 try:
@@ -41,7 +42,7 @@ class KnowledgeEmbedding(Base):
     # Rich metadata for filtering — source_type, member_ids, topics, etc.
     metadata_json = Column(JSON, default=dict)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     __table_args__ = (
         # HNSW index for fast approximate nearest-neighbour search (pgvector ≥ 0.5)

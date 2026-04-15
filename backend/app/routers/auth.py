@@ -3,23 +3,23 @@ import os
 import time
 from collections import defaultdict
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request
 
+from app.db.database import create_session
+from app.models.user import UserRecord
 from app.schemas.requests import (
-    RegisterRequest,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    GoogleAccessTokenRequest,
+    GoogleAuthRequest,
     LoginRequest,
     ProfileUpdateRequest,
-    GoogleAuthRequest,
-    GoogleAccessTokenRequest,
-    ForgotPasswordRequest,
-    ResetPasswordRequest,
-    ChangePasswordRequest,
     RefreshTokenRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
 )
-from app.schemas.responses import UserResponse, AuthResponse
+from app.schemas.responses import AuthResponse, UserResponse
 from app.services.auth_service import AuthService
-from app.models.user import UserRecord
-from app.db.database import create_session
 
 logger = logging.getLogger(__name__)
 

@@ -3,9 +3,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.routers.organizations import (
+    InviteMemberRequest,
     OrgCreateRequest,
     OrgUpdateRequest,
-    InviteMemberRequest,
     SSOConfigRequest,
 )
 

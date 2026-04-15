@@ -1,7 +1,5 @@
 """RAG evaluation tests — precision, recall, hallucination, groundedness."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ---------------------------------------------------------------------------

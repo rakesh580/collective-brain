@@ -4,15 +4,17 @@ Revision ID: 003_pgvector
 Revises: 002_multi_tenancy
 Create Date: 2026-04-07
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
+
 revision: str = "003_pgvector"
-down_revision: Union[str, None] = "002_multi_tenancy"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "002_multi_tenancy"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Must match CB_EMBEDDING_DIMENSION (default 384 for all-MiniLM-L6-v2)
 VECTOR_DIM = 384

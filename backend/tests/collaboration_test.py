@@ -15,7 +15,7 @@ Usage:
 import asyncio
 import json
 import sys
-import time
+
 import httpx
 import websockets
 
@@ -219,7 +219,7 @@ async def test_room_websocket(tokens: list[dict], room_id: str):
                 )
             else:
                 test_result("Bob receives real-time message", False, f"Got event type: {data.get('type')}")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             test_result("Bob receives real-time message", False, "Timeout waiting for message")
 
         await alice_ws.close()
@@ -420,7 +420,7 @@ async def test_discussion_websocket(tokens: list[dict], thread_id: str):
                 data.get("type") == "new_message",
                 f"Event: {data.get('type')}",
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             test_result("Bob receives real-time discussion update", False, "Timeout")
 
         await bob_ws.close()

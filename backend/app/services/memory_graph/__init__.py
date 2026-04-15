@@ -14,9 +14,9 @@ Features:
 
 from sqlalchemy.orm import Session
 
-from .builder import invalidate_graph_cache, GraphBuilderMixin
-from .query import GraphQueryMixin
 from .analysis import GraphAnalysisMixin
+from .builder import GraphBuilderMixin, invalidate_graph_cache
+from .query import GraphQueryMixin
 
 
 class MemoryGraph(GraphBuilderMixin, GraphQueryMixin, GraphAnalysisMixin):

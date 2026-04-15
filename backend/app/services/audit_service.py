@@ -6,7 +6,7 @@ Usage:
 """
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -46,7 +46,7 @@ class AuditService:
             user_agent=user_agent,
             result=result,
             detail=detail or {},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         try:
             db.add(entry)

@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 
-from app.models.member import MemberRecord
-from app.models.artifact import ArtifactRecord
-from app.models.insight import InsightRecord
-from app.models.room import ChatRoom
 from app.db.database import create_session
 from app.dependencies import get_current_user
+from app.models.artifact import ArtifactRecord
+from app.models.insight import InsightRecord
+from app.models.member import MemberRecord
+from app.models.room import ChatRoom
 
 router = APIRouter()
 

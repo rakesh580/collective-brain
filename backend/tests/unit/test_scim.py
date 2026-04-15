@@ -1,5 +1,5 @@
 """Unit tests for SCIM helper functions."""
-import pytest
+from datetime import UTC
 from unittest.mock import MagicMock
 
 
@@ -35,10 +35,11 @@ class TestSlugifyUsername:
 
 class TestScimUserShape:
     def test_scim_user_dict_has_required_fields(self):
-        from app.routers.scim import _scim_user
-        from app.models.user import UserRecord
+        from datetime import datetime
         from unittest.mock import MagicMock
-        from datetime import datetime, timezone
+
+        from app.models.user import UserRecord
+        from app.routers.scim import _scim_user
 
         user = UserRecord(
             id="u-1",
@@ -47,7 +48,7 @@ class TestScimUserShape:
             display_name="Alice",
             is_active=True,
             scim_external_id="ext-1",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         request = MagicMock()
         request.base_url = "http://localhost:8000/"

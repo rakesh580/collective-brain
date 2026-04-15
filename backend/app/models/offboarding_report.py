@@ -1,5 +1,7 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
+
 from app.db.database import Base
 
 
@@ -15,7 +17,7 @@ class OffboardingReport(Base):
     )
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
     )
     # Expertise areas only this member contributes to

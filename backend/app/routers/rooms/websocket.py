@@ -1,9 +1,10 @@
 """Room WebSocket endpoint for real-time messaging and presence."""
 
 import asyncio
+import contextlib
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -42,8 +43,8 @@ async def room_websocket(websocket: WebSocket, room_id: str):
             await websocket.close(code=4001, reason="Token required")
             return
 
-        from app.services.auth_service import AuthService
         from app.config import get_settings
+        from app.services.auth_service import AuthService
 
         settings = get_settings()
         auth_svc = AuthService(settings)
@@ -124,7 +125,7 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                     websocket.receive_text(),
                     timeout=_MEMBERSHIP_CHECK_INTERVAL,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No message received — re-check membership
                 db = _get_db()
                 try:
@@ -190,11 +191,11 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                                 message_type="user",
                                 content=content,
                                 parent_message_id=data.get("parent_message_id"),
-                                created_at=datetime.now(timezone.utc),
+                                created_at=datetime.now(UTC),
                             )
                             db.add(msg)
                             room.message_count = (room.message_count or 0) + 1
-                            room.last_message_at = datetime.now(timezone.utc)
+                            room.last_message_at = datetime.now(UTC)
                             db.commit()
 
                             await _broadcast(room_id, {
@@ -213,13 +214,11 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                             db.close()
 
                     if not saved:
-                        try:
+                        with contextlib.suppress(Exception):
                             await websocket.send_json({
                                 "type": "error",
                                 "message": "Failed to save message. Please try again.",
                             })
-                        except Exception:
-                            pass
 
                 elif msg_type == "ping":
                     await websocket.send_json({"type": "pong"})
@@ -264,12 +263,10 @@ async def room_websocket(websocket: WebSocket, room_id: str):
 
         logger.info("Room WS disconnected: user=%s room=%s", user_id, room_id)
 
-        try:
+        with contextlib.suppress(Exception):
             await _broadcast(room_id, {
                 "type": "presence",
                 "online_users": _get_online_list(room_id),
                 "user_left": user_id,
                 "username": username,
             })
-        except Exception:
-            pass

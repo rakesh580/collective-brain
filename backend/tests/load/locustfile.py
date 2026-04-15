@@ -4,7 +4,6 @@ Locust load test for Collective Brain API.
 Run:  locust -f tests/load/locustfile.py --host http://localhost:8000
 """
 
-import json
 import random
 
 from locust import HttpUser, between, task

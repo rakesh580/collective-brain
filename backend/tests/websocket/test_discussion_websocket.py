@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 from starlette.websockets import WebSocketDisconnect
 
 

@@ -1,17 +1,18 @@
-from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import func, cast, Date
+from datetime import UTC, datetime, timedelta
 
-from app.models.member import MemberRecord
-from app.models.artifact import ArtifactRecord
-from app.models.contribution import ContributionRecord
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import Date, cast, func
+
 from app.db.database import create_session
 from app.dependencies import get_current_user
+from app.models.artifact import ArtifactRecord
+from app.models.contribution import ContributionRecord
+from app.models.member import MemberRecord
 from app.services.team_health_service import (
     compute_health_snapshot,
-    save_health_snapshot,
     get_health_trends,
     predict_risks,
+    save_health_snapshot,
 )
 
 router = APIRouter()
@@ -26,7 +27,7 @@ async def get_activity_timeline(request: Request, days: int = Query(default=30, 
     """Daily contribution counts for the last N days using SQL aggregation."""
     db = _get_db()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
 
         # Use SQL GROUP BY date for aggregation
         query = (
@@ -45,7 +46,7 @@ async def get_activity_timeline(request: Request, days: int = Query(default=30, 
         # Fill in missing days
         timeline = []
         current = cutoff.date()
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         total = 0
         while current <= today:
             day_str = current.strftime("%Y-%m-%d")
@@ -171,7 +172,7 @@ async def get_member_activity(request: Request, days: int = Query(default=30, ge
     """Per-member contribution counts over last N days using SQL aggregation."""
     db = _get_db()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
 
         # SQL GROUP BY member_id for counts
         query = (
@@ -217,7 +218,7 @@ async def get_topic_trends(request: Request, days: int = Query(default=30, ge=1,
     """Most common topics in recent contributions."""
     db = _get_db()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         query = db.query(ContributionRecord.topics).filter(
             ContributionRecord.timestamp >= cutoff
         )

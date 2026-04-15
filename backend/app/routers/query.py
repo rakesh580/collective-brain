@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from app.db.database import create_session
+from app.dependencies import get_current_user
 from app.schemas.requests import QueryRequest
 from app.schemas.responses import QueryResponse
 from app.services.rag_pipeline import RAGPipeline
-from app.db.database import create_session
-from app.dependencies import get_current_user
 
 router = APIRouter()
 

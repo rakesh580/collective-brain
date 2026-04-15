@@ -4,8 +4,9 @@ VectorStoreService tests use a real PostgreSQL connection when CB_DATABASE_URL
 is set (CI environment). If not set, those tests are skipped automatically.
 """
 import os
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from app.config import Settings
 

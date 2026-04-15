@@ -1,7 +1,7 @@
 """pgvector-based VectorStoreService with OpenTelemetry spans + Prometheus metrics."""
 import logging
 import time
-from typing import Generator
+from collections.abc import Generator
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -35,8 +35,8 @@ class VectorStoreService:
         metadatas: list[dict],
     ):
         """Upsert chunks into knowledge_embeddings."""
-        from app.services.telemetry import get_tracer
         from app.services.metrics import INGESTION_CHUNKS_TOTAL
+        from app.services.telemetry import get_tracer
 
         tracer = get_tracer("collective_brain.vector_store")
         org_id = metadatas[0].get("organization_id", "-") if metadatas else "-"
@@ -107,8 +107,8 @@ class VectorStoreService:
         organization_id: str | None = None,
     ) -> dict:
         """Cosine-similarity nearest-neighbour search."""
-        from app.services.telemetry import get_tracer
         from app.services.metrics import VECTOR_SEARCH_LATENCY, VECTOR_SEARCH_TOTAL
+        from app.services.telemetry import get_tracer
 
         empty = {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
 

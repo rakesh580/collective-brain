@@ -1,6 +1,5 @@
 """Integration tests for the AI query endpoint."""
 
-import pytest
 
 
 class TestQueryEndpoint:

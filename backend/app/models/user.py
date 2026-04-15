@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON, Text
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base
 
 
@@ -18,7 +20,7 @@ class UserRecord(Base):
     avatar_url = Column(String, nullable=True)
     linked_member_id = Column(String, ForeignKey("members.id"), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     last_login = Column(DateTime, nullable=True)
     google_id = Column(String, unique=True, nullable=True, index=True)
     auth_provider = Column(String, nullable=True, default="local")

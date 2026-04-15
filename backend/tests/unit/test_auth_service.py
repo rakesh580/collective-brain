@@ -1,12 +1,11 @@
-import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch, PropertyMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 from jose import jwt
 
-from app.services.auth_service import AuthService, pwd_context
 from app.models.user import UserRecord
+from app.services.auth_service import AuthService
 
 
 class TestHashPassword:
@@ -52,7 +51,7 @@ class TestDecodeToken:
     def test_decode_token_expired(self, settings):
         service = AuthService(settings)
         # Manually create an expired token
-        expire = datetime.now(timezone.utc) - timedelta(minutes=5)
+        expire = datetime.now(UTC) - timedelta(minutes=5)
         payload = {"sub": "user-789", "type": "access", "exp": expire}
         token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
         result = service.decode_token(token)

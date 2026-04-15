@@ -2,10 +2,10 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.schemas.responses import GraphResponse
-from app.services.memory_graph import MemoryGraph
 from app.db.database import create_session
 from app.dependencies import get_current_user
+from app.schemas.responses import GraphResponse
+from app.services.memory_graph import MemoryGraph
 
 logger = logging.getLogger("collective_brain.graph")
 

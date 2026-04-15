@@ -10,7 +10,7 @@ Source input:  dict with keys:
 Requires:  google-api-python-client, google-auth
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.ingestion.base import BaseConnector, ParsedChunk
 from app.ingestion.chunker import ChunkingStrategy
@@ -22,9 +22,9 @@ logger = logging.getLogger("collective_brain.ingestion.google_docs")
 def _build_services(service_account_file: str | None, access_token: str | None):
     """Return (docs_service, drive_service) using service account or access token."""
     try:
-        from googleapiclient.discovery import build
         from google.oauth2 import service_account
         from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
     except ImportError:
         raise RuntimeError(
             "google-api-python-client is not installed. "

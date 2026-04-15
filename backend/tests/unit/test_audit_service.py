@@ -1,5 +1,6 @@
 """Unit tests for AuditService — log writing, querying, request parsing."""
 from unittest.mock import MagicMock
+
 from app.services.audit_service import AuditService
 
 

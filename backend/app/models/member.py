@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Float, JSON, ForeignKey
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base
 
 
@@ -18,8 +20,8 @@ class MemberRecord(Base):
     expertise_scores = Column(JSON, default=dict)
     strengths = Column(JSON, default=list)
     weaknesses = Column(JSON, default=list)
-    first_seen = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    last_active = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    first_seen = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_active = Column(DateTime, default=lambda: datetime.now(UTC))
     total_contributions = Column(Float, default=0)
     metadata_json = Column(JSON, default=dict)
 

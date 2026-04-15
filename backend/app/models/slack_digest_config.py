@@ -1,7 +1,8 @@
 """ORM model for the slack_digest_config table (BUG-017 fix)."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+
 from app.db.database import Base
 
 
@@ -19,4 +20,4 @@ class SlackDigestConfig(Base):
     schedule_hour = Column(Integer, default=9)
     enabled = Column(Boolean, default=True)
     last_sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))

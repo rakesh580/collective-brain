@@ -1,8 +1,10 @@
-import time
-import httpx
 import logging
+import time
+
+import httpx
+
 from app.config import Settings
-from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerError
+from app.services.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger("collective_brain.llm")
 
@@ -37,8 +39,8 @@ class LLMService:
         return await self.breaker.call(self._generate_impl, messages, max_tokens)
 
     async def _generate_impl(self, messages: list[dict], max_tokens: int = 2048) -> str:
+        from app.services.metrics import LLM_LATENCY, LLM_REQUESTS_TOTAL, LLM_TOKENS_ESTIMATED
         from app.services.telemetry import get_tracer
-        from app.services.metrics import LLM_REQUESTS_TOTAL, LLM_LATENCY, LLM_TOKENS_ESTIMATED
 
         tracer = get_tracer("collective_brain.llm")
         t0 = time.perf_counter()

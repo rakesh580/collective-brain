@@ -156,7 +156,8 @@ export function useMindMapLayout(
         } else if (connectedMembers.length === 1) {
           const m = connectedMembers[0];
           const angle = Math.atan2(m.y - cy, m.x - cx);
-          const jitter = (Math.random() - 0.5) * 0.6;
+          // Deterministic jitter based on node index to avoid impure render
+          const jitter = ((idx * 0.618033988749) % 1 - 0.5) * 0.6;
           tx = cx + ring2 * Math.cos(angle + jitter);
           ty = cy + ring2 * Math.sin(angle + jitter);
         } else {

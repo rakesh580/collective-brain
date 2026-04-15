@@ -2,13 +2,12 @@
 """Focused WebSocket + DB Write tests that reuse existing users."""
 
 import asyncio
-import time
 import json
-import random
-import string
-import statistics
 import logging
-import sys
+import random
+import statistics
+import string
+import time
 
 import httpx
 
@@ -76,9 +75,9 @@ async def test_websocket(num_connections: int, tokens: list, room_id: str):
                         while True:
                             await ws.recv()
                             messages_received += 1
-                except (asyncio.TimeoutError, Exception):
+                except (TimeoutError, Exception):
                     pass
-        except Exception as e:
+        except Exception:
             failed += 1
             connect_times.append((time.monotonic() - start) * 1000)
 

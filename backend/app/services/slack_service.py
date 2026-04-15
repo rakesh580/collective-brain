@@ -3,14 +3,13 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.models.slack_integration import SlackWorkspace, SlackChannelSync
+from app.models.slack_integration import SlackWorkspace
 
 logger = logging.getLogger("collective_brain.slack")
 
@@ -100,7 +99,7 @@ class SlackService:
             bot_token=bot_token,
             bot_user_id=bot_user_id,
             installed_by_user_id=installed_by_user_id,
-            installed_at=datetime.now(timezone.utc),
+            installed_at=datetime.now(UTC),
         )
         db.add(workspace)
         db.commit()

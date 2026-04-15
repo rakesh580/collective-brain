@@ -2,10 +2,10 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.requests import (
-    RegisterRequest,
     LoginRequest,
-    ResetPasswordRequest,
     QueryRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
 )
 
 

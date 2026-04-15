@@ -20,10 +20,7 @@ class TaskConnector(BaseConnector):
         file_path = Path(source_input)
         content = file_path.read_text(encoding="utf-8", errors="ignore")
 
-        if file_path.suffix == ".csv":
-            tasks = self._parse_csv(content)
-        else:
-            tasks = self._parse_json(content)
+        tasks = self._parse_csv(content) if file_path.suffix == ".csv" else self._parse_json(content)
 
         chunks = []
         for task in tasks:
@@ -65,10 +62,7 @@ class TaskConnector(BaseConnector):
         file_path = Path(source_input)
         content = file_path.read_text(encoding="utf-8", errors="ignore")
 
-        if file_path.suffix == ".csv":
-            tasks = self._parse_csv(content)
-        else:
-            tasks = self._parse_json(content)
+        tasks = self._parse_csv(content) if file_path.suffix == ".csv" else self._parse_json(content)
 
         members: dict[str, dict] = {}
         for task in tasks:
@@ -111,10 +105,7 @@ class TaskConnector(BaseConnector):
         assignee = task.get("assignee", "unassigned")
         status = task.get("status", "unknown")
         tags = task.get("tags", [])
-        if isinstance(tags, list):
-            tags_str = ", ".join(tags)
-        else:
-            tags_str = str(tags)
+        tags_str = ", ".join(tags) if isinstance(tags, list) else str(tags)
         notes = task.get("notes", "")
         due_date = task.get("due_date", "")
 

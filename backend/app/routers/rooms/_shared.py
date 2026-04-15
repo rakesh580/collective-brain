@@ -1,15 +1,13 @@
 """Shared state, constants, and helpers used across all room sub-modules."""
 
-import json
+import contextlib
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
-from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket
 
 from app.db.database import create_session
-from app.models.room import ChatRoom, ChatRoomMember, ChatRoomMessage
+from app.models.room import ChatRoomMessage
 from app.models.user import UserRecord
 
 logger = logging.getLogger("collective_brain.rooms")
@@ -93,10 +91,8 @@ async def _broadcast_local(room_id: str, event: dict):
         except Exception:
             dead.append((ws, uid, uname))
     for entry in dead:
-        try:
+        with contextlib.suppress(ValueError):
             connections.remove(entry)
-        except ValueError:
-            pass
         _online_users[room_id].discard(entry[1])
 
 

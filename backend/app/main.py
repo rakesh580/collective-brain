@@ -1,37 +1,50 @@
-from contextlib import asynccontextmanager
+import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pythonjsonlogger import jsonlogger
 
+import app.models  # noqa: F401 -- ensure all models registered with Base
 from app.config import get_settings
 from app.db.database import init_db
-from app.services.embedding_service import EmbeddingService
-from app.services.vector_store import VectorStoreService
-from app.services.llm_service import LLMService
-from app.services.redis_service import RedisService
-from app.services.task_queue import TaskQueue
-from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerError
-from app.services.telemetry import setup_telemetry, current_trace_id
-from app.services.metrics import APP_INFO
-import app.models  # noqa: F401 -- ensure all models registered with Base
 from app.routers import (
-    health, ingest, query, members, insights, graph,
-    conversations, artifacts, analytics, search, auth, discussions, rooms, slack,
-    github_webhooks, expert_routing,
+    analytics,
+    artifacts,
+    auth,
+    conversations,
+    discussions,
+    expert_routing,
+    github_webhooks,
+    graph,
+    health,
+    ingest,
+    insights,
+    members,
+    query,
+    rooms,
+    search,
+    slack,
 )
+from app.routers.offboarding import router as offboarding_router
 from app.routers.organizations import router as organizations_router
+from app.routers.public_kb import manage_router as public_kb_manage_router
+from app.routers.public_kb import public_router as public_kb_router
 from app.routers.saml import router as saml_router
 from app.routers.scim import router as scim_router
-from app.routers.offboarding import router as offboarding_router
-from app.routers.public_kb import manage_router as public_kb_manage_router, public_router as public_kb_router
-
-import logging
-from pythonjsonlogger import jsonlogger
+from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerError
+from app.services.embedding_service import EmbeddingService
+from app.services.llm_service import LLMService
+from app.services.metrics import APP_INFO
+from app.services.redis_service import RedisService
+from app.services.task_queue import TaskQueue
+from app.services.telemetry import current_trace_id, setup_telemetry
+from app.services.vector_store import VectorStoreService
 
 # ── OpenTelemetry must be set up before any instrumented code runs ──
 setup_telemetry(service_name="collective-brain", version="0.3.0")
@@ -101,8 +114,8 @@ async def lifespan(app: FastAPI):
     )
 
     # ── Initialize Redis references in routers ──
-    from app.routers.rooms import init_redis_from_app as rooms_init_redis
     from app.routers.discussions import init_redis_from_app as discussions_init_redis
+    from app.routers.rooms import init_redis_from_app as rooms_init_redis
     rooms_init_redis(app)
     discussions_init_redis(app)
 
@@ -201,10 +214,11 @@ app.add_middleware(
 )
 
 # ── Middleware ────────────────────────────────────────────────────────────────
+import contextvars
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
-import contextvars
 
 _request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 _org_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("org_id", default="-")

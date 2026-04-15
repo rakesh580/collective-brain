@@ -2,7 +2,7 @@
 
 import networkx as nx
 
-from app.schemas.responses import GraphNode, GraphEdge
+from app.schemas.responses import GraphEdge, GraphNode
 
 
 class GraphQueryMixin:

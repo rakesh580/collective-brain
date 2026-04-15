@@ -13,8 +13,7 @@ Verification statuses (stored on InsightRecord.verification_status):
   "disputed" — LLM spot-check contradicts the insight
 """
 import logging
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -70,7 +69,7 @@ class KnowledgeVerificationService:
 
         if not artifact_ids:
             # No source artifacts recorded — fall back to generated_at age
-            delta = (datetime.now(timezone.utc) - _ensure_tz(insight.generated_at)).days
+            delta = (datetime.now(UTC) - _ensure_tz(insight.generated_at)).days
             staleness_days = delta
             if delta > self._threshold:
                 status = "outdated"
@@ -91,7 +90,7 @@ class KnowledgeVerificationService:
                 for art in artifacts:
                     ref_date = art.last_synced_at or art.ingested_at
                     if ref_date:
-                        days = (datetime.now(timezone.utc) - _ensure_tz(ref_date)).days
+                        days = (datetime.now(UTC) - _ensure_tz(ref_date)).days
                         max_staleness = max(max_staleness, days)
                 staleness_days = max_staleness
                 if max_staleness > self._threshold:
@@ -127,7 +126,7 @@ class KnowledgeVerificationService:
         # ── Persist results ────────────────────────────────────────────────────
         insight.verification_status = status
         insight.staleness_days = staleness_days
-        insight.verified_at = datetime.now(timezone.utc)
+        insight.verified_at = datetime.now(UTC)
         if verifier_user_id:
             insight.verified_by = verifier_user_id
         db.commit()
@@ -212,7 +211,7 @@ class KnowledgeVerificationService:
 def _ensure_tz(dt: datetime) -> datetime:
     """Ensure a datetime is timezone-aware (UTC if naive)."""
     if dt is None:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt

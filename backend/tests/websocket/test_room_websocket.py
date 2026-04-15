@@ -1,10 +1,7 @@
 """WebSocket tests for chat rooms — messaging, typing, presence, membership."""
 
 import json
-import time
 
-import pytest
-from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 

@@ -1,7 +1,6 @@
 """Graph analysis: pattern detection, stats, clusters, expertise gaps, expert routing."""
 
-from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import networkx as nx
 
@@ -99,7 +98,7 @@ class GraphAnalysisMixin:
                 })
 
         # Stale expertise: members inactive >90 days
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stale_threshold = now - timedelta(days=90)
         contribs = self._query_contributions()
         member_last_active: dict[str, datetime] = {}
@@ -351,7 +350,7 @@ class GraphAnalysisMixin:
                 if prev is None or c.timestamp > prev:
                     member_last_active[c.member_id] = c.timestamp
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scored: list[dict] = []
 
         for mid, mdata in member_nodes.items():

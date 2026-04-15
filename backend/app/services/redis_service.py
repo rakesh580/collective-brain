@@ -4,12 +4,14 @@ Falls back gracefully to in-memory when Redis is unavailable,
 so the app works in dev without Redis running.
 """
 
-import json
 import asyncio
+import contextlib
+import json
 import logging
 import time
 from collections import defaultdict
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 logger = logging.getLogger("collective_brain.redis")
 
@@ -171,10 +173,8 @@ class RedisService:
     async def unsubscribe(self, channel: str):
         """Unsubscribe from a channel."""
         if self._redis and self._pubsub:
-            try:
+            with contextlib.suppress(Exception):
                 await self._pubsub.unsubscribe(channel)
-            except Exception:
-                pass
 
         self._subscriptions.pop(channel, None)
         _memory_pubsub.pop(channel, None)
@@ -245,10 +245,8 @@ class RedisService:
         """Clean shutdown."""
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
 
         if self._pubsub:
             await self._pubsub.close()

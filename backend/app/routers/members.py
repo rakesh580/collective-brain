@@ -1,16 +1,16 @@
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.schemas.requests import MemberAliasUpdate, MemberCreateRequest, MemberUpdateRequest
-from app.schemas.responses import MemberResponse, MemberDetailResponse, ContributionResponse
-from app.models.member import MemberRecord
-from app.models.contribution import ContributionRecord
-from app.models.artifact import ArtifactRecord
 from app.db.database import create_session
 from app.dependencies import require_role
+from app.models.artifact import ArtifactRecord
+from app.models.contribution import ContributionRecord
+from app.models.member import MemberRecord
+from app.schemas.requests import MemberAliasUpdate, MemberCreateRequest, MemberUpdateRequest
+from app.schemas.responses import ContributionResponse, MemberDetailResponse, MemberResponse
 
 router = APIRouter()
 
@@ -159,7 +159,7 @@ async def create_member(body: MemberCreateRequest, request: Request, user=Depend
         # Ensure unique ID
         if db.query(MemberRecord).filter(MemberRecord.id == member_id).first():
             member_id = f"{slug}-{uuid4().hex[:6]}"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         member = MemberRecord(
             id=member_id,
             name=body.name,

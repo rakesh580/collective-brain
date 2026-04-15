@@ -12,7 +12,7 @@ Usage example:
     INGESTION_CHUNKS.labels(source_type="markdown", org_id=org_id).inc(chunk_count)
 """
 
-from prometheus_client import Counter, Histogram, Gauge, Info
+from prometheus_client import Counter, Gauge, Histogram, Info
 
 # ── HTTP layer (augments prometheus-fastapi-instrumentator's auto metrics) ──
 

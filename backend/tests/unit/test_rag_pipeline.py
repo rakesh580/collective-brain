@@ -1,6 +1,6 @@
 """Unit tests for RAGPipeline — intent classification, retrieval, LLM integration."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -59,8 +59,9 @@ class TestAnswer:
 
     @pytest.mark.asyncio
     async def test_answer_with_existing_conversation(self, pipeline, db_session):
-        from app.models.conversation import ConversationRecord
         from uuid import uuid4
+
+        from app.models.conversation import ConversationRecord
 
         conv = ConversationRecord(
             id=str(uuid4()),
@@ -91,9 +92,8 @@ class TestAnswer:
     @pytest.mark.asyncio
     async def test_llm_timeout_returns_fallback(self, pipeline):
         """When LLM times out, should return a graceful fallback response."""
-        import asyncio
 
-        pipeline.llm.generate = AsyncMock(side_effect=asyncio.TimeoutError())
+        pipeline.llm.generate = AsyncMock(side_effect=TimeoutError())
         result = await pipeline.answer(
             question="Test question",
             sender_user_id="user-1",

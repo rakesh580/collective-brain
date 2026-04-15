@@ -11,10 +11,11 @@ Prevents:
   - Resource starvation when LLM/embedding/external APIs go down
 """
 
-import time
 import logging
+import time
+from collections.abc import Awaitable, Callable
 from enum import Enum
-from typing import TypeVar, Callable, Awaitable
+from typing import TypeVar
 
 logger = logging.getLogger("collective_brain.circuit_breaker")
 

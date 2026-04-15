@@ -1,7 +1,6 @@
 """Unit tests for RedisService — caching, pub/sub, rate limiting (in-memory fallback)."""
 
 import asyncio
-import time
 
 import pytest
 

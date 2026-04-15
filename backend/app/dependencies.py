@@ -1,10 +1,10 @@
-from fastapi import Request, Depends, HTTPException, status
+from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.services.embedding_service import EmbeddingService
-from app.services.vector_store import VectorStoreService
-from app.services.llm_service import LLMService
 from app.db.database import create_session
+from app.services.embedding_service import EmbeddingService
+from app.services.llm_service import LLMService
+from app.services.vector_store import VectorStoreService
 
 
 def get_db() -> Session:

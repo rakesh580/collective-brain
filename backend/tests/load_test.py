@@ -11,8 +11,8 @@ Usage:
 
 import random
 import string
-import json
-from locust import HttpUser, task, between, events, tag
+
+from locust import HttpUser, between, tag, task
 
 
 def _rand(n=8):

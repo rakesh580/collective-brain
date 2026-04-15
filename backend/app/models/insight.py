@@ -1,5 +1,7 @@
-from datetime import datetime, timezone
-from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+
 from app.db.database import Base
 
 
@@ -13,7 +15,7 @@ class InsightRecord(Base):
     insight_type = Column(String, index=True)
     title = Column(String)
     body = Column(Text)
-    generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    generated_at = Column(DateTime, default=lambda: datetime.now(UTC))
     related_member_ids = Column(JSON, default=list)
     confidence = Column(Float, default=0.0)
     period_start = Column(DateTime, nullable=True)

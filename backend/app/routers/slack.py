@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from app.db.database import create_session
-from app.models.slack_integration import SlackWorkspace, SlackChannelSync
+from app.models.slack_integration import SlackChannelSync, SlackWorkspace
 
 logger = logging.getLogger("collective_brain.slack_router")
 
@@ -310,8 +310,8 @@ async def backfill_sync(sync_id: str, request: Request, limit: int = 200):
             raise HTTPException(status_code=404, detail="Sync not found")
 
         settings = request.app.state.settings
-        from app.services.slack_service import SlackService
         from app.services.slack_event_processor import SlackEventProcessor
+        from app.services.slack_service import SlackService
 
         slack = SlackService(settings)
         processor = SlackEventProcessor(
@@ -365,8 +365,8 @@ async def slack_events(request: Request):
         db = _get_db()
         try:
             if event_type == "message" and not event.get("subtype"):
-                from app.services.slack_service import SlackService
                 from app.services.slack_event_processor import SlackEventProcessor
+                from app.services.slack_service import SlackService
 
                 slack_svc = SlackService(settings)
                 processor = SlackEventProcessor(
@@ -378,9 +378,9 @@ async def slack_events(request: Request):
                 await processor.process_message(event, team_id)
 
             elif event_type == "app_mention":
-                from app.services.slack_service import SlackService
-                from app.services.slack_event_processor import SlackEventProcessor
                 from app.services.rag_pipeline import RAGPipeline
+                from app.services.slack_event_processor import SlackEventProcessor
+                from app.services.slack_service import SlackService
 
                 slack_svc = SlackService(settings)
                 processor = SlackEventProcessor(
@@ -436,7 +436,7 @@ async def slack_commands(request: Request):
             raise HTTPException(status_code=401, detail="Invalid signature")
 
     form = await request.form()
-    command = form.get("command", "")
+    form.get("command", "")
     text = form.get("text", "").strip()
     channel_id = form.get("channel_id", "")
     team_id = form.get("team_id", "")
@@ -563,9 +563,9 @@ async def digest_preview(request: Request):
     get_current_user(request)
 
     from app.services.digest_service import (
-        generate_weekly_digest,
         format_slack_blocks,
         format_text_digest,
+        generate_weekly_digest,
     )
 
     db = _get_db()

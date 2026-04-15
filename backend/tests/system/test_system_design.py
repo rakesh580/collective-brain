@@ -1,10 +1,7 @@
 """System design validation tests — idempotency, concurrency, scalability, statelessness."""
 
 import concurrent.futures
-import io
 import time
-
-import pytest
 
 
 # ---------------------------------------------------------------------------

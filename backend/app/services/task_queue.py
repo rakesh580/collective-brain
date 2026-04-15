@@ -7,12 +7,14 @@ Prevents: AI queries and ingestion from blocking the API request cycle.
 """
 
 import asyncio
+import contextlib
 import logging
 import time
 import traceback
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger("collective_brain.tasks")
 
@@ -78,17 +80,13 @@ class TaskQueue:
             await self._queue.put(None)  # type: ignore
         for w in self._workers:
             w.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await w
-            except asyncio.CancelledError:
-                pass
         self._workers.clear()
         if hasattr(self, "_cleanup_task"):
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Task queue stopped")
 
     async def enqueue(
@@ -168,7 +166,7 @@ class TaskQueue:
         while self._running:
             try:
                 entry = await asyncio.wait_for(self._queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break

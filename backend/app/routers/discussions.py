@@ -1,18 +1,18 @@
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 
 from app.db.database import create_session
-from app.models.discussion import DiscussionThread, DiscussionMessage
+from app.models.discussion import DiscussionMessage, DiscussionThread
 from app.models.user import UserRecord
 from app.schemas.requests import (
-    CreateThreadRequest,
     CreateDiscussionMessageRequest,
+    CreateThreadRequest,
     EditDiscussionMessageRequest,
 )
 
@@ -107,8 +107,8 @@ async def create_thread(body: CreateThreadRequest, request: Request):
             context_type=body.context_type,
             context_id=body.context_id,
             room_id=body.room_id,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         db.add(thread)
         db.commit()
@@ -269,10 +269,10 @@ async def add_message(
             user_id=user.id,
             content=body.content,
             parent_message_id=body.parent_message_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(msg)
-        thread.updated_at = datetime.now(timezone.utc)
+        thread.updated_at = datetime.now(UTC)
         db.commit()
 
         msg_dict = _msg_to_dict(msg, db)
@@ -311,7 +311,7 @@ async def edit_message(
             raise HTTPException(status_code=403, detail="Can only edit your own messages")
 
         msg.content = body.content
-        msg.edited_at = datetime.now(timezone.utc)
+        msg.edited_at = datetime.now(UTC)
         db.commit()
 
         msg_dict = _msg_to_dict(msg, db)
@@ -368,8 +368,8 @@ async def discussion_websocket(websocket: WebSocket, thread_id: str):
             await websocket.close(code=4001, reason="Token required")
             return
 
-        from app.services.auth_service import AuthService
         from app.config import get_settings
+        from app.services.auth_service import AuthService
 
         settings = get_settings()
         auth_svc = AuthService(settings)

@@ -15,12 +15,10 @@ Implemented endpoints:
 The X-SCIM-Org header (or a separate URL prefix per org) carries the org slug.
 """
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.database import create_session
@@ -125,10 +123,9 @@ def list_users(
         q = db.query(UserRecord).filter_by(organization_id=org.id)
 
         # Basic SCIM filter: userName eq "email@example.com"
-        if filter:
-            if 'userName eq "' in filter:
-                email = filter.split('"')[1]
-                q = q.filter(UserRecord.email == email)
+        if filter and 'userName eq "' in filter:
+            email = filter.split('"')[1]
+            q = q.filter(UserRecord.email == email)
 
         total = q.count()
         users = q.offset(startIndex - 1).limit(count).all()
@@ -221,7 +218,7 @@ async def provision_user(
             auth_provider="scim",
             organization_id=org.id,
             is_active=active,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(user)
         db.commit()

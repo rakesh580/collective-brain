@@ -4,8 +4,6 @@ import concurrent.futures
 import io
 import time
 
-import pytest
-
 
 class TestResponseTimes:
     """API response time benchmarks (using mocked LLM, so no network latency)."""
@@ -106,7 +104,7 @@ class TestBulkIngestion:
     def test_bulk_markdown_upload(self, app_client, auth_headers):
         """Upload 10 markdown files at once."""
         files = [
-            ("files", (f"doc_{i}.md", io.BytesIO(f"# Doc {i}\nContent for document {i} " * 50 + "\n".encode() if isinstance(f"# Doc {i}\nContent for document {i} " * 50, str) else b"content"), "text/markdown"))
+            ("files", (f"doc_{i}.md", io.BytesIO(f"# Doc {i}\nContent for document {i} " * 50 + b"\n" if isinstance(f"# Doc {i}\nContent for document {i} " * 50, str) else b"content"), "text/markdown"))
             for i in range(10)
         ]
         # Fix: properly create BytesIO objects

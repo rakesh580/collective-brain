@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 
 /* ── Neural Network Canvas Background ── */
 interface Node {
@@ -18,7 +18,7 @@ export default function NeuralBackground() {
   const animRef = useRef<number>(0);
 
   // Check prefers-reduced-motion once on mount
-  const prefersReducedMotion = useRef(
+  const [reducedMotion] = useState(() =>
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
@@ -42,7 +42,7 @@ export default function NeuralBackground() {
 
   useEffect(() => {
     // Skip the entire canvas animation when user prefers reduced motion
-    if (prefersReducedMotion.current) return;
+    if (reducedMotion) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -253,7 +253,7 @@ export default function NeuralBackground() {
   }, [initNodes]);
 
   // When reduced motion is preferred, render a static gradient background only
-  if (prefersReducedMotion.current) {
+  if (reducedMotion) {
     return (
       <div
         className="fixed inset-0 z-0"

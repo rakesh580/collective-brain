@@ -241,7 +241,7 @@ class TestThousandUserScale:
 
         # Phase 3: Analyze results
         print(f"\n{'='*60}")
-        print(f"PHASE 3: Results Analysis")
+        print("PHASE 3: Results Analysis")
         print(f"{'='*60}")
 
         members_ok = sum(1 for r in all_results if r.members_ok)
@@ -281,7 +281,7 @@ class TestThousandUserScale:
         print(f"  Total errors:   {len(all_errors)}")
 
         if all_errors:
-            print(f"\n  Error details (first 30):")
+            print("\n  Error details (first 30):")
             for e in all_errors[:30]:
                 print(f"    - {e}")
 
@@ -326,7 +326,7 @@ class TestThousandUserScale:
 
         print(f"\nLogin verification: {login_ok}/{len(sample_indices)} succeeded")
         assert login_ok == len(sample_indices), (
-            f"Login failures:\n" + "\n".join(login_errors)
+            "Login failures:\n" + "\n".join(login_errors)
         )
 
         # Verify each user can see their own profile
@@ -413,5 +413,5 @@ class TestThousandUserScale:
 
         print(f"\nIsolation check: {len(isolation_errors)} violations")
         assert len(isolation_errors) == 0, (
-            f"Data isolation failures:\n" + "\n".join(isolation_errors)
+            "Data isolation failures:\n" + "\n".join(isolation_errors)
         )

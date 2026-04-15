@@ -1,24 +1,25 @@
 import asyncio
 import logging
+from datetime import UTC, datetime
 from uuid import uuid4
-from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
-from app.services.llm_service import LLMService
+from app.models.contribution import ContributionRecord
+from app.models.conversation import ConversationRecord, MessageRecord
+from app.models.member import MemberRecord
+from app.models.user import UserRecord
+from app.schemas.responses import QueryResponse, RelatedMember, SourceRef
 from app.services.embedding_service import EmbeddingService
-from app.services.vector_store import VectorStoreService
+from app.services.llm_service import LLMService
 from app.services.prompts import (
-    SYSTEM_PROMPT,
     CONTEXT_TEMPLATE,
     MEMBER_RECOMMENDATION_TEMPLATE,
     PATTERN_ANALYSIS_TEMPLATE,
     STRATEGY_TEMPLATE,
+    SYSTEM_PROMPT,
 )
-from app.schemas.responses import QueryResponse, SourceRef, RelatedMember
-from app.models.member import MemberRecord
-from app.models.contribution import ContributionRecord
-from app.models.conversation import ConversationRecord, MessageRecord
-from app.models.user import UserRecord
+from app.services.vector_store import VectorStoreService
 
 logger = logging.getLogger("collective_brain.rag")
 
@@ -81,7 +82,7 @@ class RAGPipeline:
                 self.llm.generate(messages),
                 timeout=LLM_TIMEOUT_SECONDS,
             )
-        except (asyncio.TimeoutError, Exception) as e:
+        except (TimeoutError, Exception) as e:
             logger.error("LLM call failed: %s", e)
             response_text = FALLBACK_RESPONSE
 
@@ -109,8 +110,8 @@ class RAGPipeline:
             conv = ConversationRecord(
                 id=conv_id,
                 title=(question.strip()[:100] or "Untitled"),
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 owner_user_id=owner_user_id,
                 room_id=getattr(self, "room_id", None),
             )
@@ -121,7 +122,7 @@ class RAGPipeline:
         self, conv_id: str, user_content: str, response_text: str, results: dict,
         sender_user_id: str | None = None, sender_name: str | None = None,
     ):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         user_msg = MessageRecord(
             id=str(uuid4()),
             conversation_id=conv_id,

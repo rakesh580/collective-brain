@@ -19,9 +19,9 @@ import logging
 import os
 
 from opentelemetry import trace
+from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 logger = logging.getLogger("collective_brain.telemetry")
 

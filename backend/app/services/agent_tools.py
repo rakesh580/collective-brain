@@ -6,19 +6,18 @@ exposing them for the LLM to call autonomously.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 
-from app.models.member import MemberRecord
 from app.models.contribution import ContributionRecord
 from app.models.insight import InsightRecord
+from app.models.member import MemberRecord
 from app.models.user import UserRecord
 from app.services.embedding_service import EmbeddingService
-from app.services.vector_store import VectorStoreService
 from app.services.memory_graph import MemoryGraph
+from app.services.vector_store import VectorStoreService
 
 
 def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorStoreService, room_id: str | None = None):
@@ -187,7 +186,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         if not member:
             return f"No member found matching '{member_name}'."
 
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         q = db.query(ContributionRecord).filter(
             ContributionRecord.member_id == member.id,
             ContributionRecord.timestamp >= since,
@@ -287,7 +286,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         """Get the team-wide recent activity summary for the specified number of days.
         Shows all contributions across the team, grouped by type.
         Use this for an overview of what the whole team has been doing."""
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         q = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= since)
         if room_id:
             q = q.filter(ContributionRecord.room_id == room_id)

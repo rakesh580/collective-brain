@@ -1,12 +1,12 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
-from typing import Generator
 
 Base = declarative_base()
 
@@ -81,9 +81,11 @@ def _run_alembic_migrations(settings):
     Alembic needs a session-mode connection, not the transaction pooler.
     """
     try:
-        from alembic.config import Config
-        from alembic import command
         import os
+
+        from alembic.config import Config
+
+        from alembic import command
 
         alembic_cfg = Config()
         # Locate alembic.ini relative to this file: backend/alembic.ini
@@ -145,7 +147,7 @@ def save_digest_config(
             schedule_day=schedule_day,
             schedule_hour=schedule_hour,
             enabled=enabled,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(new_config)
         db.commit()
@@ -194,7 +196,7 @@ def update_digest_last_sent(db: Session, config_id: str) -> bool:
     if not config:
         return False
 
-    config.last_sent_at = datetime.now(timezone.utc)
+    config.last_sent_at = datetime.now(UTC)
     db.commit()
     return True
 
@@ -209,7 +211,7 @@ def create_help_request(
     from app.models.help_request import HelpRequest
 
     request_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     topics_json = json.dumps(topics or [])
 
     new_request = HelpRequest(
@@ -242,6 +244,7 @@ def get_help_requests(
     linked_member_id: str | None = None,
 ) -> list[dict]:
     from sqlalchemy import or_
+
     from app.models.help_request import HelpRequest
 
     query = db.query(HelpRequest)
@@ -289,7 +292,7 @@ def update_help_request_status(db: Session, request_id: str, new_status: str) ->
         return False
 
     request.status = new_status
-    request.resolved_at = datetime.now(timezone.utc) if new_status == "resolved" else None
+    request.resolved_at = datetime.now(UTC) if new_status == "resolved" else None
     db.commit()
     return True
 
@@ -307,7 +310,7 @@ def save_health_snapshot_record(
 ) -> dict:
     from app.models.health_snapshot import HealthSnapshot
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     snapshot = HealthSnapshot(
         id=snapshot_id,
         timestamp=now,
@@ -339,7 +342,7 @@ def save_health_snapshot_record(
 def get_health_snapshots(db: Session, days: int = 90) -> list[dict]:
     from app.models.health_snapshot import HealthSnapshot
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     rows = (
         db.query(HealthSnapshot)
         .filter(HealthSnapshot.timestamp >= cutoff)

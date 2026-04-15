@@ -1,16 +1,15 @@
 """Weekly Slack Digest Bot — compiles and sends team knowledge digests."""
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.models.member import MemberRecord
-from app.models.artifact import ArtifactRecord
 from app.models.slack_integration import SlackWorkspace
 from app.services.memory_graph import MemoryGraph
 
@@ -24,7 +23,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
 
     Returns a DigestData dict with all metrics, highlights, and risks.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
 
     # ── Recent contributions (last 7 days) ────────────────────

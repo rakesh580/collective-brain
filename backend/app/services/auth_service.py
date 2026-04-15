@@ -1,11 +1,10 @@
 import logging
-import random
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from jose import JWTError, jwt
 from passlib.context import CryptContext
-from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -28,12 +27,12 @@ class AuthService:
         return pwd_context.verify(plain, hashed)
 
     def create_token(self, user_id: str) -> str:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=self.expire_minutes)
+        expire = datetime.now(UTC) + timedelta(minutes=self.expire_minutes)
         payload = {"sub": user_id, "type": "access", "exp": expire}
         return jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
     def create_refresh_token(self, user_id: str) -> str:
-        expire = datetime.now(timezone.utc) + timedelta(days=7)
+        expire = datetime.now(UTC) + timedelta(days=7)
         payload = {"sub": user_id, "type": "refresh", "exp": expire}
         return jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
@@ -85,7 +84,7 @@ class AuthService:
             display_name=display_name or username,
             auth_provider="local",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(user)
         db.commit()
@@ -111,7 +110,7 @@ class AuthService:
             raise ValueError("Invalid credentials")
         if not self.verify_password(password, user.password_hash):
             raise ValueError("Invalid credentials")
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
         db.commit()
         return user
 
@@ -125,8 +124,8 @@ class AuthService:
         google_client_id: str,
     ) -> UserRecord:
         """Verify a Google ID token, then find or create the user."""
-        from google.oauth2 import id_token as google_id_token_mod
         from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token_mod
 
         try:
             idinfo = google_id_token_mod.verify_oauth2_token(
@@ -151,7 +150,7 @@ class AuthService:
         if user:
             if not user.is_active:
                 raise ValueError("This account has been deactivated")
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(UTC)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -166,7 +165,7 @@ class AuthService:
             user.auth_provider = (
                 "google+local" if user.password_hash else "google"
             )
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(UTC)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -190,8 +189,8 @@ class AuthService:
             google_id=google_sub,
             auth_provider="google",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
-            last_login=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            last_login=datetime.now(UTC),
         )
         db.add(user)
         db.commit()
@@ -237,7 +236,7 @@ class AuthService:
         if user:
             if not user.is_active:
                 raise ValueError("This account has been deactivated")
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(UTC)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -252,7 +251,7 @@ class AuthService:
             user.auth_provider = (
                 "google+local" if user.password_hash else "google"
             )
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(UTC)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
             db.commit()
@@ -276,8 +275,8 @@ class AuthService:
             google_id=google_sub,
             auth_provider="google",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
-            last_login=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            last_login=datetime.now(UTC),
         )
         db.add(user)
         db.commit()
@@ -306,7 +305,7 @@ class AuthService:
         import secrets as _secrets
         code = "".join(_secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
         user.reset_code = pwd_context.hash(code)
-        user.reset_code_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        user.reset_code_expires = datetime.now(UTC) + timedelta(minutes=15)
         db.commit()
         return code
 
@@ -322,7 +321,7 @@ class AuthService:
             raise ValueError("No account found with that email address")
         if not user.reset_code or not pwd_context.verify(code, user.reset_code):
             raise ValueError("Invalid verification code")
-        if user.reset_code_expires and user.reset_code_expires < datetime.now(timezone.utc):
+        if user.reset_code_expires and user.reset_code_expires < datetime.now(UTC):
             raise ValueError("Verification code has expired")
 
         user.password_hash = self.hash_password(new_password)

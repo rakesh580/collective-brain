@@ -1,6 +1,5 @@
 """Integration tests for member management endpoints."""
 
-import pytest
 
 
 class TestMemberCRUD:

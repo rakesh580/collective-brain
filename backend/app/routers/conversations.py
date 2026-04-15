@@ -3,10 +3,10 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import IntegrityError
 
-from app.models.conversation import ConversationRecord, MessageRecord, ConversationParticipant
+from app.db.database import create_session
+from app.models.conversation import ConversationParticipant, ConversationRecord, MessageRecord
 from app.models.user import UserRecord
 from app.schemas.requests import ShareConversationRequest
-from app.db.database import create_session
 
 router = APIRouter()
 

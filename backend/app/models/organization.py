@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, JSON, ForeignKey, UniqueConstraint
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base
 
 
@@ -12,7 +14,7 @@ class OrganizationRecord(Base):
     slug = Column(String, nullable=False, unique=True, index=True)  # URL-safe identifier
     plan = Column(String, nullable=False, default="free")  # "free", "pro", "enterprise"
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     settings_json = Column(JSON, default=dict)   # org-level config (SSO, branding, etc.)
     metadata_json = Column(JSON, default=dict)
 
@@ -37,7 +39,7 @@ class OrganizationMembership(Base):
     )
     # "owner" — full control, "admin" — manage members/settings, "member" — standard access
     role = Column(String, nullable=False, default="member")
-    joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    joined_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     organization = relationship("OrganizationRecord", back_populates="memberships")
 

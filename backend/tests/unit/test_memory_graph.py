@@ -1,9 +1,7 @@
 """Unit tests for MemoryGraph — graph building, subgraphs, pattern detection."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
-
-import pytest
 
 from app.services.memory_graph import MemoryGraph
 
@@ -99,16 +97,16 @@ class TestPatternDetection:
 
     def test_bus_factor_detection(self, db_session):
         """A topic with only one contributor should trigger bus factor risk."""
-        from app.models.member import MemberRecord
         from app.models.artifact import ArtifactRecord
         from app.models.contribution import ContributionRecord
+        from app.models.member import MemberRecord
 
         member = MemberRecord(
             id="lone-dev",
             name="Lone Dev",
             expertise_tags=["niche-topic"],
             total_contributions=10,
-            last_active=datetime.now(timezone.utc),
+            last_active=datetime.now(UTC),
         )
         db_session.add(member)
 
@@ -127,7 +125,7 @@ class TestPatternDetection:
             member_id="lone-dev",
             artifact_id="solo-art",
             contribution_type="git_content",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             description="solo work",
             topics=["niche-topic"],
         )
@@ -142,15 +140,15 @@ class TestPatternDetection:
 
     def test_stale_expertise_detection(self, db_session):
         """A member inactive > 90 days should trigger stale expertise."""
-        from app.models.member import MemberRecord
         from app.models.contribution import ContributionRecord
+        from app.models.member import MemberRecord
 
         member = MemberRecord(
             id="stale-dev",
             name="Stale Dev",
             expertise_tags=["old-tech"],
             total_contributions=10,
-            last_active=datetime.now(timezone.utc) - timedelta(days=120),
+            last_active=datetime.now(UTC) - timedelta(days=120),
         )
         db_session.add(member)
 
@@ -161,7 +159,7 @@ class TestPatternDetection:
             member_id="stale-dev",
             artifact_id=None,
             contribution_type="git_content",
-            timestamp=datetime.now(timezone.utc) - timedelta(days=120),
+            timestamp=datetime.now(UTC) - timedelta(days=120),
             description="old work",
             topics=["old-tech"],
         )

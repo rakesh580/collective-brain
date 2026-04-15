@@ -1,7 +1,8 @@
 """ORM model for the help_requests table (BUG-017 fix)."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
+
 from app.db.database import Base
 
 
@@ -17,5 +18,5 @@ class HelpRequest(Base):
     query = Column(Text, nullable=False)
     topics = Column(Text, default="[]")  # JSON-encoded list stored as text
     status = Column(String, default="pending")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     resolved_at = Column(DateTime, nullable=True)

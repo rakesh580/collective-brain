@@ -1,7 +1,6 @@
 """Unit tests for CircuitBreaker — state transitions, failure tracking, recovery."""
 
 import asyncio
-import time
 
 import pytest
 

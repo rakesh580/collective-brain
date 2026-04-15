@@ -3,9 +3,10 @@
 Requires CB_DATABASE_URL and CB_MIGRATION_DATABASE_URL to be set (CI provides them).
 """
 import os
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
@@ -43,7 +44,8 @@ def db_session(SessionFactory):
 @pytest.fixture(scope="session", autouse=True)
 def _run_migrations(db_engine):
     """Run Alembic migrations once before integration tests."""
-    import subprocess, sys
+    import subprocess
+    import sys
     backend_dir = os.path.join(os.path.dirname(__file__), "..", "..")
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
@@ -72,9 +74,10 @@ def app_settings():
 @pytest.fixture(scope="session")
 def app_client(app_settings):
     """TestClient with the real FastAPI app connected to the CI database."""
-    from app.db.database import init_db, get_session
-    from app.main import app
     from unittest.mock import patch
+
+    from app.db.database import init_db
+    from app.main import app
 
     # Patch init_db to skip running migrations again (already done above)
     with patch("app.db.database._run_alembic_migrations"):

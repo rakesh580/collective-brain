@@ -1,6 +1,8 @@
 """AuditLog model — immutable record of security-relevant events."""
-from datetime import datetime, timezone
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, JSON, String, Text
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String
+
 from app.db.database import Base
 
 
@@ -33,7 +35,7 @@ class AuditLog(Base):
 
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
         index=True,
     )

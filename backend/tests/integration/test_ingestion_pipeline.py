@@ -4,8 +4,6 @@ import io
 import json
 import zipfile
 
-import pytest
-
 
 class TestMarkdownUpload:
     def test_upload_single_markdown(self, app_client, auth_headers):

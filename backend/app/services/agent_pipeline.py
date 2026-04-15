@@ -6,10 +6,10 @@ that reasons about which tools to use and synthesizes multi-step results.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from sqlalchemy.orm import Session
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.models.conversation import ConversationRecord, MessageRecord
 from app.models.member import MemberRecord
-from app.schemas.responses import QueryResponse, SourceRef, RelatedMember
+from app.schemas.responses import QueryResponse, RelatedMember, SourceRef
 from app.services.agent_tools import create_tools
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_store import VectorStoreService
@@ -165,8 +165,8 @@ class AgentPipeline:
         conv = ConversationRecord(
             id=conv_id,
             title=title,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             message_count=0,
             owner_user_id=owner_user_id,
             room_id=getattr(self, "_room_id", None),
@@ -207,7 +207,7 @@ class AgentPipeline:
         sender_name: str | None = None,
     ):
         """Save the user question and agent response to DB."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Save user message
         user_msg = MessageRecord(
