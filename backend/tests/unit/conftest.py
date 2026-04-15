@@ -91,6 +91,8 @@ def vector_store(db_session):
         ),
         [
             {"id": "a1", "st": "test", "sp": "/test/a1", "t": "Test Artifact 1"},
+            {"id": "a2", "st": "test", "sp": "/test/a2", "t": "Test Artifact 2"},
+            {"id": "a3", "st": "test", "sp": "/test/a3", "t": "Test Artifact 3"},
             {"id": "art-1", "st": "test", "sp": "/test/art1", "t": "Test Artifact Art1"},
             {"id": "art-2", "st": "test", "sp": "/test/art2", "t": "Test Artifact Art2"},
         ],

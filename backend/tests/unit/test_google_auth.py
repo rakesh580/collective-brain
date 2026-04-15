@@ -141,8 +141,8 @@ class TestPasswordReset:
         svc = AuthService(settings)
         svc.register(db_session, "alice", "alice@test.com", "Str0ngPass!")
         code = svc.generate_reset_code(db_session, "alice@test.com")
-        assert len(code) == 6
-        assert code.isdigit()
+        assert len(code) == 8  # 8-char alphanumeric code
+        assert code.isalnum()
 
     def test_generate_code_no_account(self, db_session, settings):
         svc = AuthService(settings)
@@ -155,7 +155,7 @@ class TestPasswordReset:
         code = svc.generate_reset_code(db_session, "alice@test.com")
         user = svc.verify_reset_code(db_session, "alice@test.com", code, "NewPass123!")
         assert user is not None
-        with pytest.raises(ValueError, match="Incorrect password"):
+        with pytest.raises(ValueError, match="Invalid credentials"):
             svc.authenticate(db_session, "alice", "Str0ngPass!")
         user = svc.authenticate(db_session, "alice", "NewPass123!")
         assert user.username == "alice"

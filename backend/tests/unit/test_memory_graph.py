@@ -3,7 +3,17 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from app.services.memory_graph import MemoryGraph
+import pytest
+
+from app.services.memory_graph import MemoryGraph, invalidate_graph_cache
+
+
+@pytest.fixture(autouse=True)
+def _clear_graph_cache():
+    """Clear the graph cache before each test to avoid stale data."""
+    invalidate_graph_cache()
+    yield
+    invalidate_graph_cache()
 
 
 class TestGraphBuilding:
@@ -140,6 +150,7 @@ class TestPatternDetection:
 
     def test_stale_expertise_detection(self, db_session):
         """A member inactive > 90 days should trigger stale expertise."""
+        from app.models.artifact import ArtifactRecord
         from app.models.contribution import ContributionRecord
         from app.models.member import MemberRecord
 
@@ -152,18 +163,28 @@ class TestPatternDetection:
         )
         db_session.add(member)
 
-        # Stale expertise needs actual contributions (checked via ContributionRecord)
-        # with timestamps > 90 days old AND total_contributions > 3
-        contrib = ContributionRecord(
-            id=str(uuid4()),
-            member_id="stale-dev",
-            artifact_id=None,
-            contribution_type="git_content",
-            timestamp=datetime.now(UTC) - timedelta(days=120),
-            description="old work",
-            topics=["old-tech"],
+        art = ArtifactRecord(
+            id="stale-art",
+            source_type="git",
+            source_path="/stale",
+            chunk_count=1,
+            member_ids=["stale-dev"],
+            status="completed",
         )
-        db_session.add(contrib)
+        db_session.add(art)
+
+        # Need 4+ contributions with timestamps > 90 days old (total_contributions > 3)
+        for i in range(5):
+            contrib = ContributionRecord(
+                id=str(uuid4()),
+                member_id="stale-dev",
+                artifact_id="stale-art",
+                contribution_type="git_content",
+                timestamp=datetime.now(UTC) - timedelta(days=120),
+                description=f"old work {i}",
+                topics=["old-tech"],
+            )
+            db_session.add(contrib)
         db_session.commit()
 
         graph = MemoryGraph(db_session)
