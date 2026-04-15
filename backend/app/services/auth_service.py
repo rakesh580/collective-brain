@@ -306,7 +306,10 @@ class AuthService:
             raise ValueError("No account found with that email address")
         if not user.reset_code or not pwd_context.verify(code, user.reset_code):
             raise ValueError("Invalid verification code")
-        if user.reset_code_expires and user.reset_code_expires < datetime.now(UTC):
+        expires = user.reset_code_expires
+        if expires and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        if expires and expires < datetime.now(UTC):
             raise ValueError("Verification code has expired")
 
         user.password_hash = self.hash_password(new_password)

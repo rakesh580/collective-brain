@@ -5,7 +5,7 @@ is set (CI environment). If not set, those tests are skipped automatically.
 """
 
 import os
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -26,6 +26,22 @@ def settings():
 @pytest.fixture
 def mock_db():
     return MagicMock()
+
+
+@pytest.fixture
+def mock_embedder():
+    """Mock embedder that returns a valid 384-dimensional embedding."""
+    embedder = MagicMock()
+    embedder.embed.return_value = [0.1] * 384
+    return embedder
+
+
+@pytest.fixture
+def mock_llm():
+    """Mock LLM that returns a plausible text response."""
+    llm = MagicMock()
+    llm.generate = AsyncMock(return_value="This is a test response from the LLM.")
+    return llm
 
 
 @pytest.fixture
@@ -115,6 +131,7 @@ def seed_members(db_session):
     for m in [
         {"id": "alice", "name": "Alice", "email": "alice@test.com"},
         {"id": "bob", "name": "Bob", "email": "bob@test.com"},
+        {"id": "charlie", "name": "Charlie", "email": "charlie@test.com"},
     ]:
         db_session.execute(
             text(
@@ -125,7 +142,7 @@ def seed_members(db_session):
             m,
         )
     db_session.commit()
-    return ["alice", "bob"]
+    return ["alice", "bob", "charlie"]
 
 
 @pytest.fixture

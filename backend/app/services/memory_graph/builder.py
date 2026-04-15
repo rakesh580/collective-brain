@@ -54,6 +54,13 @@ def invalidate_graph_cache(room_id: str | None = None):
         _graph_cache.pop(None, None)
 
 
+def _ensure_aware(dt: datetime) -> datetime:
+    """Ensure a datetime is timezone-aware (UTC). Naive datetimes are assumed UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
 def _temporal_decay(
     timestamp: datetime | None,
     now: datetime | None = None,
@@ -63,7 +70,7 @@ def _temporal_decay(
     if timestamp is None:
         return 0.5
     now = now or datetime.now(UTC)
-    age_days = max(0, (now - timestamp).total_seconds() / 86400)
+    age_days = max(0, (now - _ensure_aware(timestamp)).total_seconds() / 86400)
     return math.exp(-0.693 * age_days / half_life_days)
 
 

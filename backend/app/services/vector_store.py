@@ -113,6 +113,9 @@ class VectorStoreService:
 
         empty = {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
 
+        if not query_embedding:
+            return empty
+
         org_id = organization_id or "-"
         tracer = get_tracer("collective_brain.vector_store")
         t0 = time.perf_counter()

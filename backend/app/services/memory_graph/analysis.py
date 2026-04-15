@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import networkx as nx
 
-from .builder import _temporal_decay
+from .builder import _ensure_aware, _temporal_decay
 
 
 class GraphAnalysisMixin:
@@ -106,15 +106,16 @@ class GraphAnalysisMixin:
         member_last_active: dict[str, datetime] = {}
         for c in contribs:
             if c.timestamp and c.member_id:
+                ts = _ensure_aware(c.timestamp)
                 prev = member_last_active.get(c.member_id)
-                if prev is None or c.timestamp > prev:
-                    member_last_active[c.member_id] = c.timestamp
+                if prev is None or ts > prev:
+                    member_last_active[c.member_id] = ts
 
         for mid, mdata in member_nodes.items():
             last = member_last_active.get(mid)
             total = mdata.get("total_contributions", 0)
-            if last and last < stale_threshold and total > 3:
-                days_ago = (now - last).days
+            if last and _ensure_aware(last) < stale_threshold and total > 3:
+                days_ago = (now - _ensure_aware(last)).days
                 patterns.append(
                     {
                         "type": "risk",
@@ -340,9 +341,10 @@ class GraphAnalysisMixin:
         member_last_active: dict[str, datetime] = {}
         for c in contribs:
             if c.timestamp and c.member_id:
+                ts = _ensure_aware(c.timestamp)
                 prev = member_last_active.get(c.member_id)
-                if prev is None or c.timestamp > prev:
-                    member_last_active[c.member_id] = c.timestamp
+                if prev is None or ts > prev:
+                    member_last_active[c.member_id] = ts
 
         now = datetime.now(UTC)
         scored: list[dict] = []
@@ -385,7 +387,7 @@ class GraphAnalysisMixin:
 
             # Availability hint based on recency
             if last_active:
-                days_ago = (now - last_active).days
+                days_ago = (now - _ensure_aware(last_active)).days
                 if days_ago <= 7:
                     availability_hint = "active"
                 elif days_ago <= 30:
