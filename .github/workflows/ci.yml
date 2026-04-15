@@ -90,7 +90,7 @@ jobs:
           # Install CPU-only torch first (prevents pulling ~2 GB GPU build)
           pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
 
       - name: Enable pgvector extension
         run: |
