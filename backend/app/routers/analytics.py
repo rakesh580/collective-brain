@@ -23,20 +23,22 @@ def _get_db():
 
 
 @router.get("/activity-timeline")
-async def get_activity_timeline(request: Request, days: int = Query(default=30, ge=1, le=365), room_id: str | None = None, user=Depends(get_current_user)):
+async def get_activity_timeline(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+    room_id: str | None = None,
+    user=Depends(get_current_user),
+):
     """Daily contribution counts for the last N days using SQL aggregation."""
     db = _get_db()
     try:
         cutoff = datetime.now(UTC) - timedelta(days=days)
 
         # Use SQL GROUP BY date for aggregation
-        query = (
-            db.query(
-                cast(ContributionRecord.timestamp, Date).label("day"),
-                func.count().label("cnt"),
-            )
-            .filter(ContributionRecord.timestamp >= cutoff)
-        )
+        query = db.query(
+            cast(ContributionRecord.timestamp, Date).label("day"),
+            func.count().label("cnt"),
+        ).filter(ContributionRecord.timestamp >= cutoff)
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
         daily_rows = query.group_by("day").all()
@@ -98,19 +100,23 @@ async def get_expertise_matrix(request: Request, room_id: str | None = None, use
         if room_id:
             # Only members with contributions in this room
             member_ids = [
-                mid for (mid,) in
-                db.query(ContributionRecord.member_id)
+                mid
+                for (mid,) in db.query(ContributionRecord.member_id)
                 .filter(ContributionRecord.room_id == room_id)
                 .distinct()
                 .all()
             ]
             members = (
-                db.query(MemberRecord)
-                .filter(MemberRecord.id.in_(member_ids))
-                .order_by(MemberRecord.total_contributions.desc())
-                .limit(20)
-                .all()
-            ) if member_ids else []
+                (
+                    db.query(MemberRecord)
+                    .filter(MemberRecord.id.in_(member_ids))
+                    .order_by(MemberRecord.total_contributions.desc())
+                    .limit(20)
+                    .all()
+                )
+                if member_ids
+                else []
+            )
         else:
             members = (
                 db.query(MemberRecord)
@@ -158,8 +164,7 @@ async def get_contribution_types(request: Request, room_id: str | None = None, u
         total = sum(r.cnt for r in rows)
         return {
             "types": [
-                {"type": r.contribution_type, "count": r.cnt}
-                for r in sorted(rows, key=lambda x: x.cnt, reverse=True)
+                {"type": r.contribution_type, "count": r.cnt} for r in sorted(rows, key=lambda x: x.cnt, reverse=True)
             ],
             "total": total,
         }
@@ -168,31 +173,29 @@ async def get_contribution_types(request: Request, room_id: str | None = None, u
 
 
 @router.get("/member-activity")
-async def get_member_activity(request: Request, days: int = Query(default=30, ge=1, le=365), room_id: str | None = None, user=Depends(get_current_user)):
+async def get_member_activity(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+    room_id: str | None = None,
+    user=Depends(get_current_user),
+):
     """Per-member contribution counts over last N days using SQL aggregation."""
     db = _get_db()
     try:
         cutoff = datetime.now(UTC) - timedelta(days=days)
 
         # SQL GROUP BY member_id for counts
-        query = (
-            db.query(
-                ContributionRecord.member_id,
-                func.count().label("cnt"),
-            )
-            .filter(ContributionRecord.timestamp >= cutoff)
-        )
+        query = db.query(
+            ContributionRecord.member_id,
+            func.count().label("cnt"),
+        ).filter(ContributionRecord.timestamp >= cutoff)
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
         rows = query.group_by(ContributionRecord.member_id).all()
 
         # Resolve member names in one query
         member_ids = [r.member_id for r in rows if r.member_id]
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.id.in_(member_ids))
-            .all()
-        ) if member_ids else []
+        members = (db.query(MemberRecord).filter(MemberRecord.id.in_(member_ids)).all()) if member_ids else []
         name_map = {m.id: m.name for m in members}
 
         activity = sorted(
@@ -214,30 +217,31 @@ async def get_member_activity(request: Request, days: int = Query(default=30, ge
 
 
 @router.get("/topic-trends")
-async def get_topic_trends(request: Request, days: int = Query(default=30, ge=1, le=365), room_id: str | None = None, user=Depends(get_current_user)):
+async def get_topic_trends(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+    room_id: str | None = None,
+    user=Depends(get_current_user),
+):
     """Most common topics in recent contributions."""
     db = _get_db()
     try:
         cutoff = datetime.now(UTC) - timedelta(days=days)
-        query = db.query(ContributionRecord.topics).filter(
-            ContributionRecord.timestamp >= cutoff
-        )
+        query = db.query(ContributionRecord.topics).filter(ContributionRecord.timestamp >= cutoff)
         if room_id:
             query = query.filter(ContributionRecord.room_id == room_id)
 
         # Topics are stored as JSON arrays — need Python-side counting
         # but we only fetch the topics column, not full records
         from collections import Counter
+
         topic_counts: Counter = Counter()
         for (topics,) in query.all():
-            for topic in (topics or []):
+            for topic in topics or []:
                 topic_counts[topic] += 1
 
         return {
-            "topics": [
-                {"topic": k, "count": v}
-                for k, v in topic_counts.most_common(20)
-            ],
+            "topics": [{"topic": k, "count": v} for k, v in topic_counts.most_common(20)],
             "period_days": days,
         }
     finally:
@@ -255,7 +259,9 @@ async def get_health(request: Request, user=Depends(get_current_user)):
 
 
 @router.get("/health/trends")
-async def get_health_trends_endpoint(request: Request, days: int = Query(default=90, ge=1, le=365), user=Depends(get_current_user)):
+async def get_health_trends_endpoint(
+    request: Request, days: int = Query(default=90, ge=1, le=365), user=Depends(get_current_user)
+):
     """Historical trend data for team health."""
     db = _get_db()
     try:

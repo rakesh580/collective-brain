@@ -10,9 +10,7 @@ class MemberRecord(Base):
     __tablename__ = "members"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String, nullable=False, index=True)
     aliases = Column(JSON, default=list)
     email = Column(String, nullable=True)

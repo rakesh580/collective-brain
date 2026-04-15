@@ -22,6 +22,7 @@ class LLMService:
 
         if self.provider == "claude":
             import anthropic
+
             self.client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
             self.model = settings.claude_model
         elif self.provider == "mistral":
@@ -71,13 +72,14 @@ class LLMService:
             finally:
                 elapsed = time.perf_counter() - t0
                 LLM_LATENCY.labels(provider=self.provider, model=self.model).observe(elapsed)
-                LLM_REQUESTS_TOTAL.labels(
-                    provider=self.provider, model=self.model, status=status
-                ).inc()
+                LLM_REQUESTS_TOTAL.labels(provider=self.provider, model=self.model, status=status).inc()
                 LLM_TOKENS_ESTIMATED.labels(provider=self.provider, org_id="-").inc(estimated_tokens)
                 logger.debug(
                     "LLM generate: provider=%s model=%s elapsed=%.2fs status=%s",
-                    self.provider, self.model, elapsed, status,
+                    self.provider,
+                    self.model,
+                    elapsed,
+                    status,
                 )
 
     async def _call_provider(self, messages: list[dict], max_tokens: int) -> str:
@@ -143,6 +145,7 @@ class LLMService:
     async def is_available(self) -> bool:
         """Check if LLM is available (respects circuit breaker)."""
         from app.services.metrics import CIRCUIT_BREAKER_STATE
+
         is_open = not self.breaker.is_available
         CIRCUIT_BREAKER_STATE.labels(service=f"llm_{self.provider}").set(1 if is_open else 0)
 
@@ -169,9 +172,7 @@ class LLMService:
                     return resp.status_code == 200
             else:
                 async with httpx.AsyncClient() as client:
-                    resp = await client.get(
-                        f"{self.ollama_url}/api/tags", timeout=5.0
-                    )
+                    resp = await client.get(f"{self.ollama_url}/api/tags", timeout=5.0)
                     return resp.status_code == 200
         except Exception:
             return False

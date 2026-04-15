@@ -3,6 +3,7 @@
 Artifacts and insights can be individually published (is_public=True).
 These endpoints require NO authentication and are mounted at /public/.
 """
+
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -22,6 +23,7 @@ public_router = APIRouter()
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
+
 
 class PublicArtifactResponse(BaseModel):
     id: str
@@ -48,6 +50,7 @@ class PublishResponse(BaseModel):
 
 def _require_admin(request: Request):
     from app.dependencies import get_current_user
+
     user = get_current_user(request)
     if getattr(user, "role", "member") not in ("admin", "owner"):
         raise HTTPException(status_code=403, detail="Admin role required to publish content")
@@ -55,6 +58,7 @@ def _require_admin(request: Request):
 
 
 # ── Management endpoints (authenticated) ──────────────────────────────────────
+
 
 @manage_router.post(
     "/artifacts/{artifact_id}/publish",
@@ -133,6 +137,7 @@ def unpublish_insight(insight_id: str, request: Request):
 
 
 # ── Public read-only endpoints (no auth) ──────────────────────────────────────
+
 
 @public_router.get(
     "/artifacts",
@@ -230,9 +235,7 @@ def get_public_insight(insight_id: str):
     db = create_session()
     try:
         insight = (
-            db.query(InsightRecord)
-            .filter(InsightRecord.id == insight_id, InsightRecord.is_public.is_(True))
-            .first()
+            db.query(InsightRecord).filter(InsightRecord.id == insight_id, InsightRecord.is_public.is_(True)).first()
         )
     finally:
         db.close()

@@ -52,10 +52,13 @@ async def send_message(room_id: str, body: RoomMessageRequest, request: Request)
         msg_dict = _msg_to_dict(msg)
 
         # Broadcast to all room WebSocket connections
-        await _broadcast(room_id, {
-            "type": "new_message",
-            "message": msg_dict,
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "new_message",
+                "message": msg_dict,
+            },
+        )
 
         return msg_dict
     finally:
@@ -86,26 +89,14 @@ async def get_messages(
         if not membership:
             raise HTTPException(status_code=403, detail="Not a member of this room")
 
-        query = db.query(ChatRoomMessage).filter(
-            ChatRoomMessage.room_id == room_id
-        )
+        query = db.query(ChatRoomMessage).filter(ChatRoomMessage.room_id == room_id)
 
         if before:
-            ref_msg = (
-                db.query(ChatRoomMessage)
-                .filter(ChatRoomMessage.id == before)
-                .first()
-            )
+            ref_msg = db.query(ChatRoomMessage).filter(ChatRoomMessage.id == before).first()
             if ref_msg:
-                query = query.filter(
-                    ChatRoomMessage.created_at < ref_msg.created_at
-                )
+                query = query.filter(ChatRoomMessage.created_at < ref_msg.created_at)
 
-        messages = (
-            query.order_by(ChatRoomMessage.created_at.desc())
-            .limit(limit)
-            .all()
-        )
+        messages = query.order_by(ChatRoomMessage.created_at.desc()).limit(limit).all()
         messages.reverse()
 
         return {"messages": [_msg_to_dict(m) for m in messages]}

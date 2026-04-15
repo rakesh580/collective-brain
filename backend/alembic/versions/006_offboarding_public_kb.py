@@ -4,6 +4,7 @@ Revision ID: 006_offboarding_public_kb
 Revises: 005_knowledge_verification
 Create Date: 2026-04-09
 """
+
 from collections.abc import Sequence
 from typing import Union
 

@@ -26,10 +26,7 @@ class InsightEngine:
         week_ago = now - timedelta(days=7)
 
         # Gather last week's activity
-        query = (
-            self.db.query(ContributionRecord)
-            .filter(ContributionRecord.timestamp >= week_ago)
-        )
+        query = self.db.query(ContributionRecord).filter(ContributionRecord.timestamp >= week_ago)
         if self.room_id:
             query = query.filter(ContributionRecord.room_id == self.room_id)
         contribs = query.order_by(ContributionRecord.timestamp.desc()).all()
@@ -87,17 +84,10 @@ class InsightEngine:
             insights.append(insight)
 
         # LLM-based deeper pattern analysis
-        contrib_query = (
-            self.db.query(ContributionRecord)
-        )
+        contrib_query = self.db.query(ContributionRecord)
         if self.room_id:
             contrib_query = contrib_query.filter(ContributionRecord.room_id == self.room_id)
-        contribs = (
-            contrib_query
-            .order_by(ContributionRecord.timestamp.desc())
-            .limit(50)
-            .all()
-        )
+        contribs = contrib_query.order_by(ContributionRecord.timestamp.desc()).limit(50).all()
         if contribs:
             team_data = self._format_contributions(contribs)
             prompt = INSIGHT_DETECTION_PROMPT.format(team_data=team_data)
@@ -126,9 +116,7 @@ class InsightEngine:
         self.db.commit()
         return insights
 
-    async def get_cached_insights(
-        self, insight_type: str | None = None, limit: int = 10
-    ) -> list[InsightRecord]:
+    async def get_cached_insights(self, insight_type: str | None = None, limit: int = 10) -> list[InsightRecord]:
         query = self.db.query(InsightRecord).order_by(InsightRecord.generated_at.desc())
         if self.room_id:
             query = query.filter(InsightRecord.room_id == self.room_id)
@@ -142,8 +130,7 @@ class InsightEngine:
             ts = c.timestamp.strftime("%Y-%m-%d %H:%M") if c.timestamp else "unknown"
             topics_str = ", ".join(c.topics or [])
             parts.append(
-                f"- [{c.contribution_type}] {c.description or ''} "
-                f"(by {c.member_id}, {ts}, topics: {topics_str})"
+                f"- [{c.contribution_type}] {c.description or ''} (by {c.member_id}, {ts}, topics: {topics_str})"
             )
         return "\n".join(parts) if parts else "(No activity data)"
 
@@ -178,7 +165,7 @@ class InsightEngine:
                     # Remove the opening fence line (```json or ```)
                     first_newline = inner.find("\n")
                     if first_newline != -1:
-                        json_str = inner[first_newline + 1:]
+                        json_str = inner[first_newline + 1 :]
                     else:
                         json_str = inner.replace("```json", "").replace("```", "")
                 else:

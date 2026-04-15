@@ -7,6 +7,7 @@ Create Date: 2026-03-16
 This captures the complete schema state including all columns that were
 previously added via hand-rolled ALTER TABLE statements in database.py.
 """
+
 from collections.abc import Sequence
 from typing import Union
 

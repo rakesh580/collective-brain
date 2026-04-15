@@ -10,6 +10,7 @@ Source input:  dict with keys:
 
 Requires: atlassian-python-api
 """
+
 import contextlib
 import logging
 from datetime import datetime
@@ -24,6 +25,7 @@ logger = logging.getLogger("collective_brain.ingestion.confluence")
 
 class _HTMLStripper(HTMLParser):
     """Minimal HTML-to-plain-text stripper for Confluence storage format."""
+
     def __init__(self):
         super().__init__()
         self._parts: list[str] = []
@@ -54,10 +56,7 @@ class ConfluenceConnector(BaseConnector):
         try:
             from atlassian import Confluence
         except ImportError:
-            raise RuntimeError(
-                "atlassian-python-api is not installed. "
-                "Run: pip install atlassian-python-api"
-            )
+            raise RuntimeError("atlassian-python-api is not installed. Run: pip install atlassian-python-api")
         self._confluence = Confluence(
             url=url,
             username=username,
@@ -103,8 +102,7 @@ class ConfluenceConnector(BaseConnector):
     def _collect_pages(self, source_input: dict) -> list[dict]:
         if "page_ids" in source_input:
             return [
-                self._confluence.get_page_by_id(pid, expand="body.storage,version")
-                for pid in source_input["page_ids"]
+                self._confluence.get_page_by_id(pid, expand="body.storage,version") for pid in source_input["page_ids"]
             ]
         if "space_key" in source_input:
             return self._get_all_pages(source_input["space_key"])
@@ -159,21 +157,23 @@ class ConfluenceConnector(BaseConnector):
         parsed: list[ParsedChunk] = []
         for rc in raw_chunks:
             chunk_text = rc["text"]
-            parsed.append(ParsedChunk(
-                text=chunk_text,
-                source_type="confluence",
-                source_ref=source_url,
-                author=author_name,
-                author_aliases=[author_name.lower()],
-                timestamp=timestamp,
-                topics=topics,
-                chunk_metadata={
-                    "page_id": page_id,
-                    "title": title,
-                    "source_url": source_url,
-                    "space_key": page.get("space", {}).get("key", ""),
-                    "content_hash": content_hash(chunk_text),
-                    **rc.get("metadata", {}),
-                },
-            ))
+            parsed.append(
+                ParsedChunk(
+                    text=chunk_text,
+                    source_type="confluence",
+                    source_ref=source_url,
+                    author=author_name,
+                    author_aliases=[author_name.lower()],
+                    timestamp=timestamp,
+                    topics=topics,
+                    chunk_metadata={
+                        "page_id": page_id,
+                        "title": title,
+                        "source_url": source_url,
+                        "space_key": page.get("space", {}).get("key", ""),
+                        "content_hash": content_hash(chunk_text),
+                        **rc.get("metadata", {}),
+                    },
+                )
+            )
         return parsed

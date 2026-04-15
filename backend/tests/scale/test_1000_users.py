@@ -59,12 +59,15 @@ class TestThousandUserScale:
 
     def _register_user(self, i: int) -> dict:
         """Register user i and return {token, user_id, headers} or {error}."""
-        resp = self.client.post("/auth/register", json={
-            "username": f"scale_user_{i}",
-            "email": f"scale_{i}@test.com",
-            "password": "Str0ngPass!",
-            "display_name": f"Scale User {i}",
-        })
+        resp = self.client.post(
+            "/auth/register",
+            json={
+                "username": f"scale_user_{i}",
+                "email": f"scale_{i}@test.com",
+                "password": "Str0ngPass!",
+                "display_name": f"Scale User {i}",
+            },
+        )
         if resp.status_code == 201:
             data = resp.json()
             return {
@@ -93,9 +96,13 @@ class TestThousandUserScale:
         # 2. AI query
         t0 = time.perf_counter()
         try:
-            resp = self.client.post("/query", headers=headers, json={
-                "question": f"What is the team working on? (user {i})",
-            })
+            resp = self.client.post(
+                "/query",
+                headers=headers,
+                json={
+                    "question": f"What is the team working on? (user {i})",
+                },
+            )
             result.query_ok = resp.status_code == 200
             if not result.query_ok:
                 result.errors.append(f"query: HTTP {resp.status_code}")
@@ -106,9 +113,13 @@ class TestThousandUserScale:
         # 3. Create a room
         t0 = time.perf_counter()
         try:
-            resp = self.client.post("/rooms", headers=headers, json={
-                "name": f"Room by user {i}",
-            })
+            resp = self.client.post(
+                "/rooms",
+                headers=headers,
+                json={
+                    "name": f"Room by user {i}",
+                },
+            )
             result.room_create_ok = resp.status_code in (200, 201)
             if result.room_create_ok:
                 room_id = resp.json().get("id")
@@ -131,11 +142,15 @@ class TestThousandUserScale:
         # 4. Create a discussion thread
         t0 = time.perf_counter()
         try:
-            resp = self.client.post("/discussions", headers=headers, json={
-                "title": f"Discussion by user {i}",
-                "context_type": "member",
-                "context_id": f"scale_user_{i}",
-            })
+            resp = self.client.post(
+                "/discussions",
+                headers=headers,
+                json={
+                    "title": f"Discussion by user {i}",
+                    "context_type": "member",
+                    "context_id": f"scale_user_{i}",
+                },
+            )
             result.discussion_ok = resp.status_code in (200, 201)
             if not result.discussion_ok:
                 result.errors.append(f"discussion: HTTP {resp.status_code}")
@@ -163,9 +178,9 @@ class TestThousandUserScale:
         total_start = time.perf_counter()
 
         # Phase 1: Register 1000 users in batches
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"PHASE 1: Registering {NUM_USERS} users in batches of {BATCH_SIZE}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         registered_users = {}  # i -> user_info
         registration_errors = []
@@ -174,10 +189,7 @@ class TestThousandUserScale:
         for batch_start in range(0, NUM_USERS, BATCH_SIZE):
             batch_end = min(batch_start + BATCH_SIZE, NUM_USERS)
             with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-                futures = {
-                    pool.submit(self._register_user, i): i
-                    for i in range(batch_start, batch_end)
-                }
+                futures = {pool.submit(self._register_user, i): i for i in range(batch_start, batch_end)}
                 for future in concurrent.futures.as_completed(futures):
                     i = futures[future]
                     try:
@@ -191,38 +203,35 @@ class TestThousandUserScale:
 
             # Progress
             done = len(registered_users) + len(registration_errors)
-            print(f"  Batch {batch_start}-{batch_end-1}: "
-                  f"{len(registered_users)} registered, "
-                  f"{len(registration_errors)} errors "
-                  f"({done}/{NUM_USERS})")
+            print(
+                f"  Batch {batch_start}-{batch_end - 1}: "
+                f"{len(registered_users)} registered, "
+                f"{len(registration_errors)} errors "
+                f"({done}/{NUM_USERS})"
+            )
 
         reg_elapsed = time.perf_counter() - reg_start
-        print(f"\nRegistration complete: {len(registered_users)}/{NUM_USERS} "
-              f"in {reg_elapsed:.1f}s")
+        print(f"\nRegistration complete: {len(registered_users)}/{NUM_USERS} in {reg_elapsed:.1f}s")
 
         # Assert all registrations succeeded
         assert len(registration_errors) == 0, (
-            f"{len(registration_errors)} registration errors:\n"
-            + "\n".join(registration_errors[:20])  # Show first 20
+            f"{len(registration_errors)} registration errors:\n" + "\n".join(registration_errors[:20])  # Show first 20
         )
         assert len(registered_users) == NUM_USERS
 
         # Phase 2: Run user sessions in batches
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"PHASE 2: Running user sessions ({NUM_USERS} users)")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         all_results = []
         session_start = time.perf_counter()
 
         user_items = list(registered_users.items())
         for batch_start in range(0, len(user_items), BATCH_SIZE):
-            batch = user_items[batch_start:batch_start + BATCH_SIZE]
+            batch = user_items[batch_start : batch_start + BATCH_SIZE]
             with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-                futures = {
-                    pool.submit(self._user_session, i, info): i
-                    for i, info in batch
-                }
+                futures = {pool.submit(self._user_session, i, info): i for i, info in batch}
                 for future in concurrent.futures.as_completed(futures):
                     try:
                         result = future.result()
@@ -240,9 +249,9 @@ class TestThousandUserScale:
         total_elapsed = time.perf_counter() - total_start
 
         # Phase 3: Analyze results
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("PHASE 3: Results Analysis")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         members_ok = sum(1 for r in all_results if r.members_ok)
         query_ok = sum(1 for r in all_results if r.query_ok)
@@ -251,23 +260,27 @@ class TestThousandUserScale:
         disc_ok = sum(1 for r in all_results if r.discussion_ok)
         conv_ok = sum(1 for r in all_results if r.conversations_ok)
 
-        print(f"\n  Registration:   {len(registered_users)}/{NUM_USERS} ({100*len(registered_users)/NUM_USERS:.1f}%)")
-        print(f"  List Members:   {members_ok}/{NUM_USERS} ({100*members_ok/NUM_USERS:.1f}%)")
-        print(f"  AI Query:       {query_ok}/{NUM_USERS} ({100*query_ok/NUM_USERS:.1f}%)")
-        print(f"  Room Create:    {room_ok}/{NUM_USERS} ({100*room_ok/NUM_USERS:.1f}%)")
-        print(f"  Room Message:   {room_msg_ok}/{NUM_USERS} ({100*room_msg_ok/NUM_USERS:.1f}%)")
-        print(f"  Discussion:     {disc_ok}/{NUM_USERS} ({100*disc_ok/NUM_USERS:.1f}%)")
-        print(f"  Conversations:  {conv_ok}/{NUM_USERS} ({100*conv_ok/NUM_USERS:.1f}%)")
+        print(
+            f"\n  Registration:   {len(registered_users)}/{NUM_USERS} ({100 * len(registered_users) / NUM_USERS:.1f}%)"
+        )
+        print(f"  List Members:   {members_ok}/{NUM_USERS} ({100 * members_ok / NUM_USERS:.1f}%)")
+        print(f"  AI Query:       {query_ok}/{NUM_USERS} ({100 * query_ok / NUM_USERS:.1f}%)")
+        print(f"  Room Create:    {room_ok}/{NUM_USERS} ({100 * room_ok / NUM_USERS:.1f}%)")
+        print(f"  Room Message:   {room_msg_ok}/{NUM_USERS} ({100 * room_msg_ok / NUM_USERS:.1f}%)")
+        print(f"  Discussion:     {disc_ok}/{NUM_USERS} ({100 * disc_ok / NUM_USERS:.1f}%)")
+        print(f"  Conversations:  {conv_ok}/{NUM_USERS} ({100 * conv_ok / NUM_USERS:.1f}%)")
 
         # Latency stats
         for op in ["members", "query", "room", "discussion", "conversations"]:
             lats = [r.latencies.get(op, 0) for r in all_results if op in r.latencies]
             if lats:
                 print(f"\n  {op} latency:")
-                print(f"    p50={statistics.median(lats):.3f}s  "
-                      f"p95={sorted(lats)[int(len(lats)*0.95)]:.3f}s  "
-                      f"p99={sorted(lats)[int(len(lats)*0.99)]:.3f}s  "
-                      f"max={max(lats):.3f}s")
+                print(
+                    f"    p50={statistics.median(lats):.3f}s  "
+                    f"p95={sorted(lats)[int(len(lats) * 0.95)]:.3f}s  "
+                    f"p99={sorted(lats)[int(len(lats) * 0.99)]:.3f}s  "
+                    f"max={max(lats):.3f}s"
+                )
 
         # Collect all errors
         all_errors = []
@@ -286,9 +299,8 @@ class TestThousandUserScale:
                 print(f"    - {e}")
 
         # FINAL ASSERTION: Zero errors
-        assert len(all_errors) == 0, (
-            f"\n{len(all_errors)} errors across {NUM_USERS} users:\n"
-            + "\n".join(all_errors[:50])
+        assert len(all_errors) == 0, f"\n{len(all_errors)} errors across {NUM_USERS} users:\n" + "\n".join(
+            all_errors[:50]
         )
 
     def test_1000_users_data_integrity(self):
@@ -298,10 +310,7 @@ class TestThousandUserScale:
         for batch_start in range(0, NUM_USERS, BATCH_SIZE):
             batch_end = min(batch_start + BATCH_SIZE, NUM_USERS)
             with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-                futures = {
-                    pool.submit(self._register_user, i): i
-                    for i in range(batch_start, batch_end)
-                }
+                futures = {pool.submit(self._register_user, i): i for i in range(batch_start, batch_end)}
                 for future in concurrent.futures.as_completed(futures):
                     i = futures[future]
                     info = future.result()
@@ -315,19 +324,20 @@ class TestThousandUserScale:
         login_ok = 0
         login_errors = []
         for i in sample_indices:
-            resp = self.client.post("/auth/login", json={
-                "username": f"scale_user_{i}",
-                "password": "Str0ngPass!",
-            })
+            resp = self.client.post(
+                "/auth/login",
+                json={
+                    "username": f"scale_user_{i}",
+                    "password": "Str0ngPass!",
+                },
+            )
             if resp.status_code == 200:
                 login_ok += 1
             else:
                 login_errors.append(f"User {i}: HTTP {resp.status_code}")
 
         print(f"\nLogin verification: {login_ok}/{len(sample_indices)} succeeded")
-        assert login_ok == len(sample_indices), (
-            "Login failures:\n" + "\n".join(login_errors)
-        )
+        assert login_ok == len(sample_indices), "Login failures:\n" + "\n".join(login_errors)
 
         # Verify each user can see their own profile
         profile_ok = 0
@@ -369,9 +379,7 @@ class TestThousandUserScale:
                     completed += 1
 
         print(f"\nConcurrent reads: {completed - len(errors)}/{completed} succeeded")
-        assert len(errors) == 0, (
-            f"{len(errors)} read failures:\n" + "\n".join(errors[:20])
-        )
+        assert len(errors) == 0, f"{len(errors)} read failures:\n" + "\n".join(errors[:20])
 
     def test_cross_user_isolation_at_scale(self):
         """Each user should only see their own conversations, not others'."""
@@ -388,9 +396,13 @@ class TestThousandUserScale:
         # Each user creates a query (which creates a conversation)
         conversation_ids = {}
         for i, info in users.items():
-            resp = self.client.post("/query", headers=info["headers"], json={
-                "question": f"Private question from user {i}",
-            })
+            resp = self.client.post(
+                "/query",
+                headers=info["headers"],
+                json={
+                    "question": f"Private question from user {i}",
+                },
+            )
             if resp.status_code == 200:
                 conv_id = resp.json().get("conversation_id")
                 if conv_id:
@@ -407,11 +419,7 @@ class TestThousandUserScale:
                 for conv in convs:
                     owner = conv.get("user_id") or conv.get("owner_id")
                     if owner and owner != info["user_id"]:
-                        isolation_errors.append(
-                            f"User {i} sees conversation owned by {owner}"
-                        )
+                        isolation_errors.append(f"User {i} sees conversation owned by {owner}")
 
         print(f"\nIsolation check: {len(isolation_errors)} violations")
-        assert len(isolation_errors) == 0, (
-            "Data isolation failures:\n" + "\n".join(isolation_errors)
-        )
+        assert len(isolation_errors) == 0, "Data isolation failures:\n" + "\n".join(isolation_errors)

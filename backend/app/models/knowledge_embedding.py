@@ -6,10 +6,12 @@ from app.db.database import Base
 
 try:
     from pgvector.sqlalchemy import Vector
+
     _PGVECTOR_AVAILABLE = True
 except ImportError:
     # Fallback type for environments without pgvector (tests, CI)
     from sqlalchemy import Text as Vector  # type: ignore[assignment]
+
     _PGVECTOR_AVAILABLE = False
 
 
@@ -19,18 +21,13 @@ class KnowledgeEmbedding(Base):
     Replaces ChromaDB — all vectors live in Supabase alongside relational data.
     Each row is one chunk from an ingested artifact, scoped to an organization.
     """
+
     __tablename__ = "knowledge_embeddings"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    artifact_id = Column(
-        String, ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    room_id = Column(
-        String, ForeignKey("chat_rooms.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    artifact_id = Column(String, ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=True, index=True)
+    room_id = Column(String, ForeignKey("chat_rooms.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # The raw text chunk stored alongside the vector (avoids a join during RAG)
     content = Column(Text, nullable=False)

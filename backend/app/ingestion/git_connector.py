@@ -35,9 +35,7 @@ class GitConnector(BaseConnector):
 
             files_changed = []
             for fpath, stat in stats.items():
-                files_changed.append(
-                    f"  - {fpath} (+{stat['insertions']}, -{stat['deletions']})"
-                )
+                files_changed.append(f"  - {fpath} (+{stat['insertions']}, -{stat['deletions']})")
             files_str = "\n".join(files_changed[:20])  # Cap at 20 files
             if len(files_changed) > 20:
                 files_str += f"\n  ... and {len(files_changed) - 20} more files"

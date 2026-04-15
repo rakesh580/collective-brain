@@ -85,11 +85,7 @@ async def create_room(body: CreateRoomRequest, request: Request):
         db.commit()
 
         info = _get_user_info(db, user.id)
-        member_count = (
-            db.query(ChatRoomMember)
-            .filter(ChatRoomMember.room_id == room.id)
-            .count()
-        )
+        member_count = db.query(ChatRoomMember).filter(ChatRoomMember.room_id == room.id).count()
 
         return {
             "id": room.id,
@@ -116,11 +112,7 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
     db = _get_db()
     try:
         # Get rooms where user is a member
-        user_room_ids = (
-            db.query(ChatRoomMember.room_id)
-            .filter(ChatRoomMember.user_id == user.id)
-            .subquery()
-        )
+        user_room_ids = db.query(ChatRoomMember.room_id).filter(ChatRoomMember.user_id == user.id).subquery()
 
         # Subquery: member count per room
         member_count_sq = (
@@ -191,19 +183,21 @@ async def list_rooms(request: Request, limit: int = 50, offset: int = 0):
             if last_sender and last_content:
                 last_preview = f"{last_sender}: {last_content[:80]}"
 
-            result.append({
-                "id": room.id,
-                "name": room.name,
-                "description": room.description,
-                "created_by_user_id": room.created_by_user_id,
-                "created_by_username": creator_username or "unknown",
-                "avatar_color": room.avatar_color,
-                "member_count": member_count or 0,
-                "message_count": room.message_count or 0,
-                "last_message_at": room.last_message_at.isoformat() if room.last_message_at else None,
-                "last_message_preview": last_preview,
-                "created_at": room.created_at.isoformat() if room.created_at else None,
-            })
+            result.append(
+                {
+                    "id": room.id,
+                    "name": room.name,
+                    "description": room.description,
+                    "created_by_user_id": room.created_by_user_id,
+                    "created_by_username": creator_username or "unknown",
+                    "avatar_color": room.avatar_color,
+                    "member_count": member_count or 0,
+                    "message_count": room.message_count or 0,
+                    "last_message_at": room.last_message_at.isoformat() if room.last_message_at else None,
+                    "last_message_preview": last_preview,
+                    "created_at": room.created_at.isoformat() if room.created_at else None,
+                }
+            )
 
         return {"rooms": result, "total": total}
     finally:
@@ -220,10 +214,7 @@ async def discover_rooms(request: Request, q: str | None = None, limit: int = 50
     try:
         # Get rooms user is already in
         user_room_ids = [
-            rid for (rid,) in
-            db.query(ChatRoomMember.room_id)
-            .filter(ChatRoomMember.user_id == user.id)
-            .all()
+            rid for (rid,) in db.query(ChatRoomMember.room_id).filter(ChatRoomMember.user_id == user.id).all()
         ]
 
         query = (
@@ -235,37 +226,28 @@ async def discover_rooms(request: Request, q: str | None = None, limit: int = 50
             query = query.filter(~ChatRoom.id.in_(user_room_ids))
         if q:
             q_lower = f"%{q.lower()}%"
-            query = query.filter(
-                ChatRoom.name.ilike(q_lower) | ChatRoom.description.ilike(q_lower)
-            )
+            query = query.filter(ChatRoom.name.ilike(q_lower) | ChatRoom.description.ilike(q_lower))
 
         total = query.count()
-        rooms = (
-            query.order_by(ChatRoom.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        rooms = query.order_by(ChatRoom.created_at.desc()).offset(offset).limit(limit).all()
 
         result = []
         for room in rooms:
             info = _get_user_info(db, room.created_by_user_id)
-            member_count = (
-                db.query(ChatRoomMember)
-                .filter(ChatRoomMember.room_id == room.id)
-                .count()
+            member_count = db.query(ChatRoomMember).filter(ChatRoomMember.room_id == room.id).count()
+            result.append(
+                {
+                    "id": room.id,
+                    "name": room.name,
+                    "description": room.description,
+                    "created_by_user_id": room.created_by_user_id,
+                    "created_by_username": info["username"],
+                    "avatar_color": room.avatar_color,
+                    "is_public": room.is_public,
+                    "member_count": member_count,
+                    "created_at": room.created_at.isoformat() if room.created_at else None,
+                }
             )
-            result.append({
-                "id": room.id,
-                "name": room.name,
-                "description": room.description,
-                "created_by_user_id": room.created_by_user_id,
-                "created_by_username": info["username"],
-                "avatar_color": room.avatar_color,
-                "is_public": room.is_public,
-                "member_count": member_count,
-                "created_at": room.created_at.isoformat() if room.created_at else None,
-            })
 
         return {"rooms": result, "total": total}
     finally:
@@ -322,10 +304,13 @@ async def join_room(room_id: str, request: Request):
         room.last_message_at = datetime.now(UTC)
         db.commit()
 
-        await _broadcast(room_id, {
-            "type": "new_message",
-            "message": _msg_to_dict(sys_msg),
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "new_message",
+                "message": _msg_to_dict(sys_msg),
+            },
+        )
         await _broadcast(room_id, {"type": "members_changed"})
 
         return {"status": "joined", "room_id": room_id}
@@ -359,25 +344,23 @@ async def get_room(room_id: str, request: Request):
         info = _get_user_info(db, room.created_by_user_id)
 
         # Get members
-        members_q = (
-            db.query(ChatRoomMember)
-            .filter(ChatRoomMember.room_id == room_id)
-            .all()
-        )
+        members_q = db.query(ChatRoomMember).filter(ChatRoomMember.room_id == room_id).all()
         online_set = _online_users.get(room_id, set())
         members = []
         for m in members_q:
             u_info = _get_user_info(db, m.user_id)
-            members.append({
-                "user_id": m.user_id,
-                "username": u_info["username"],
-                "display_name": u_info["display_name"],
-                "role": m.role,
-                "joined_at": m.joined_at.isoformat() if m.joined_at else None,
-                "is_online": m.user_id in online_set,
-                "skills": u_info.get("skills", []),
-                "role_title": u_info.get("role_title"),
-            })
+            members.append(
+                {
+                    "user_id": m.user_id,
+                    "username": u_info["username"],
+                    "display_name": u_info["display_name"],
+                    "role": m.role,
+                    "joined_at": m.joined_at.isoformat() if m.joined_at else None,
+                    "is_online": m.user_id in online_set,
+                    "skills": u_info.get("skills", []),
+                    "role_title": u_info.get("role_title"),
+                }
+            )
 
         # Get messages (last 100)
         messages = (

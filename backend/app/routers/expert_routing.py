@@ -23,6 +23,7 @@ router = APIRouter()
 
 # ── Request / Response Schemas ────────────────────────────────────
 
+
 class HelpRequestCreate(BaseModel):
     expert_member_id: str = Field(..., min_length=1)
     query: str = Field(..., min_length=1, max_length=2000)
@@ -57,22 +58,103 @@ class ExpertRecommendationResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────
 
+
 def _get_db():
     return create_session()
 
 
-_STOP_WORDS = frozenset({
-    "i", "me", "my", "we", "our", "you", "your", "it", "its", "he", "she",
-    "they", "them", "this", "that", "the", "a", "an", "is", "are", "was",
-    "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
-    "will", "would", "shall", "should", "may", "might", "can", "could",
-    "about", "above", "after", "before", "between", "but", "by", "for",
-    "from", "in", "into", "of", "on", "or", "out", "over", "to", "under",
-    "up", "with", "and", "not", "no", "so", "if", "at", "as", "how", "what",
-    "who", "whom", "which", "when", "where", "why", "all", "any", "each",
-    "need", "help", "know", "talk", "find", "want", "get", "someone",
-    "expert", "person", "question",
-})
+_STOP_WORDS = frozenset(
+    {
+        "i",
+        "me",
+        "my",
+        "we",
+        "our",
+        "you",
+        "your",
+        "it",
+        "its",
+        "he",
+        "she",
+        "they",
+        "them",
+        "this",
+        "that",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "about",
+        "above",
+        "after",
+        "before",
+        "between",
+        "but",
+        "by",
+        "for",
+        "from",
+        "in",
+        "into",
+        "of",
+        "on",
+        "or",
+        "out",
+        "over",
+        "to",
+        "under",
+        "up",
+        "with",
+        "and",
+        "not",
+        "no",
+        "so",
+        "if",
+        "at",
+        "as",
+        "how",
+        "what",
+        "who",
+        "whom",
+        "which",
+        "when",
+        "where",
+        "why",
+        "all",
+        "any",
+        "each",
+        "need",
+        "help",
+        "know",
+        "talk",
+        "find",
+        "want",
+        "get",
+        "someone",
+        "expert",
+        "person",
+        "question",
+    }
+)
 
 
 def _extract_topics(query: str) -> list[str]:
@@ -91,6 +173,7 @@ def _extract_topics(query: str) -> list[str]:
 
 # ── Endpoints ─────────────────────────────────────────────────────
 
+
 @router.get("/recommend", response_model=ExpertRecommendationResponse)
 async def recommend_experts(
     request: Request,
@@ -100,6 +183,7 @@ async def recommend_experts(
 ):
     """Given a query, recommend the best experts to talk to."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     if top_k < 1:
@@ -145,6 +229,7 @@ async def request_help(body: HelpRequestCreate, request: Request):
             raise HTTPException(status_code=404, detail="Expert member not found")
 
         from app.db.database import create_help_request
+
         help_req = create_help_request(
             db,
             requester_user_id=user.id,
@@ -170,6 +255,7 @@ async def list_help_requests(request: Request):
     db = _get_db()
     try:
         from app.db.database import get_help_requests
+
         rows = get_help_requests(db, user_id=user.id, linked_member_id=user.linked_member_id)
         return [HelpRequestResponse(**r) for r in rows]
     finally:

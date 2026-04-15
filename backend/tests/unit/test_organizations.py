@@ -1,4 +1,5 @@
 """Unit tests for organization router helpers — slug validation, role checks."""
+
 import pytest
 from pydantic import ValidationError
 

@@ -23,6 +23,7 @@ router = APIRouter()
 
 # ── Verification schemas ───────────────────────────────────────────────────────
 
+
 class VerifyInsightRequest(BaseModel):
     run_llm_spot_check: bool = False
 
@@ -58,10 +59,7 @@ async def get_dashboard(request: Request, room_id: str | None = None, user=Depen
             art_query = art_query.filter(ArtifactRecord.room_id == room_id)
         total_artifacts = art_query.count()
 
-        ins_query = (
-            db.query(InsightRecord)
-            .order_by(InsightRecord.generated_at.desc())
-        )
+        ins_query = db.query(InsightRecord).order_by(InsightRecord.generated_at.desc())
         if room_id:
             ins_query = ins_query.filter(InsightRecord.room_id == room_id)
         insights = ins_query.limit(5).all()
@@ -110,12 +108,9 @@ async def get_weekly_summary(request: Request, room_id: str | None = None, user=
         # Check for cached weekly summary
         now = datetime.now(UTC)
         week_ago = now - timedelta(days=7)
-        cache_query = (
-            db.query(InsightRecord)
-            .filter(
-                InsightRecord.insight_type == "weekly_summary",
-                InsightRecord.period_end >= week_ago,
-            )
+        cache_query = db.query(InsightRecord).filter(
+            InsightRecord.insight_type == "weekly_summary",
+            InsightRecord.period_end >= week_ago,
         )
         if room_id:
             cache_query = cache_query.filter(InsightRecord.room_id == room_id)
@@ -221,15 +216,14 @@ async def freshness_alerts(request: Request, user=Depends(get_current_user)):
         report = get_freshness_report(db)
         # Return stale and aging alerts, prioritized by staleness score
         all_alerts = report["alerts"]
-        critical_alerts = [
-            a for a in all_alerts if a["status"] in ("stale", "aging")
-        ]
+        critical_alerts = [a for a in all_alerts if a["status"] in ("stale", "aging")]
         return {"alerts": critical_alerts[:10]}
     finally:
         db.close()
 
 
 # ── Knowledge Verification (Phase 5) ─────────────────────────────────────────
+
 
 @router.post("/{insight_id}/verify", response_model=VerifyInsightResponse)
 async def verify_insight(
@@ -246,9 +240,7 @@ async def verify_insight(
             raise HTTPException(status_code=404, detail="Insight not found")
 
         settings = request.app.state.settings
-        svc = KnowledgeVerificationService(
-            staleness_threshold_days=settings.knowledge_staleness_threshold_days
-        )
+        svc = KnowledgeVerificationService(staleness_threshold_days=settings.knowledge_staleness_threshold_days)
         result = svc.verify_insight(
             db,
             insight,
@@ -280,9 +272,7 @@ async def bulk_verify_insights(
     db = _get_db()
     try:
         settings = request.app.state.settings
-        svc = KnowledgeVerificationService(
-            staleness_threshold_days=settings.knowledge_staleness_threshold_days
-        )
+        svc = KnowledgeVerificationService(staleness_threshold_days=settings.knowledge_staleness_threshold_days)
         summary = svc.bulk_verify(db, organization_id=organization_id, limit=limit)
         return BulkVerifyResponse(**summary)
     finally:

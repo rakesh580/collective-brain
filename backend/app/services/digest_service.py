@@ -1,4 +1,5 @@
 """Weekly Slack Digest Bot — compiles and sends team knowledge digests."""
+
 import logging
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -27,19 +28,13 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
     week_ago = now - timedelta(days=7)
 
     # ── Recent contributions (last 7 days) ────────────────────
-    contrib_query = (
-        db.query(ContributionRecord)
-        .filter(ContributionRecord.timestamp >= week_ago)
-    )
+    contrib_query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= week_ago)
     if room_id:
         contrib_query = contrib_query.filter(ContributionRecord.room_id == room_id)
     recent_contribs = contrib_query.order_by(ContributionRecord.timestamp.desc()).all()
 
     # ── Count new members this week ───────────────────────────
-    new_members_query = (
-        db.query(MemberRecord)
-        .filter(MemberRecord.first_seen >= week_ago)
-    )
+    new_members_query = db.query(MemberRecord).filter(MemberRecord.first_seen >= week_ago)
     new_members = new_members_query.all()
 
     # ── Count new artifacts this week ─────────────────────────
@@ -47,9 +42,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
     if room_id:
         new_artifacts_query = new_artifacts_query.filter(ArtifactRecord.room_id == room_id)
     # ArtifactRecord may not have created_at; count artifacts that have contributions this week
-    artifact_ids_this_week = list({
-        c.artifact_id for c in recent_contribs if c.artifact_id
-    })
+    artifact_ids_this_week = list({c.artifact_id for c in recent_contribs if c.artifact_id})
 
     # ── Topics this week ──────────────────────────────────────
     topic_counts: dict[str, int] = defaultdict(int)
@@ -72,10 +65,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
 
     # ── Bus factor risks (topics with only 1 expert) ──────────
     expertise_gaps = graph.get_expertise_gaps()
-    bus_factor_risks = [
-        r for r in expertise_gaps.get("bus_factor_risks", [])
-        if r.get("severity") == "high"
-    ][:10]
+    bus_factor_risks = [r for r in expertise_gaps.get("bus_factor_risks", []) if r.get("severity") == "high"][:10]
 
     # ── Top contributors this week ────────────────────────────
     member_contrib_counts: dict[str, int] = defaultdict(int)
@@ -83,9 +73,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
         if c.member_id:
             member_contrib_counts[c.member_id] += 1
 
-    top_contributors_raw = sorted(
-        member_contrib_counts.items(), key=lambda x: x[1], reverse=True
-    )[:5]
+    top_contributors_raw = sorted(member_contrib_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
     # Resolve member names
     top_contributor_ids = [mid for mid, _ in top_contributors_raw]
@@ -95,8 +83,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
         members_by_id = {m.id: m.name for m in members}
 
     top_contributors = [
-        {"member_id": mid, "name": members_by_id.get(mid, mid), "count": count}
-        for mid, count in top_contributors_raw
+        {"member_id": mid, "name": members_by_id.get(mid, mid), "count": count} for mid, count in top_contributors_raw
     ]
 
     digest_data = {
@@ -132,14 +119,16 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
     blocks: list[dict] = []
 
     # ── Header ────────────────────────────────────────────────
-    blocks.append({
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": f"Weekly Knowledge Digest: {period_start} to {period_end}",
-            "emoji": True,
-        },
-    })
+    blocks.append(
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"Weekly Knowledge Digest: {period_start} to {period_end}",
+                "emoji": True,
+            },
+        }
+    )
 
     # ── Overview section ──────────────────────────────────────
     overview_lines = [
@@ -148,13 +137,15 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
         f"*New members:* {digest_data['new_members_count']}",
         f"*New artifacts:* {digest_data['new_artifacts_count']}",
     ]
-    blocks.append({
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "\n".join(overview_lines),
-        },
-    })
+    blocks.append(
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "\n".join(overview_lines),
+            },
+        }
+    )
 
     blocks.append({"type": "divider"})
 
@@ -165,48 +156,50 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
             medal = ["", "", ""][i - 1] if i <= 3 else f"{i}."
             contrib_lines.append(f"{medal} *{tc['name']}* — {tc['count']} contributions")
 
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Top Contributors*\n" + "\n".join(contrib_lines),
-            },
-        })
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Top Contributors*\n" + "\n".join(contrib_lines),
+                },
+            }
+        )
 
         blocks.append({"type": "divider"})
 
     # ── Trending Topics ───────────────────────────────────────
     if digest_data["top_topics"]:
-        topic_lines = [
-            f"  {t['topic']} ({t['count']} mentions)"
-            for t in digest_data["top_topics"][:7]
-        ]
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Trending Topics*\n" + "\n".join(topic_lines),
-            },
-        })
+        topic_lines = [f"  {t['topic']} ({t['count']} mentions)" for t in digest_data["top_topics"][:7]]
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Trending Topics*\n" + "\n".join(topic_lines),
+                },
+            }
+        )
 
         blocks.append({"type": "divider"})
 
     # ── Bus Factor Risks ──────────────────────────────────────
     if digest_data["bus_factor_risks"]:
         risk_lines = [
-            f"  *{r['topic']}* — only expert: {r['sole_expert']}"
-            for r in digest_data["bus_factor_risks"][:5]
+            f"  *{r['topic']}* — only expert: {r['sole_expert']}" for r in digest_data["bus_factor_risks"][:5]
         ]
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": (
-                    f"*Bus Factor Risks* ({digest_data['bus_factor_risk_count']} topics at risk)\n"
-                    + "\n".join(risk_lines)
-                ),
-            },
-        })
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*Bus Factor Risks* ({digest_data['bus_factor_risk_count']} topics at risk)\n"
+                        + "\n".join(risk_lines)
+                    ),
+                },
+            }
+        )
 
         blocks.append({"type": "divider"})
 
@@ -214,45 +207,49 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
     gs = digest_data.get("graph_stats", {})
     if gs:
         graph_lines = [
-            f"*Knowledge Graph:* {gs.get('total_nodes', 0)} nodes, "
-            f"{gs.get('total_edges', 0)} edges",
+            f"*Knowledge Graph:* {gs.get('total_nodes', 0)} nodes, {gs.get('total_edges', 0)} edges",
             f"*Members:* {gs.get('members', 0)} | "
             f"*Topics:* {gs.get('topics', 0)} | "
             f"*Artifacts:* {gs.get('artifacts', 0)}",
-            f"*Communities:* {gs.get('communities', 0)} | "
-            f"*Density:* {gs.get('density', 0):.4f}",
+            f"*Communities:* {gs.get('communities', 0)} | *Density:* {gs.get('density', 0):.4f}",
         ]
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "\n".join(graph_lines),
-            },
-        })
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "\n".join(graph_lines),
+                },
+            }
+        )
 
     # ── New Members ───────────────────────────────────────────
     if digest_data["new_members"]:
         member_names = ", ".join(m["name"] for m in digest_data["new_members"][:10])
-        blocks.append({
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"New team members this week: {member_names}",
+                    }
+                ],
+            }
+        )
+
+    # ── Footer ────────────────────────────────────────────────
+    blocks.append(
+        {
             "type": "context",
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"New team members this week: {member_names}",
+                    "text": f"Generated by Collective Brain on {digest_data['period_end'][:10]}",
                 }
             ],
-        })
-
-    # ── Footer ────────────────────────────────────────────────
-    blocks.append({
-        "type": "context",
-        "elements": [
-            {
-                "type": "mrkdwn",
-                "text": f"Generated by Collective Brain on {digest_data['period_end'][:10]}",
-            }
-        ],
-    })
+        }
+    )
 
     return blocks
 
@@ -295,14 +292,9 @@ def format_text_digest(digest_data: dict) -> str:
         lines.append("-- Knowledge Graph --")
         lines.append(f"  Nodes: {gs.get('total_nodes', 0)}, Edges: {gs.get('total_edges', 0)}")
         lines.append(
-            f"  Members: {gs.get('members', 0)}, "
-            f"Topics: {gs.get('topics', 0)}, "
-            f"Artifacts: {gs.get('artifacts', 0)}"
+            f"  Members: {gs.get('members', 0)}, Topics: {gs.get('topics', 0)}, Artifacts: {gs.get('artifacts', 0)}"
         )
-        lines.append(
-            f"  Communities: {gs.get('communities', 0)}, "
-            f"Density: {gs.get('density', 0):.4f}"
-        )
+        lines.append(f"  Communities: {gs.get('communities', 0)}, Density: {gs.get('density', 0):.4f}")
         lines.append("")
 
     if digest_data["new_members"]:
@@ -377,12 +369,10 @@ async def send_digest_to_slack(
         # Update last_sent_at for any matching digest config
         try:
             from app.db.database import update_digest_last_sent
+
             # Find config for this workspace + channel
             row = db.execute(
-                text(
-                    "SELECT id FROM slack_digest_config "
-                    "WHERE workspace_id = :wid AND channel_id = :cid LIMIT 1"
-                ),
+                text("SELECT id FROM slack_digest_config WHERE workspace_id = :wid AND channel_id = :cid LIMIT 1"),
                 {"wid": workspace_id, "cid": channel_id},
             ).fetchone()
             if row:

@@ -12,6 +12,7 @@ collect_ignore = [
     os.path.join(os.path.dirname(__file__), "stress_test.py"),
 ]
 
+
 @pytest.fixture
 def settings():
     return Settings(
@@ -21,22 +22,27 @@ def settings():
         google_client_id="test-google-client-id",
     )
 
+
 @pytest.fixture
 def mock_db():
     db = MagicMock()
     return db
 
+
 @pytest.fixture
 def db_session():
     return MagicMock()
+
 
 @pytest.fixture
 def mock_llm():
     return MagicMock()
 
+
 @pytest.fixture
 def mock_embedder():
     return MagicMock()
+
 
 @pytest.fixture
 def vector_store():

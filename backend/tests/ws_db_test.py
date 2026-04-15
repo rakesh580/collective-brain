@@ -27,8 +27,12 @@ async def register_user(client, idx):
     try:
         resp = await client.post(
             f"{BASE_URL}/auth/register",
-            json={"username": uname, "email": f"{uname}@test.com",
-                  "password": "Test123!", "display_name": f"WSTest {idx}"},
+            json={
+                "username": uname,
+                "email": f"{uname}@test.com",
+                "password": "Test123!",
+                "display_name": f"WSTest {idx}",
+            },
             timeout=60.0,
         )
         if resp.status_code == 201:
@@ -96,8 +100,13 @@ async def test_websocket(num_connections: int, tokens: list, room_id: str):
     p95 = sorted(connect_times)[int(len(connect_times) * 0.95)] if connect_times else 0
     mx = max(connect_times) if connect_times else 0
 
-    log.info("  Connected: %d/%d (%.1f%%), Failed: %d", connected, num_connections,
-             connected / num_connections * 100 if num_connections else 0, failed)
+    log.info(
+        "  Connected: %d/%d (%.1f%%), Failed: %d",
+        connected,
+        num_connections,
+        connected / num_connections * 100 if num_connections else 0,
+        failed,
+    )
     log.info("  Connect P50: %.0fms, P95: %.0fms, Max: %.0fms", p50, p95, mx)
     log.info("  Messages sent: %d, received: %d", messages_sent, messages_received)
     log.info("  Duration: %.1fs", duration)
@@ -151,8 +160,9 @@ async def test_db_writes(concurrent_writers: int, writes_per_user: int, tokens: 
     mx = max(latencies) if latencies else 0
     rps = total / duration if duration else 0
 
-    log.info("  Total: %d, Success: %d (%.1f%%), Errors: %d", total, success,
-             success / total * 100 if total else 0, errors)
+    log.info(
+        "  Total: %d, Success: %d (%.1f%%), Errors: %d", total, success, success / total * 100 if total else 0, errors
+    )
     log.info("  Throughput: %.0f writes/s", rps)
     log.info("  Latency P50: %.0fms, P95: %.0fms, P99: %.0fms, Max: %.0fms", p50, p95, p99, mx)
     log.info("  Duration: %.1fs", duration)
@@ -182,9 +192,9 @@ async def main():
     async with httpx.AsyncClient(timeout=60.0) as client:
         for i in range(5):
             headers = {"Authorization": f"Bearer {tokens[i]['token']}", "Content-Type": "application/json"}
-            resp = await client.post(f"{BASE_URL}/rooms",
-                                     json={"name": f"Test Room {i}", "description": "load test"},
-                                     headers=headers)
+            resp = await client.post(
+                f"{BASE_URL}/rooms", json={"name": f"Test Room {i}", "description": "load test"}, headers=headers
+            )
             if resp.status_code in (200, 201):
                 room_ids.append(resp.json()["id"])
     log.info("Created %d rooms", len(room_ids))
@@ -201,7 +211,7 @@ async def main():
             other_user_ids = [t["user_id"] for t in tokens if t["user_id"] != creator["user_id"]]
             # Add in batches of 20
             for batch_start in range(0, len(other_user_ids), 20):
-                batch_ids = other_user_ids[batch_start:batch_start + 20]
+                batch_ids = other_user_ids[batch_start : batch_start + 20]
                 headers = {"Authorization": f"Bearer {creator['token']}", "Content-Type": "application/json"}
                 resp = await client.post(
                     f"{BASE_URL}/rooms/{room_id}/members",

@@ -88,9 +88,9 @@ class Settings(BaseSettings):
     google_access_token: str = ""
 
     # Confluence
-    confluence_url: str = ""       # e.g. https://yoursite.atlassian.net/wiki
-    confluence_user: str = ""      # email for Confluence Cloud
-    confluence_token: str = ""     # API token
+    confluence_url: str = ""  # e.g. https://yoursite.atlassian.net/wiki
+    confluence_user: str = ""  # email for Confluence Cloud
+    confluence_token: str = ""  # API token
     confluence_cloud: bool = True
 
     # Knowledge verification
@@ -104,8 +104,7 @@ class Settings(BaseSettings):
         """Runtime DB URL — must be set via CB_DATABASE_URL."""
         if not self.database_url:
             raise RuntimeError(
-                "CB_DATABASE_URL is not set. "
-                "Copy .env.example to backend/.env and fill in your Supabase pooler URL."
+                "CB_DATABASE_URL is not set. Copy .env.example to backend/.env and fill in your Supabase pooler URL."
             )
         return self.database_url
 

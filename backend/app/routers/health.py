@@ -36,6 +36,7 @@ async def detailed_health(request: Request):
     # ── Database ──
     try:
         from app.db.database import create_session
+
         db = create_session()
         try:
             db.execute(text("SELECT 1"))
@@ -98,10 +99,7 @@ async def detailed_health(request: Request):
         }
 
     # Overall status
-    all_healthy = all(
-        c.get("status") in ("healthy", "fallback")
-        for c in checks.values()
-    )
+    all_healthy = all(c.get("status") in ("healthy", "fallback") for c in checks.values())
 
     return JSONResponse(
         status_code=200 if all_healthy else 503,

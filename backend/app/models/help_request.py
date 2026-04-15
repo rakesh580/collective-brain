@@ -1,4 +1,5 @@
 """ORM model for the help_requests table (BUG-017 fix)."""
+
 from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
@@ -10,9 +11,7 @@ class HelpRequest(Base):
     __tablename__ = "help_requests"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     requester_user_id = Column(String, nullable=False, index=True)
     expert_member_id = Column(String, nullable=False, index=True)
     query = Column(Text, nullable=False)

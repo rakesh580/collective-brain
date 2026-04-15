@@ -22,6 +22,7 @@ def _get_db():
 @router.get("")
 async def list_members(request: Request, room_id: str | None = None, limit: int = 50, offset: int = 0):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -29,18 +30,14 @@ async def list_members(request: Request, room_id: str | None = None, limit: int 
         if room_id:
             # Only members with contributions in this room
             member_ids = [
-                mid for (mid,) in
-                db.query(ContributionRecord.member_id)
+                mid
+                for (mid,) in db.query(ContributionRecord.member_id)
                 .filter(ContributionRecord.room_id == room_id)
                 .distinct()
                 .all()
             ]
             if member_ids:
-                base_query = (
-                    db.query(MemberRecord)
-                    .filter(MemberRecord.id.in_(member_ids))
-                    .order_by(MemberRecord.name)
-                )
+                base_query = db.query(MemberRecord).filter(MemberRecord.id.in_(member_ids)).order_by(MemberRecord.name)
                 total = base_query.count()
                 members = base_query.offset(offset).limit(limit).all()
             else:
@@ -61,6 +58,7 @@ async def list_members(request: Request, room_id: str | None = None, limit: int 
 @router.get("/{member_id}", response_model=MemberDetailResponse)
 async def get_member(member_id: str, request: Request, room_id: str | None = None):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -69,18 +67,10 @@ async def get_member(member_id: str, request: Request, room_id: str | None = Non
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        contrib_query = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.member_id == member_id)
-        )
+        contrib_query = db.query(ContributionRecord).filter(ContributionRecord.member_id == member_id)
         if room_id:
             contrib_query = contrib_query.filter(ContributionRecord.room_id == room_id)
-        contribs = (
-            contrib_query
-            .order_by(ContributionRecord.timestamp.desc())
-            .limit(50)
-            .all()
-        )
+        contribs = contrib_query.order_by(ContributionRecord.timestamp.desc()).limit(50).all()
 
         resp = _to_response(member)
         return MemberDetailResponse(
@@ -101,7 +91,9 @@ async def get_member(member_id: str, request: Request, room_id: str | None = Non
 
 
 @router.put("/{member_id}/aliases", response_model=MemberResponse)
-async def update_aliases(member_id: str, body: MemberAliasUpdate, request: Request, user=Depends(require_role("admin", "member"))):
+async def update_aliases(
+    member_id: str, body: MemberAliasUpdate, request: Request, user=Depends(require_role("admin", "member"))
+):
 
     db = _get_db()
     try:
@@ -119,22 +111,15 @@ async def update_aliases(member_id: str, body: MemberAliasUpdate, request: Reque
 @router.get("/{member_id}/contributions", response_model=list[ContributionResponse])
 async def get_contributions(member_id: str, request: Request, room_id: str | None = None, limit: int = 50):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
     try:
-        contrib_query = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.member_id == member_id)
-        )
+        contrib_query = db.query(ContributionRecord).filter(ContributionRecord.member_id == member_id)
         if room_id:
             contrib_query = contrib_query.filter(ContributionRecord.room_id == room_id)
-        contribs = (
-            contrib_query
-            .order_by(ContributionRecord.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
+        contribs = contrib_query.order_by(ContributionRecord.timestamp.desc()).limit(limit).all()
         return [
             ContributionResponse(
                 id=c.id,
@@ -182,7 +167,9 @@ async def create_member(body: MemberCreateRequest, request: Request, user=Depend
 
 
 @router.put("/{member_id}", response_model=MemberResponse)
-async def update_member(member_id: str, body: MemberUpdateRequest, request: Request, user=Depends(require_role("admin", "member"))):
+async def update_member(
+    member_id: str, body: MemberUpdateRequest, request: Request, user=Depends(require_role("admin", "member"))
+):
 
     db = _get_db()
     try:
@@ -214,15 +201,9 @@ async def delete_member(member_id: str, request: Request, user=Depends(require_r
         member = db.query(MemberRecord).filter(MemberRecord.id == member_id).first()
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
-        db.query(ContributionRecord).filter(
-            ContributionRecord.member_id == member_id
-        ).delete()
+        db.query(ContributionRecord).filter(ContributionRecord.member_id == member_id).delete()
         # Only load artifacts that reference this member (not ALL artifacts)
-        artifacts = (
-            db.query(ArtifactRecord)
-            .filter(ArtifactRecord.member_ids.isnot(None))
-            .all()
-        )
+        artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.member_ids.isnot(None)).all()
         for a in artifacts:
             if member_id in (a.member_ids or []):
                 a.member_ids = [mid for mid in a.member_ids if mid != member_id]

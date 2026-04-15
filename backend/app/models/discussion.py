@@ -10,9 +10,7 @@ class DiscussionThread(Base):
     __tablename__ = "discussion_threads"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String, nullable=False)
     created_by_user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     status = Column(String, default="open")  # "open" or "closed"

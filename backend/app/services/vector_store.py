@@ -1,4 +1,5 @@
 """pgvector-based VectorStoreService with OpenTelemetry spans + Prometheus metrics."""
+
 import logging
 import time
 from collections.abc import Generator
@@ -225,10 +226,12 @@ class VectorStoreService:
 # Helpers
 # ------------------------------------------------------------------
 
+
 def _to_pg_vector(embedding: list[float]) -> str:
     return "[" + ",".join(str(x) for x in embedding) + "]"
 
 
 def _to_jsonb(d: dict) -> str:
     import json
+
     return json.dumps(d)

@@ -10,9 +10,7 @@ class ChatRoom(Base):
     __tablename__ = "chat_rooms"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     created_by_user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)

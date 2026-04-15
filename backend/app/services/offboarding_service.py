@@ -9,6 +9,7 @@ Given a member_id the service computes:
 
 Results are persisted to the offboarding_reports table so they can be retrieved later.
 """
+
 from __future__ import annotations
 
 import logging
@@ -94,51 +95,38 @@ class OffboardingService:
 
     # ── Internal analysis ──────────────────────────────────────────────────────
 
-    def _analyse(
-        self, db: Session, member: MemberRecord, llm_service: Any
-    ) -> OffboardingResult:
+    def _analyse(self, db: Session, member: MemberRecord, llm_service: Any) -> OffboardingResult:
         member_id = member.id
 
         # All contributions by this member
-        own_contribs = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.member_id == member_id)
-            .all()
-        )
+        own_contribs = db.query(ContributionRecord).filter(ContributionRecord.member_id == member_id).all()
 
         # Topics this member has contributed to
         own_topics: set[str] = set()
         for c in own_contribs:
-            for t in (c.topics or []):
+            for t in c.topics or []:
                 own_topics.add(t)
 
         # All active members except the one leaving
         other_members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.id != member_id, MemberRecord.status != "offboarded")
-            .all()
+            db.query(MemberRecord).filter(MemberRecord.id != member_id, MemberRecord.status != "offboarded").all()
         )
 
         # Map: topic -> set of other member IDs who also cover it
         topic_coverage: dict[str, set[str]] = defaultdict(set)
         for om in other_members:
-            for tag in (om.expertise_tags or []):
+            for tag in om.expertise_tags or []:
                 topic_coverage[tag.lower()].add(om.id)
 
         # Unique expertise = topics this member has that NO other active member covers
-        unique_expertise = [
-            t for t in own_topics if t not in topic_coverage or not topic_coverage[t]
-        ]
+        unique_expertise = [t for t in own_topics if t not in topic_coverage or not topic_coverage[t]]
 
         # Sole-contributor artifacts
         own_artifact_ids = {c.artifact_id for c in own_contribs if c.artifact_id}
         sole_artifact_ids: list[str] = []
         for art_id in own_artifact_ids:
             contributor_ids = {
-                c.member_id
-                for c in db.query(ContributionRecord)
-                .filter(ContributionRecord.artifact_id == art_id)
-                .all()
+                c.member_id for c in db.query(ContributionRecord).filter(ContributionRecord.artifact_id == art_id).all()
             }
             if contributor_ids == {member_id}:
                 sole_artifact_ids.append(art_id)
@@ -208,6 +196,7 @@ class OffboardingService:
 
 # ── Module-level helpers ───────────────────────────────────────────────────────
 
+
 def _find_candidates(topic: str, others: list[MemberRecord]) -> list[MemberRecord]:
     """Return members ordered by how well they cover the given topic."""
     scored: list[tuple[float, MemberRecord]] = []
@@ -248,9 +237,7 @@ def _build_summary(
     if not unique_expertise:
         lines.append("No unique expertise identified; knowledge is well distributed.")
     else:
-        lines.append(
-            f"Unique expertise (no other team member covers): {', '.join(unique_expertise)}."
-        )
+        lines.append(f"Unique expertise (no other team member covers): {', '.join(unique_expertise)}.")
     if sole_artifact_ids:
         lines.append(
             f"{len(sole_artifact_ids)} artifact(s) have only this member as contributor "

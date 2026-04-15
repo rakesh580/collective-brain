@@ -12,10 +12,12 @@ class ChunkingStrategy:
         chunks = self._recursive_split(text, 0)
         result = []
         for i, chunk_text in enumerate(chunks):
-            result.append({
-                "text": chunk_text.strip(),
-                "metadata": {**metadata, "chunk_index": i},
-            })
+            result.append(
+                {
+                    "text": chunk_text.strip(),
+                    "metadata": {**metadata, "chunk_index": i},
+                }
+            )
         return [r for r in result if r["text"]]
 
     def _recursive_split(self, text: str, sep_idx: int) -> list[str]:

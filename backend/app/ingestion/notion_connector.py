@@ -8,6 +8,7 @@ Source input:   dict with keys:
 The connector walks the block tree, concatenates rich-text content, and
 produces one ParsedChunk per logical section (heading → next heading).
 """
+
 import contextlib
 import logging
 from datetime import datetime
@@ -110,22 +111,24 @@ class NotionConnector(BaseConnector):
         parsed: list[ParsedChunk] = []
         for rc in raw_chunks:
             chunk_text = rc["text"]
-            parsed.append(ParsedChunk(
-                text=chunk_text,
-                source_type="notion",
-                source_ref=source_url,
-                author=author or None,
-                author_aliases=[author.lower()] if author else [],
-                timestamp=timestamp,
-                topics=topics,
-                chunk_metadata={
-                    "page_id": page_id,
-                    "title": title,
-                    "source_url": source_url,
-                    "content_hash": content_hash(chunk_text),
-                    **rc.get("metadata", {}),
-                },
-            ))
+            parsed.append(
+                ParsedChunk(
+                    text=chunk_text,
+                    source_type="notion",
+                    source_ref=source_url,
+                    author=author or None,
+                    author_aliases=[author.lower()] if author else [],
+                    timestamp=timestamp,
+                    topics=topics,
+                    chunk_metadata={
+                        "page_id": page_id,
+                        "title": title,
+                        "source_url": source_url,
+                        "content_hash": content_hash(chunk_text),
+                        **rc.get("metadata", {}),
+                    },
+                )
+            )
         return parsed
 
     def _blocks_to_text(self, block_id: str, depth: int = 0) -> str:

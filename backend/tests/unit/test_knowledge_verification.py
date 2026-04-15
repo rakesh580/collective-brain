@@ -1,4 +1,5 @@
 """Unit tests for KnowledgeVerificationService."""
+
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -131,9 +132,7 @@ class TestBulkVerify:
             generated_at=datetime.now(UTC) - timedelta(days=50),
             source_artifact_ids=[],
         )
-        db.query.return_value.filter.return_value.limit.return_value.all.return_value = [
-            fresh, stale
-        ]
+        db.query.return_value.filter.return_value.limit.return_value.all.return_value = [fresh, stale]
         summary = svc.bulk_verify(db)
         assert isinstance(summary, dict)
         assert "verified" in summary
@@ -160,37 +159,44 @@ class TestEnsureTz:
 class TestIngestRequestSchemas:
     def test_notion_request_with_database_id(self):
         from app.schemas.requests import NotionIngestRequest
+
         req = NotionIngestRequest(database_id="db-123")
         assert req.to_source_input() == {"database_id": "db-123"}
 
     def test_notion_request_with_page_id(self):
         from app.schemas.requests import NotionIngestRequest
+
         req = NotionIngestRequest(page_id="page-456")
         assert req.to_source_input() == {"page_id": "page-456"}
 
     def test_notion_request_requires_one_field(self):
         from app.schemas.requests import NotionIngestRequest
+
         req = NotionIngestRequest()
         with pytest.raises(ValueError):
             req.to_source_input()
 
     def test_google_docs_with_doc_ids(self):
         from app.schemas.requests import GoogleDocsIngestRequest
+
         req = GoogleDocsIngestRequest(document_ids=["doc-1", "doc-2"])
         assert req.to_source_input() == {"document_ids": ["doc-1", "doc-2"]}
 
     def test_google_docs_with_folder(self):
         from app.schemas.requests import GoogleDocsIngestRequest
+
         req = GoogleDocsIngestRequest(folder_id="folder-abc")
         assert req.to_source_input() == {"folder_id": "folder-abc"}
 
     def test_confluence_with_space_key(self):
         from app.schemas.requests import ConfluenceIngestRequest
+
         req = ConfluenceIngestRequest(space_key="ENG")
         assert req.to_source_input() == {"space_key": "ENG"}
 
     def test_confluence_with_page_ids(self):
         from app.schemas.requests import ConfluenceIngestRequest
+
         req = ConfluenceIngestRequest(page_ids=["123", "456"])
         assert req.to_source_input() == {"page_ids": ["123", "456"]}
 
@@ -198,6 +204,7 @@ class TestIngestRequestSchemas:
 class TestConnectorUtils:
     def test_content_hash_is_deterministic(self):
         from app.ingestion.utils import content_hash
+
         h1 = content_hash("hello world")
         h2 = content_hash("hello world")
         assert h1 == h2
@@ -205,14 +212,17 @@ class TestConnectorUtils:
 
     def test_content_hash_normalises_whitespace(self):
         from app.ingestion.utils import content_hash
+
         assert content_hash("hello  world") == content_hash("hello world")
 
     def test_different_texts_give_different_hashes(self):
         from app.ingestion.utils import content_hash
+
         assert content_hash("foo") != content_hash("bar")
 
     def test_extract_topics_finds_tech_terms(self):
         from app.ingestion.utils import extract_topics_from_text
+
         topics = extract_topics_from_text("We use FastAPI backend with PostgreSQL and Redis")
         assert "backend" in topics
         assert "redis" in topics
@@ -220,13 +230,29 @@ class TestConnectorUtils:
 
     def test_extract_topics_is_capped(self):
         from app.ingestion.utils import extract_topics_from_text
-        long_text = " ".join(["api", "backend", "docker", "kubernetes", "redis",
-                              "kafka", "python", "react", "sql", "aws", "gcp", "azure"])
+
+        long_text = " ".join(
+            [
+                "api",
+                "backend",
+                "docker",
+                "kubernetes",
+                "redis",
+                "kafka",
+                "python",
+                "react",
+                "sql",
+                "aws",
+                "gcp",
+                "azure",
+            ]
+        )
         topics = extract_topics_from_text(long_text, max_topics=5)
         assert len(topics) <= 5
 
     def test_slugify(self):
         from app.ingestion.utils import slugify
+
         assert slugify("Hello World!") == "hello-world"
         assert slugify("API Backend") == "api-backend"
 
@@ -246,6 +272,7 @@ class TestNotionBlockParsing:
 
     def test_paragraph_returns_text(self):
         from app.ingestion.notion_connector import NotionConnector
+
         block = self._make_block("paragraph", "Hello paragraph")
         # We call the static method directly — no API needed
         result = NotionConnector._block_to_text(block)
@@ -253,24 +280,28 @@ class TestNotionBlockParsing:
 
     def test_heading_1_prefixed(self):
         from app.ingestion.notion_connector import NotionConnector
+
         block = self._make_block("heading_1", "Big Title")
         result = NotionConnector._block_to_text(block)
         assert result == "# Big Title"
 
     def test_heading_3_prefixed(self):
         from app.ingestion.notion_connector import NotionConnector
+
         block = self._make_block("heading_3", "Small Heading")
         result = NotionConnector._block_to_text(block)
         assert result == "### Small Heading"
 
     def test_bulleted_list(self):
         from app.ingestion.notion_connector import NotionConnector
+
         block = self._make_block("bulleted_list_item", "Item one")
         result = NotionConnector._block_to_text(block)
         assert result == "• Item one"
 
     def test_code_block(self):
         from app.ingestion.notion_connector import NotionConnector
+
         block = {
             "type": "code",
             "code": {
@@ -284,6 +315,7 @@ class TestNotionBlockParsing:
 
     def test_unknown_block_returns_empty(self):
         from app.ingestion.notion_connector import NotionConnector
+
         block = {"type": "image", "image": {}}
         result = NotionConnector._block_to_text(block)
         assert result == ""
@@ -292,6 +324,7 @@ class TestNotionBlockParsing:
 class TestGoogleDocToText:
     def test_extracts_paragraphs(self):
         from app.ingestion.google_docs_connector import GoogleDocsConnector
+
         doc = {
             "title": "Test Doc",
             "body": {
@@ -310,6 +343,7 @@ class TestGoogleDocToText:
 
     def test_headings_get_hash_prefix(self):
         from app.ingestion.google_docs_connector import GoogleDocsConnector
+
         doc = {
             "title": "Test",
             "body": {
@@ -328,6 +362,7 @@ class TestGoogleDocToText:
 
     def test_empty_paragraphs_skipped(self):
         from app.ingestion.google_docs_connector import GoogleDocsConnector
+
         doc = {
             "title": "Test",
             "body": {
@@ -348,6 +383,7 @@ class TestGoogleDocToText:
 class TestConfluenceHtmlToText:
     def test_strips_html_tags(self):
         from app.ingestion.confluence_connector import _html_to_text
+
         html = "<h1>Title</h1><p>Some <b>bold</b> text here.</p>"
         result = _html_to_text(html)
         assert "Title" in result
@@ -356,10 +392,12 @@ class TestConfluenceHtmlToText:
 
     def test_empty_html(self):
         from app.ingestion.confluence_connector import _html_to_text
+
         assert _html_to_text("") == ""
 
     def test_code_block_preserved(self):
         from app.ingestion.confluence_connector import _html_to_text
+
         html = "<pre><code>def foo(): pass</code></pre>"
         result = _html_to_text(html)
         assert "def foo" in result

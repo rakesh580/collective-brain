@@ -2,6 +2,7 @@
 
 Requires CB_DATABASE_URL and CB_MIGRATION_DATABASE_URL to be set (CI provides them).
 """
+
 import os
 
 import pytest
@@ -46,6 +47,7 @@ def _run_migrations(db_engine):
     """Run Alembic migrations once before integration tests."""
     import subprocess
     import sys
+
     backend_dir = os.path.join(os.path.dirname(__file__), "..", "..")
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
@@ -60,6 +62,7 @@ def _run_migrations(db_engine):
 @pytest.fixture(scope="session")
 def app_settings():
     from app.config import Settings
+
     return Settings(
         jwt_secret="integration-test-secret-32-chars-min",
         jwt_algorithm="HS256",
@@ -90,21 +93,27 @@ def app_client(app_settings):
 @pytest.fixture
 def registered_user(app_client):
     """Pre-register a test user and return (user_data, auth_token)."""
-    resp = app_client.post("/api/v1/auth/register", json={
-        "username": "alice",
-        "email": "alice@test.example",
-        "password": "StrongP@ss1",
-        "display_name": "Alice Test",
-    })
+    resp = app_client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "alice",
+            "email": "alice@test.example",
+            "password": "StrongP@ss1",
+            "display_name": "Alice Test",
+        },
+    )
     # Accept 201 (created) or 409 (already exists from a previous test run)
     assert resp.status_code in (201, 409), f"Unexpected: {resp.status_code} {resp.text}"
 
     if resp.status_code == 409:
         # Log in instead
-        login = app_client.post("/api/v1/auth/login", json={
-            "username": "alice",
-            "password": "StrongP@ss1",
-        })
+        login = app_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "alice",
+                "password": "StrongP@ss1",
+            },
+        )
         assert login.status_code == 200, f"Login failed: {login.text}"
         data = login.json()
     else:

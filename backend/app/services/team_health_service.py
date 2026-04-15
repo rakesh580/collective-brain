@@ -19,12 +19,8 @@ def compute_health_snapshot(db: Session) -> dict:
     G = mg._get_or_build_nx_graph()
 
     # ── Collect node sets ──
-    member_nodes = {
-        nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "member"
-    }
-    topic_nodes = {
-        nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "topic"
-    }
+    member_nodes = {nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "member"}
+    topic_nodes = {nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "topic"}
 
     total_topics = len(topic_nodes)
     total_members = len(member_nodes)
@@ -34,34 +30,26 @@ def compute_health_snapshot(db: Session) -> dict:
     topics_with_2_plus = 0
 
     for tid, tdata in topic_nodes.items():
-        member_experts = [
-            n for n in G.neighbors(tid)
-            if G.nodes[n].get("node_type") == "member"
-        ]
+        member_experts = [n for n in G.neighbors(tid) if G.nodes[n].get("node_type") == "member"]
         if len(member_experts) <= 1:
-            expert_names = [
-                G.nodes[m].get("label", m) for m in member_experts
-            ]
-            bus_factor_topics.append({
-                "topic": tdata.get("label", tid),
-                "expert_count": len(member_experts),
-                "experts": expert_names,
-            })
+            expert_names = [G.nodes[m].get("label", m) for m in member_experts]
+            bus_factor_topics.append(
+                {
+                    "topic": tdata.get("label", tid),
+                    "expert_count": len(member_experts),
+                    "experts": expert_names,
+                }
+            )
         if len(member_experts) >= 2:
             topics_with_2_plus += 1
 
     bus_factor_count = len(bus_factor_topics)
 
     # ── 2. Knowledge coverage % ──
-    coverage_pct = round(
-        (topics_with_2_plus / max(1, total_topics)) * 100, 1
-    )
+    coverage_pct = round((topics_with_2_plus / max(1, total_topics)) * 100, 1)
 
     # ── 3. Collaboration density ──
-    collab_edges = sum(
-        1 for _, _, d in G.edges(data=True)
-        if d.get("edge_type") == "COLLABORATED_WITH"
-    )
+    collab_edges = sum(1 for _, _, d in G.edges(data=True) if d.get("edge_type") == "COLLABORATED_WITH")
     possible_member_edges = total_members * (total_members - 1) / 2 if total_members > 1 else 1
     collab_density = round(collab_edges / possible_member_edges, 4)
 
@@ -77,20 +65,14 @@ def compute_health_snapshot(db: Session) -> dict:
                 member_last_active[c.member_id] = c.timestamp
 
     active_members = sum(
-        1 for mid in member_nodes
-        if member_last_active.get(mid) and member_last_active[mid] >= cutoff_30d
+        1 for mid in member_nodes if member_last_active.get(mid) and member_last_active[mid] >= cutoff_30d
     )
-    active_member_pct = round(
-        (active_members / max(1, total_members)) * 100, 1
-    )
+    active_member_pct = round((active_members / max(1, total_members)) * 100, 1)
 
     # ── 5. Average expertise breadth ──
     breadths: list[int] = []
     for mid in member_nodes:
-        topic_count = sum(
-            1 for nbr in G.neighbors(mid)
-            if G.nodes[nbr].get("node_type") == "topic"
-        )
+        topic_count = sum(1 for nbr in G.neighbors(mid) if G.nodes[nbr].get("node_type") == "topic")
         breadths.append(topic_count)
     avg_breadth = round(sum(breadths) / max(1, len(breadths)), 2)
 
@@ -195,17 +177,19 @@ def get_health_trends(db: Session, period_days: int = 90) -> dict:
         else:
             risk_parsed = risk_raw or {}
 
-        snapshots.append({
-            "id": row[0],
-            "timestamp": row[1].isoformat() if hasattr(row[1], "isoformat") else str(row[1]),
-            "bus_factor_count": row[2],
-            "coverage_pct": row[3],
-            "collab_density": row[4],
-            "active_member_pct": row[5],
-            "avg_breadth": row[6],
-            "health_score": row[7],
-            "risk_summary": risk_parsed,
-        })
+        snapshots.append(
+            {
+                "id": row[0],
+                "timestamp": row[1].isoformat() if hasattr(row[1], "isoformat") else str(row[1]),
+                "bus_factor_count": row[2],
+                "coverage_pct": row[3],
+                "collab_density": row[4],
+                "active_member_pct": row[5],
+                "avg_breadth": row[6],
+                "health_score": row[7],
+                "risk_summary": risk_parsed,
+            }
+        )
 
     return {"snapshots": snapshots, "period_days": period_days}
 
@@ -230,15 +214,17 @@ def predict_risks(db: Session, horizon_days: int = 90) -> dict:
         if len(snapshots) < 2:
             # Not enough data to predict
             current_val = snapshots[-1][metric_key] if snapshots else 0
-            predictions.append({
-                "metric": metric_label,
-                "current_value": round(current_val, 2),
-                "predicted_value": round(current_val, 2),
-                "horizon_days": horizon_days,
-                "trend": "stable",
-                "risk_level": "low",
-                "description": "Not enough historical data for prediction.",
-            })
+            predictions.append(
+                {
+                    "metric": metric_label,
+                    "current_value": round(current_val, 2),
+                    "predicted_value": round(current_val, 2),
+                    "horizon_days": horizon_days,
+                    "trend": "stable",
+                    "risk_level": "low",
+                    "description": "Not enough historical data for prediction.",
+                }
+            )
             continue
 
         # Linear regression on the metric values
@@ -263,6 +249,7 @@ def predict_risks(db: Session, horizon_days: int = 90) -> dict:
             last_ts = snapshots[-1]["timestamp"]
             try:
                 from dateutil.parser import parse as parse_dt
+
                 dt_first = parse_dt(first_ts) if isinstance(first_ts, str) else first_ts
                 dt_last = parse_dt(last_ts) if isinstance(last_ts, str) else last_ts
                 total_span = max((dt_last - dt_first).total_seconds() / 86400, 1)
@@ -305,20 +292,24 @@ def predict_risks(db: Session, horizon_days: int = 90) -> dict:
 
         # Description
         if trend == "improving":
-            description = f"{metric_label} is trending upward and expected to improve over the next {horizon_days} days."
+            description = (
+                f"{metric_label} is trending upward and expected to improve over the next {horizon_days} days."
+            )
         elif trend == "declining":
             description = f"{metric_label} is trending downward. Consider taking action to prevent further decline."
         else:
             description = f"{metric_label} is stable with no significant change expected."
 
-        predictions.append({
-            "metric": metric_label,
-            "current_value": round(current_val, 2),
-            "predicted_value": round(predicted_val, 2),
-            "horizon_days": horizon_days,
-            "trend": trend,
-            "risk_level": risk_level,
-            "description": description,
-        })
+        predictions.append(
+            {
+                "metric": metric_label,
+                "current_value": round(current_val, 2),
+                "predicted_value": round(predicted_val, 2),
+                "horizon_days": horizon_days,
+                "trend": trend,
+                "risk_level": risk_level,
+                "description": description,
+            }
+        )
 
     return {"predictions": predictions}

@@ -4,6 +4,7 @@ Revision ID: 005_knowledge_verification
 Revises: 004_enterprise
 Create Date: 2026-04-09
 """
+
 from collections.abc import Sequence
 from typing import Union
 
@@ -29,7 +30,9 @@ def upgrade() -> None:
 
     # ── Insights: knowledge verification tracking ─────────────────────────────
     op.add_column("insights", sa.Column("verified_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("insights", sa.Column("verified_by", sa.String(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True))
+    op.add_column(
+        "insights", sa.Column("verified_by", sa.String(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    )
     op.add_column("insights", sa.Column("verification_status", sa.String(20), nullable=True, server_default="pending"))
     # "pending" | "verified" | "outdated" | "disputed"
     op.add_column("insights", sa.Column("source_artifact_ids", sa.JSON(), server_default="[]"))

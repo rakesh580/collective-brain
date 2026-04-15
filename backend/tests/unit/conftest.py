@@ -3,6 +3,7 @@
 VectorStoreService tests use a real PostgreSQL connection when CB_DATABASE_URL
 is set (CI environment). If not set, those tests are skipped automatically.
 """
+
 import os
 from unittest.mock import MagicMock
 
@@ -35,6 +36,7 @@ def tmp_dir(tmp_path):
 
 # ── VectorStore fixtures ──────────────────────────────────────────────────────
 
+
 def _requires_db():
     """Skip if no real database is available."""
     url = os.environ.get("CB_DATABASE_URL", "")
@@ -55,7 +57,7 @@ def db_session():
     session = Session()
     try:
         yield session
-        session.rollback()   # Roll back after each test — keeps DB clean
+        session.rollback()  # Roll back after each test — keeps DB clean
     finally:
         session.close()
         engine.dispose()
@@ -69,12 +71,14 @@ def vector_store(db_session):
 
     def _factory():
         from sqlalchemy.orm import sessionmaker
+
         maker = sessionmaker(bind=db_session.get_bind())
         return maker()
 
     svc = VectorStoreService(_factory)
     # Clean slate — remove any leftover rows from previous runs
     from sqlalchemy import text
+
     db_session.execute(text("DELETE FROM knowledge_embeddings"))
     db_session.commit()
     svc._cached_count = None

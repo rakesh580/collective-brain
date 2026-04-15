@@ -31,9 +31,7 @@ def get_current_user(request: Request):
 
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     token = auth_header.split(" ", 1)[1]
     settings = request.app.state.settings
     auth_svc = AuthService(settings)
@@ -55,9 +53,7 @@ def get_current_user(request: Request):
     finally:
         db.close()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
 
 
@@ -77,6 +73,7 @@ def require_role(*allowed_roles: str):
         async def delete_thing(request: Request, user=Depends(require_role("admin"))):
             ...
     """
+
     def checker(request: Request):
         user = get_current_user(request)
         user_role = getattr(user, "role", None) or "member"
@@ -86,4 +83,5 @@ def require_role(*allowed_roles: str):
                 detail="Insufficient permissions",
             )
         return user
+
     return checker

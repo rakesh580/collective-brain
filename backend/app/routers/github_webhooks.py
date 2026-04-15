@@ -1,4 +1,5 @@
 """GitHub webhook integration — receive push, PR, issue, and review events."""
+
 import hashlib
 import hmac
 import logging
@@ -22,9 +23,7 @@ def _verify_signature(secret: str, body: bytes, signature: str) -> bool:
         return False
     if not signature.startswith("sha256="):
         return False
-    expected = "sha256=" + hmac.new(
-        secret.encode(), body, hashlib.sha256
-    ).hexdigest()
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
@@ -35,6 +34,7 @@ def _verify_signature(secret: str, body: bytes, signature: str) -> bool:
 async def github_status(request: Request):
     """Check whether GitHub webhook integration is configured."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     settings = request.app.state.settings
@@ -49,6 +49,7 @@ async def github_status(request: Request):
 async def github_setup(request: Request):
     """Return setup instructions for GitHub webhooks."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     settings = request.app.state.settings
@@ -117,6 +118,7 @@ async def github_webhook(request: Request):
     # Parse payload
     try:
         import json
+
         payload = json.loads(body)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
@@ -128,6 +130,7 @@ async def github_webhook(request: Request):
 
     async def _process():
         from app.services.github_event_processor import GitHubEventProcessor
+
         db = _get_db()
         try:
             processor = GitHubEventProcessor(db, embedder, vs)
@@ -166,14 +169,20 @@ async def github_webhook(request: Request):
 async def github_recent_events(request: Request, limit: int = 20):
     """List recent GitHub-ingested artifacts."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
     try:
         from app.models.artifact import ArtifactRecord
+
         artifacts = (
             db.query(ArtifactRecord)
-            .filter(ArtifactRecord.source_type.in_(["github_push", "github_pr", "github_issue", "github_review", "github_comment"]))
+            .filter(
+                ArtifactRecord.source_type.in_(
+                    ["github_push", "github_pr", "github_issue", "github_review", "github_comment"]
+                )
+            )
             .order_by(ArtifactRecord.ingested_at.desc())
             .limit(limit)
             .all()

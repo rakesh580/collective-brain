@@ -40,9 +40,7 @@ class TestRegisterRequest:
             )
         # min_length=8 validation
         errors = exc_info.value.errors()
-        assert any(
-            e["type"] == "string_too_short" for e in errors
-        )
+        assert any(e["type"] == "string_too_short" for e in errors)
 
 
 class TestLoginRequest:
@@ -91,6 +89,4 @@ class TestQueryRequest:
         with pytest.raises(ValidationError) as exc_info:
             QueryRequest(question="")
         errors = exc_info.value.errors()
-        assert any(
-            e["type"] == "string_too_short" for e in errors
-        )
+        assert any(e["type"] == "string_too_short" for e in errors)

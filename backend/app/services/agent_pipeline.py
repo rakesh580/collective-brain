@@ -129,7 +129,9 @@ class AgentPipeline:
 
         except Exception as e:
             logger.error("Agent execution failed: %s", e, exc_info=True)
-            answer_text = f"I encountered an error while processing your question. Please try again. (Error: {type(e).__name__})"
+            answer_text = (
+                f"I encountered an error while processing your question. Please try again. (Error: {type(e).__name__})"
+            )
             tool_calls_made = []
 
         # Extract sources from tool calls
@@ -139,7 +141,9 @@ class AgentPipeline:
         related_members = self._extract_related_members(answer_text)
 
         # Save messages to DB
-        self._save_messages(conversation_id, question, answer_text, sources, related_members, sender_user_id, sender_name)
+        self._save_messages(
+            conversation_id, question, answer_text, sources, related_members, sender_user_id, sender_name
+        )
 
         return QueryResponse(
             answer=answer_text,
@@ -151,11 +155,7 @@ class AgentPipeline:
     def _ensure_conversation(self, question: str, conversation_id: str | None, owner_user_id: str | None = None) -> str:
         """Create or retrieve a conversation record."""
         if conversation_id:
-            conv = (
-                self.db.query(ConversationRecord)
-                .filter(ConversationRecord.id == conversation_id)
-                .first()
-            )
+            conv = self.db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
             if conv:
                 return conversation_id
 
@@ -234,17 +234,9 @@ class AgentPipeline:
         self.db.add(assistant_msg)
 
         # Update conversation
-        conv = (
-            self.db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conversation_id)
-            .first()
-        )
+        conv = self.db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
         if conv:
-            msg_count = (
-                self.db.query(MessageRecord)
-                .filter(MessageRecord.conversation_id == conversation_id)
-                .count()
-            )
+            msg_count = self.db.query(MessageRecord).filter(MessageRecord.conversation_id == conversation_id).count()
             conv.message_count = msg_count
             conv.updated_at = now
 

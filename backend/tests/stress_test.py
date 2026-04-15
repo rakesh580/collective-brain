@@ -201,8 +201,14 @@ async def phase1_rest_api(concurrent_users: int, duration_s: int = 30) -> PhaseR
     result.duration_s = time.monotonic() - start_time
 
     log.info("Phase 1 complete: %d requests in %.1fs (%.0f rps)", result.total_requests, result.duration_s, result.rps)
-    log.info("  Success rate: %.1f%% | P50: %.0fms | P95: %.0fms | P99: %.0fms | Max: %.0fms",
-             result.success_rate, result.p50, result.p95, result.p99, result.max_latency)
+    log.info(
+        "  Success rate: %.1f%% | P50: %.0fms | P95: %.0fms | P99: %.0fms | Max: %.0fms",
+        result.success_rate,
+        result.p50,
+        result.p95,
+        result.p99,
+        result.max_latency,
+    )
     log.info("  Status codes: %s", result.status_codes)
     return result
 
@@ -271,16 +277,24 @@ async def phase2_websocket(num_connections: int) -> PhaseResult:
                 connected += 1
 
                 # Send auth message
-                await ws.send(json.dumps({
-                    "type": "auth",
-                    "token": token["token"],
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "auth",
+                            "token": token["token"],
+                        }
+                    )
+                )
 
                 # Send a message
-                await ws.send(json.dumps({
-                    "type": "message",
-                    "content": f"WS stress msg from {idx}",
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "message",
+                            "content": f"WS stress msg from {idx}",
+                        }
+                    )
+                )
                 messages_sent += 1
 
                 # Listen for messages for a few seconds
@@ -314,8 +328,7 @@ async def phase2_websocket(num_connections: int) -> PhaseResult:
     result.latencies_ms = connect_times
 
     log.info("Phase 2 complete: %d/%d connected, %d failed", connected, num_connections, failed)
-    log.info("  Connect P50: %.0fms | P95: %.0fms | Max: %.0fms",
-             result.p50, result.p95, result.max_latency)
+    log.info("  Connect P50: %.0fms | P95: %.0fms | Max: %.0fms", result.p50, result.p95, result.max_latency)
     log.info("  Messages sent: %d, received: %d", messages_sent, messages_received)
     result.notes.append(f"Messages sent={messages_sent}, received={messages_received}")
     return result
@@ -394,10 +407,16 @@ async def phase3_db_writes(concurrent_writers: int, writes_per_user: int = 20) -
     await asyncio.gather(*tasks, return_exceptions=True)
     result.duration_s = time.monotonic() - start_time
 
-    log.info("Phase 3 complete: %d writes in %.1fs (%.0f writes/s)",
-             result.total_requests, result.duration_s, result.rps)
-    log.info("  Success: %.1f%% | P50: %.0fms | P95: %.0fms | P99: %.0fms",
-             result.success_rate, result.p50, result.p95, result.p99)
+    log.info(
+        "Phase 3 complete: %d writes in %.1fs (%.0f writes/s)", result.total_requests, result.duration_s, result.rps
+    )
+    log.info(
+        "  Success: %.1f%% | P50: %.0fms | P95: %.0fms | P99: %.0fms",
+        result.success_rate,
+        result.p50,
+        result.p95,
+        result.p99,
+    )
     return result
 
 
@@ -425,8 +444,15 @@ async def phase4_saturation(burst_size: int = 500) -> PhaseResult:
 
     # Fire all requests simultaneously (no staggering)
     async def burst_request(idx: int):
-        endpoints = ["/health", "/members", "/graph/full", "/conversations?limit=5",
-                     "/rooms?limit=5", "/auth/me", "/search?q=test"]
+        endpoints = [
+            "/health",
+            "/members",
+            "/graph/full",
+            "/conversations?limit=5",
+            "/rooms?limit=5",
+            "/auth/me",
+            "/search?q=test",
+        ]
         path = endpoints[idx % len(endpoints)]
         async with httpx.AsyncClient(timeout=60.0) as client:
             start = time.monotonic()
@@ -460,8 +486,13 @@ async def phase4_saturation(burst_size: int = 500) -> PhaseResult:
     result.duration_s = time.monotonic() - start_time
 
     log.info("Phase 4 complete: %d requests in %.1fs", result.total_requests, result.duration_s)
-    log.info("  Success: %.1f%% | P50: %.0fms | P95: %.0fms | Max: %.0fms",
-             result.success_rate, result.p50, result.p95, result.max_latency)
+    log.info(
+        "  Success: %.1f%% | P50: %.0fms | P95: %.0fms | Max: %.0fms",
+        result.success_rate,
+        result.p50,
+        result.p95,
+        result.max_latency,
+    )
     log.info("  Status codes: %s", result.status_codes)
     return result
 
@@ -499,7 +530,9 @@ def generate_report(phases: list[PhaseResult]) -> str:
         lines.append(f"│ Latency P99:       {phase.p99:.0f}ms{' ' * (46 - len(f'{phase.p99:.0f}ms'))}│")
         lines.append(f"│ Latency Max:       {phase.max_latency:.0f}ms{' ' * (46 - len(f'{phase.max_latency:.0f}ms'))}│")
         lines.append(f"│{'─' * 68}│")
-        lines.append(f"│ Successes: {phase.success}  Failures: {phase.failures}  Errors: {phase.errors}{' ' * max(0, 68 - len(f' Successes: {phase.success}  Failures: {phase.failures}  Errors: {phase.errors}') - 1)}│")
+        lines.append(
+            f"│ Successes: {phase.success}  Failures: {phase.failures}  Errors: {phase.errors}{' ' * max(0, 68 - len(f' Successes: {phase.success}  Failures: {phase.failures}  Errors: {phase.errors}') - 1)}│"
+        )
         codes_str = str(phase.status_codes)
         if len(codes_str) > 66:
             codes_str = codes_str[:63] + "..."
@@ -551,7 +584,7 @@ def generate_report(phases: list[PhaseResult]) -> str:
         if phase.p99 > 5000:
             lines.append(f"  - {phase.name}: P99 latency {phase.p99:.0f}ms exceeds 5s target")
         if phase.errors > phase.total_requests * 0.05:
-            lines.append(f"  - {phase.name}: Error rate {phase.errors/phase.total_requests*100:.1f}% is high")
+            lines.append(f"  - {phase.name}: Error rate {phase.errors / phase.total_requests * 100:.1f}% is high")
 
     # Architecture notes
     lines.append("")

@@ -41,10 +41,7 @@ class DiscordConnector(BaseConnector):
 
         chunks = []
         for group in groups:
-            text = (
-                f"[#{channel_name}] {group['username']} "
-                f"({group['timestamp'].strftime('%Y-%m-%d %H:%M')}):\n"
-            )
+            text = f"[#{channel_name}] {group['username']} ({group['timestamp'].strftime('%Y-%m-%d %H:%M')}):\n"
             text += "\n".join(group["texts"])
 
             chunks.append(
@@ -114,8 +111,7 @@ class DiscordConnector(BaseConnector):
             if (
                 current_group
                 and current_group["author_id"] == author_id
-                and (ts - current_group["last_ts"]).total_seconds()
-                < self.time_window_seconds
+                and (ts - current_group["last_ts"]).total_seconds() < self.time_window_seconds
             ):
                 current_group["texts"].append(content)
                 current_group["last_ts"] = ts

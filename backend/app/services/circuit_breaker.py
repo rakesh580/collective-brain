@@ -34,10 +34,7 @@ class CircuitBreakerError(Exception):
     def __init__(self, service_name: str, retry_after: float):
         self.service_name = service_name
         self.retry_after = retry_after
-        super().__init__(
-            f"Service '{service_name}' is unavailable (circuit open). "
-            f"Retry after {retry_after:.0f}s"
-        )
+        super().__init__(f"Service '{service_name}' is unavailable (circuit open). Retry after {retry_after:.0f}s")
 
 
 class CircuitBreaker:
@@ -123,7 +120,9 @@ class CircuitBreaker:
             self._state = CircuitState.OPEN
             logger.warning(
                 "Circuit %s: CLOSED → OPEN after %d failures (last: %s)",
-                self.name, self._failure_count, error,
+                self.name,
+                self._failure_count,
+                error,
             )
 
     def get_status(self) -> dict:

@@ -84,21 +84,21 @@ def compute_artifact_freshness(db: Session) -> list[dict]:
 
         # Responsible members: those linked to this artifact
         responsible_member_ids = artifact.member_ids or []
-        responsible_members = [
-            member_name_map.get(mid, mid) for mid in responsible_member_ids
-        ]
+        responsible_members = [member_name_map.get(mid, mid) for mid in responsible_member_ids]
 
-        results.append({
-            "artifact_id": artifact.id,
-            "title": artifact.title or artifact.source_path or artifact.id,
-            "source_type": artifact.source_type or "unknown",
-            "ingested_at": ingested_at.isoformat(),
-            "days_old": days_since,
-            "staleness_score": staleness_score,
-            "status": status,
-            "related_changes": related_changes,
-            "responsible_members": responsible_members,
-        })
+        results.append(
+            {
+                "artifact_id": artifact.id,
+                "title": artifact.title or artifact.source_path or artifact.id,
+                "source_type": artifact.source_type or "unknown",
+                "ingested_at": ingested_at.isoformat(),
+                "days_old": days_since,
+                "staleness_score": staleness_score,
+                "status": status,
+                "related_changes": related_changes,
+                "responsible_members": responsible_members,
+            }
+        )
 
     # Sort by staleness_score descending (most stale first)
     results.sort(key=lambda x: x["staleness_score"], reverse=True)

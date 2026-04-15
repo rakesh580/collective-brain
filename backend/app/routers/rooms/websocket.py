@@ -79,9 +79,7 @@ async def room_websocket(websocket: WebSocket, room_id: str):
 
     # Limit concurrent WebSocket connections per user per room
     _MAX_WS_PER_USER = 5
-    user_connections_in_room = sum(
-        1 for _, uid, _ in _ws_connections.get(room_id, []) if uid == user_id
-    )
+    user_connections_in_room = sum(1 for _, uid, _ in _ws_connections.get(room_id, []) if uid == user_id)
     if user_connections_in_room >= _MAX_WS_PER_USER:
         await websocket.close(code=4008, reason="Too many connections")
         return
@@ -99,6 +97,7 @@ async def room_websocket(websocket: WebSocket, room_id: str):
     is_first_in_room = len(_ws_connections[room_id]) == 1
 
     if redis and redis.is_connected and is_first_in_room:
+
         async def _on_redis_message(data: dict):
             """Deliver Redis pub/sub messages to local WebSocket connections."""
             await _broadcast_local(room_id, data)
@@ -107,12 +106,15 @@ async def room_websocket(websocket: WebSocket, room_id: str):
         logger.info("Subscribed to Redis channel: %s", channel)
 
     # Broadcast presence update
-    await _broadcast(room_id, {
-        "type": "presence",
-        "online_users": _get_online_list(room_id),
-        "user_joined": user_id,
-        "username": username,
-    })
+    await _broadcast(
+        room_id,
+        {
+            "type": "presence",
+            "online_users": _get_online_list(room_id),
+            "user_joined": user_id,
+            "username": username,
+        },
+    )
 
     # Periodic membership re-check interval (seconds).
     # If a user is removed from the room, their WS is closed within this window.
@@ -150,17 +152,23 @@ async def room_websocket(websocket: WebSocket, room_id: str):
 
                 if msg_type == "typing":
                     # Broadcast typing indicator to other users
-                    await _broadcast(room_id, {
-                        "type": "typing",
-                        "user_id": user_id,
-                        "username": username,
-                    })
+                    await _broadcast(
+                        room_id,
+                        {
+                            "type": "typing",
+                            "user_id": user_id,
+                            "username": username,
+                        },
+                    )
 
                 elif msg_type == "typing_stop":
-                    await _broadcast(room_id, {
-                        "type": "typing_stop",
-                        "user_id": user_id,
-                    })
+                    await _broadcast(
+                        room_id,
+                        {
+                            "type": "typing_stop",
+                            "user_id": user_id,
+                        },
+                    )
 
                 elif msg_type == "message":
                     # Save and broadcast message via WebSocket (with retry)
@@ -169,10 +177,12 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                         continue
                     # Enforce message length limit
                     if len(content) > 10000:
-                        await websocket.send_json({
-                            "type": "error",
-                            "message": "Message too long (max 10,000 characters).",
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "message": "Message too long (max 10,000 characters).",
+                            }
+                        )
                         continue
 
                     saved = False
@@ -198,10 +208,13 @@ async def room_websocket(websocket: WebSocket, room_id: str):
                             room.last_message_at = datetime.now(UTC)
                             db.commit()
 
-                            await _broadcast(room_id, {
-                                "type": "new_message",
-                                "message": _msg_to_dict(msg),
-                            })
+                            await _broadcast(
+                                room_id,
+                                {
+                                    "type": "new_message",
+                                    "message": _msg_to_dict(msg),
+                                },
+                            )
                             saved = True
                             break
                         except Exception as db_err:
@@ -215,10 +228,12 @@ async def room_websocket(websocket: WebSocket, room_id: str):
 
                     if not saved:
                         with contextlib.suppress(Exception):
-                            await websocket.send_json({
-                                "type": "error",
-                                "message": "Failed to save message. Please try again.",
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": "Failed to save message. Please try again.",
+                                }
+                            )
 
                 elif msg_type == "ping":
                     await websocket.send_json({"type": "pong"})
@@ -241,9 +256,7 @@ async def room_websocket(websocket: WebSocket, room_id: str):
 
         # Only remove from online if no other connections for this user
         try:
-            still_connected = any(
-                uid == user_id for _, uid, _ in _ws_connections.get(room_id, [])
-            )
+            still_connected = any(uid == user_id for _, uid, _ in _ws_connections.get(room_id, []))
             if not still_connected:
                 _online_users[room_id].discard(user_id)
         except Exception:
@@ -264,9 +277,12 @@ async def room_websocket(websocket: WebSocket, room_id: str):
         logger.info("Room WS disconnected: user=%s room=%s", user_id, room_id)
 
         with contextlib.suppress(Exception):
-            await _broadcast(room_id, {
-                "type": "presence",
-                "online_users": _get_online_list(room_id),
-                "user_left": user_id,
-                "username": username,
-            })
+            await _broadcast(
+                room_id,
+                {
+                    "type": "presence",
+                    "online_users": _get_online_list(room_id),
+                    "user_left": user_id,
+                    "username": username,
+                },
+            )

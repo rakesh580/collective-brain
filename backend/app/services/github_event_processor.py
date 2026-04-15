@@ -1,4 +1,5 @@
 """Process GitHub webhook events into the Collective Brain knowledge graph."""
+
 import logging
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -61,9 +62,15 @@ def _extract_topics_from_commit(message: str, files: list[str]) -> list[str]:
 
     # Conventional commit prefixes
     prefix_map = {
-        "feat": "feature", "fix": "bugfix", "refactor": "refactoring",
-        "docs": "documentation", "test": "testing", "chore": "maintenance",
-        "ci": "ci-cd", "perf": "performance", "style": "code-style",
+        "feat": "feature",
+        "fix": "bugfix",
+        "refactor": "refactoring",
+        "docs": "documentation",
+        "test": "testing",
+        "chore": "maintenance",
+        "ci": "ci-cd",
+        "perf": "performance",
+        "style": "code-style",
         "build": "build-system",
     }
     msg_lower = message.lower().strip()
@@ -78,16 +85,34 @@ def _extract_topics_from_commit(message: str, files: list[str]) -> list[str]:
 
     # Topics from file extensions and directories
     ext_topics = {
-        ".py": "python", ".js": "javascript", ".ts": "typescript", ".tsx": "react",
-        ".jsx": "react", ".go": "golang", ".rs": "rust", ".java": "java",
-        ".rb": "ruby", ".yml": "devops", ".yaml": "devops", ".tf": "terraform",
-        ".sql": "database", ".css": "frontend", ".html": "frontend",
-        ".dockerfile": "docker", ".sh": "scripting",
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".tsx": "react",
+        ".jsx": "react",
+        ".go": "golang",
+        ".rs": "rust",
+        ".java": "java",
+        ".rb": "ruby",
+        ".yml": "devops",
+        ".yaml": "devops",
+        ".tf": "terraform",
+        ".sql": "database",
+        ".css": "frontend",
+        ".html": "frontend",
+        ".dockerfile": "docker",
+        ".sh": "scripting",
     }
     dir_topics = {
-        "api": "api", "auth": "authentication", "test": "testing",
-        "deploy": "deployment", "infra": "infrastructure", "docs": "documentation",
-        "frontend": "frontend", "backend": "backend", "models": "data-models",
+        "api": "api",
+        "auth": "authentication",
+        "test": "testing",
+        "deploy": "deployment",
+        "infra": "infrastructure",
+        "docs": "documentation",
+        "frontend": "frontend",
+        "backend": "backend",
+        "models": "data-models",
         "migrations": "database",
     }
 
@@ -209,16 +234,18 @@ class GitHubEventProcessor:
 
             text = f"[{repo_name}:{branch}] {message}{file_summary}"
 
-            chunks.append(ParsedChunk(
-                text=text,
-                source_type="github_push",
-                source_ref=sha,
-                author=author_name,
-                author_aliases=[author_email] if author_email else [],
-                timestamp=ts,
-                topics=topics,
-                chunk_metadata={"commit_hash": sha, "repo": repo_name, "branch": branch},
-            ))
+            chunks.append(
+                ParsedChunk(
+                    text=text,
+                    source_type="github_push",
+                    source_ref=sha,
+                    author=author_name,
+                    author_aliases=[author_email] if author_email else [],
+                    timestamp=ts,
+                    topics=topics,
+                    chunk_metadata={"commit_hash": sha, "repo": repo_name, "branch": branch},
+                )
+            )
 
             if author_name:
                 member = _resolve_github_member(self.db, author_name, author_email)
@@ -286,11 +313,7 @@ class GitHubEventProcessor:
         topics.extend(_extract_topics_from_commit(pr_title, []))
 
         status_text = "merged" if merged else state
-        text = (
-            f"[PR #{pr_number}] {pr_title} ({status_text})\n"
-            f"Author: {author}\n"
-            f"Repository: {repo_name}\n"
-        )
+        text = f"[PR #{pr_number}] {pr_title} ({status_text})\nAuthor: {author}\nRepository: {repo_name}\n"
         if reviewers:
             text += f"Reviewers: {', '.join(reviewers)}\n"
         if pr_body:

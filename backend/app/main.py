@@ -52,6 +52,7 @@ setup_telemetry(service_name="collective-brain", version="0.3.0")
 # ── Log record factory: inject request_id, trace_id, org_id ──────────────────
 _old_factory = logging.getLogRecordFactory()
 
+
 def _record_factory(*args, **kwargs):
     record = _old_factory(*args, **kwargs)
     if not hasattr(record, "request_id"):
@@ -61,6 +62,7 @@ def _record_factory(*args, **kwargs):
     if not hasattr(record, "org_id"):
         record.org_id = "-"
     return record
+
 
 logging.setLogRecordFactory(_record_factory)
 
@@ -104,34 +106,37 @@ async def lifespan(app: FastAPI):
 
     # ── Core Services ──
     from app.db.database import get_session_factory
+
     app.state.embedding_service = EmbeddingService(settings.embedding_model)
     app.state.vector_store = VectorStoreService(get_session_factory())
     app.state.llm_service = LLMService(settings)
 
     # ── Circuit Breakers ──
-    app.state.embedding_breaker = CircuitBreaker(
-        "embedding_service", failure_threshold=5, recovery_timeout=60.0
-    )
+    app.state.embedding_breaker = CircuitBreaker("embedding_service", failure_threshold=5, recovery_timeout=60.0)
 
     # ── Initialize Redis references in routers ──
     from app.routers.discussions import init_redis_from_app as discussions_init_redis
     from app.routers.rooms import init_redis_from_app as rooms_init_redis
+
     rooms_init_redis(app)
     discussions_init_redis(app)
 
     redis_ok = await redis.ping()
 
     # ── Publish app info to Prometheus ──
-    APP_INFO.info({
-        "version": "0.3.0",
-        "llm_provider": settings.llm_provider,
-        "agent_mode": settings.agent_mode,
-        "embedding_model": settings.embedding_model,
-    })
+    APP_INFO.info(
+        {
+            "version": "0.3.0",
+            "llm_provider": settings.llm_provider,
+            "agent_mode": settings.agent_mode,
+            "embedding_model": settings.embedding_model,
+        }
+    )
 
     # JWT secret — generate if not set
     if not settings.jwt_secret:
         import secrets as _secrets
+
         _jwt_path = Path("/data/.cb_jwt_secret")
         if _jwt_path.exists():
             settings.jwt_secret = _jwt_path.read_text().strip()
@@ -144,8 +149,8 @@ async def lifespan(app: FastAPI):
                 logger.info("Generated and persisted JWT secret to %s", _jwt_path)
             except OSError:
                 logger.warning(
-                    "CB_JWT_SECRET is not set and could not persist to %s — "
-                    "JWTs will be invalidated on restart.", _jwt_path
+                    "CB_JWT_SECRET is not set and could not persist to %s — JWTs will be invalidated on restart.",
+                    _jwt_path,
                 )
 
     if settings.jwt_secret and len(settings.jwt_secret) < 32:
@@ -296,6 +301,7 @@ app.add_middleware(RequestIDMiddleware)
 @app.exception_handler(CircuitBreakerError)
 async def circuit_breaker_handler(request, exc: CircuitBreakerError):
     from fastapi.responses import JSONResponse
+
     return JSONResponse(
         status_code=503,
         content={
@@ -310,6 +316,7 @@ async def circuit_breaker_handler(request, exc: CircuitBreakerError):
 async def global_exception_handler(request, exc):
     logger.error("Unhandled error: %s", exc, exc_info=True)
     from fastapi.responses import JSONResponse
+
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},

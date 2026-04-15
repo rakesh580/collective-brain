@@ -28,6 +28,7 @@ def _get_db():
 def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
     """Find existing member by alias match or create new one."""
     import re
+
     member_id = member_info.get("id", "").strip()
     if member_id:
         existing = db.query(MemberRecord).filter(MemberRecord.id == member_id).first()
@@ -38,22 +39,14 @@ def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
     name = member_info.get("name", "").strip()
     if name:
         # Try exact name match first (case-insensitive)
-        match = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.name.ilike(name))
-            .first()
-        )
+        match = db.query(MemberRecord).filter(MemberRecord.name.ilike(name)).first()
         if match:
             return match
 
         # For alias matching, we still need to check JSON arrays.
         # But limit the search to a reasonable set using name-based heuristic.
         # Check if name appears as substring in any member's name
-        partial_match = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.name.ilike(f"%{name}%"))
-            .first()
-        )
+        partial_match = db.query(MemberRecord).filter(MemberRecord.name.ilike(f"%{name}%")).first()
         if partial_match:
             return partial_match
 
@@ -156,6 +149,7 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str, 
 
         # Invalidate cached graph so new data is reflected
         from app.services.memory_graph import invalidate_graph_cache
+
         invalidate_graph_cache(room_id=room_id)
 
         return IngestionResponse(
@@ -178,7 +172,7 @@ async def _read_upload(uploaded: UploadFile, max_bytes: int = _MAX_UPLOAD_BYTES)
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=413,
-            detail=f"File '{uploaded.filename}' exceeds {max_bytes // (1024*1024)}MB limit.",
+            detail=f"File '{uploaded.filename}' exceeds {max_bytes // (1024 * 1024)}MB limit.",
         )
     return content
 
@@ -195,7 +189,7 @@ def _safe_extract_zip(zf, target_dir: str, allowed_extensions: tuple | None = No
     if total_size > _MAX_ZIP_DECOMPRESSED_BYTES:
         raise HTTPException(
             status_code=400,
-            detail=f"ZIP decompressed size ({total_size // (1024*1024)}MB) exceeds limit ({_MAX_ZIP_DECOMPRESSED_BYTES // (1024*1024)}MB).",
+            detail=f"ZIP decompressed size ({total_size // (1024 * 1024)}MB) exceeds limit ({_MAX_ZIP_DECOMPRESSED_BYTES // (1024 * 1024)}MB).",
         )
 
     for member in zf.namelist():
@@ -281,6 +275,7 @@ def _validate_local_path(path: str) -> str:
 async def get_task_status(task_id: str, request: Request):
     """Check the status of an async ingestion task."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     task_queue = request.app.state.task_queue
@@ -306,6 +301,7 @@ async def ingest_markdown(body: MarkdownIngestRequest, request: Request, user=De
     if not os.path.isdir(resolved_path):
         raise HTTPException(status_code=400, detail="Path is not a directory")
     from app.ingestion.markdown_connector import MarkdownConnector
+
     settings = request.app.state.settings
     connector = MarkdownConnector(settings.chunk_size, settings.chunk_overlap)
     return _run_ingestion(request, connector, resolved_path, body.directory_path, room_id=body.room_id)
@@ -343,6 +339,7 @@ async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(requ
         except Exception as e:
             if clone_dir and os.path.exists(clone_dir):
                 import shutil
+
                 shutil.rmtree(clone_dir, ignore_errors=True)
             err_msg = str(e)
             if "could not read Username" in err_msg or "Authentication failed" in err_msg:
@@ -358,6 +355,7 @@ async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(requ
 
     try:
         from app.ingestion.git_connector import GitConnector
+
         settings = request.app.state.settings
         connector = GitConnector(
             branch=branch,
@@ -369,11 +367,17 @@ async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(requ
     finally:
         if clone_dir and os.path.exists(clone_dir):
             import shutil
+
             shutil.rmtree(clone_dir, ignore_errors=True)
 
 
 @router.post("/markdown-upload", response_model=IngestionResponse)
-async def ingest_markdown_upload(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
+async def ingest_markdown_upload(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    room_id: str | None = None,
+    user=Depends(require_role("admin", "member")),
+):
     """Upload .md, .txt, or .zip files to ingest as markdown docs."""
 
     import tempfile
@@ -413,6 +417,7 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
             )
 
         from app.ingestion.markdown_connector import MarkdownConnector
+
         settings = request.app.state.settings
         connector = MarkdownConnector(settings.chunk_size, settings.chunk_overlap)
 
@@ -421,13 +426,19 @@ async def ingest_markdown_upload(request: Request, files: list[UploadFile] = Fil
 
 
 @router.post("/slack", response_model=IngestionResponse)
-async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
+async def ingest_slack(
+    request: Request,
+    file: UploadFile = File(...),
+    room_id: str | None = None,
+    user=Depends(require_role("admin", "member")),
+):
 
     import os
     import tempfile
     import zipfile
 
     from app.ingestion.slack_connector import SlackConnector
+
     settings = request.app.state.settings
 
     # Save uploaded ZIP to temp dir
@@ -451,12 +462,18 @@ async def ingest_slack(request: Request, file: UploadFile = File(...), room_id: 
 
 
 @router.post("/discord", response_model=IngestionResponse)
-async def ingest_discord(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
+async def ingest_discord(
+    request: Request,
+    file: UploadFile = File(...),
+    room_id: str | None = None,
+    user=Depends(require_role("admin", "member")),
+):
 
     import os
     import tempfile
 
     from app.ingestion.discord_connector import DiscordConnector
+
     settings = request.app.state.settings
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -470,12 +487,18 @@ async def ingest_discord(request: Request, file: UploadFile = File(...), room_id
 
 
 @router.post("/tasks", response_model=IngestionResponse)
-async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
+async def ingest_tasks(
+    request: Request,
+    file: UploadFile = File(...),
+    room_id: str | None = None,
+    user=Depends(require_role("admin", "member")),
+):
 
     import os
     import tempfile
 
     from app.ingestion.task_connector import TaskConnector
+
     settings = request.app.state.settings
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -489,7 +512,12 @@ async def ingest_tasks(request: Request, file: UploadFile = File(...), room_id: 
 
 
 @router.post("/documents", response_model=IngestionResponse)
-async def ingest_documents(request: Request, files: list[UploadFile] = File(...), room_id: str | None = None, user=Depends(require_role("admin", "member"))):
+async def ingest_documents(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    room_id: str | None = None,
+    user=Depends(require_role("admin", "member")),
+):
     """Upload PDF, DOCX, or TXT files to ingest as documents."""
 
     import tempfile
@@ -518,6 +546,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
             raise HTTPException(status_code=400, detail="No files uploaded.")
 
         from app.ingestion.document_connector import DocumentConnector
+
         settings = request.app.state.settings
         connector = DocumentConnector(settings.chunk_size, settings.chunk_overlap)
 
@@ -540,6 +569,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
             vs = request.app.state.vector_store
 
             from uuid import uuid4
+
             artifact_id = str(uuid4())
             upload_names = ", ".join(f.filename or "file" for f in files)
             artifact = ArtifactRecord(
@@ -576,6 +606,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
             db.commit()
 
             from app.services.memory_graph import invalidate_graph_cache
+
             invalidate_graph_cache(room_id=room_id)
         finally:
             db.close()
@@ -590,6 +621,7 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
 
 
 # ── Phase 5: External integration ingest endpoints ────────────────────────────
+
 
 @router.post("/notion", response_model=IngestionResponse)
 async def ingest_notion(
@@ -614,6 +646,7 @@ async def ingest_notion(
         raise HTTPException(status_code=400, detail=str(e))
 
     from app.ingestion.notion_connector import NotionConnector
+
     connector = NotionConnector(
         token=settings.notion_token,
         chunk_size=settings.chunk_size,
@@ -648,6 +681,7 @@ async def ingest_google_docs(
         raise HTTPException(status_code=400, detail=str(e))
 
     from app.ingestion.google_docs_connector import GoogleDocsConnector
+
     connector = GoogleDocsConnector(
         service_account_file=settings.google_service_account_file or None,
         access_token=settings.google_access_token or None,
@@ -683,6 +717,7 @@ async def ingest_confluence(
         raise HTTPException(status_code=400, detail=str(e))
 
     from app.ingestion.confluence_connector import ConfluenceConnector
+
     connector = ConfluenceConnector(
         url=settings.confluence_url,
         username=settings.confluence_user,

@@ -1,4 +1,5 @@
 """Process Slack events and bridge them to the Collective Brain ingestion pipeline."""
+
 import logging
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -125,6 +126,7 @@ class SlackEventProcessor:
 
             # Invalidate graph cache
             from app.services.memory_graph import invalidate_graph_cache
+
             invalidate_graph_cache(room_id=sync.room_id)
 
             logger.info(
@@ -145,27 +147,20 @@ class SlackEventProcessor:
             return None
 
         # Try name match
-        member = (
-            self.db.query(MemberRecord)
-            .filter(MemberRecord.name.ilike(display_name))
-            .first()
-        )
+        member = self.db.query(MemberRecord).filter(MemberRecord.name.ilike(display_name)).first()
         if member:
             return member
 
         # Try email match
         email = slack_user.get("profile", {}).get("email")
         if email:
-            member = (
-                self.db.query(MemberRecord)
-                .filter(MemberRecord.email == email)
-                .first()
-            )
+            member = self.db.query(MemberRecord).filter(MemberRecord.email == email).first()
             if member:
                 return member
 
         # Create new member
         import re
+
         slug = re.sub(r"[^a-z0-9]+", "-", display_name.lower()).strip("-")
         member_id = slug or str(uuid4())[:8]
 
@@ -198,6 +193,7 @@ class SlackEventProcessor:
         # Strip bot mention from text
         # e.g. "<@U12345> what does Alice know about React?" -> "what does Alice know about React?"
         import re
+
         clean_text = re.sub(r"<@[A-Z0-9]+>", "", text).strip()
         if not clean_text:
             clean_text = "What can you help me with?"
@@ -216,17 +212,13 @@ class SlackEventProcessor:
 
         return clean_text, room_id, workspace.bot_token, channel_id, thread_ts
 
-    async def backfill_channel(
-        self, workspace_id: str, channel_id: str, limit: int = 200
-    ) -> int:
+    async def backfill_channel(self, workspace_id: str, channel_id: str, limit: int = 200) -> int:
         """Backfill historical messages from a Slack channel."""
         workspace = self.db.query(SlackWorkspace).filter(SlackWorkspace.id == workspace_id).first()
         if not workspace or not workspace.bot_token:
             return 0
 
-        messages = await self.slack.fetch_channel_history(
-            workspace.bot_token, channel_id, limit=limit
-        )
+        messages = await self.slack.fetch_channel_history(workspace.bot_token, channel_id, limit=limit)
 
         ingested = 0
         for msg in messages:

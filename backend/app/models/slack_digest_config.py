@@ -1,4 +1,5 @@
 """ORM model for the slack_digest_config table (BUG-017 fix)."""
+
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
@@ -10,9 +11,7 @@ class SlackDigestConfig(Base):
     __tablename__ = "slack_digest_config"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     workspace_id = Column(String, nullable=False, index=True)
     channel_id = Column(String, nullable=False)
     channel_name = Column(String, default="")

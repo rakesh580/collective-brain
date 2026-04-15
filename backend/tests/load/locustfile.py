@@ -21,22 +21,28 @@ class CollectiveBrainUser(HttpUser):
     def on_start(self):
         """Register a unique user and store the token."""
         suffix = random.randint(100000, 999999)
-        resp = self.client.post("/auth/register", json={
-            "username": f"loaduser_{suffix}",
-            "email": f"load{suffix}@test.com",
-            "password": "LoadT3st!Pass",
-            "display_name": f"Load User {suffix}",
-        })
+        resp = self.client.post(
+            "/auth/register",
+            json={
+                "username": f"loaduser_{suffix}",
+                "email": f"load{suffix}@test.com",
+                "password": "LoadT3st!Pass",
+                "display_name": f"Load User {suffix}",
+            },
+        )
         if resp.status_code == 201:
             data = resp.json()
             self.token = data["token"]
             self.user_id = data["user"]["id"]
         else:
             # Fallback: login
-            resp = self.client.post("/auth/login", json={
-                "username": f"loaduser_{suffix}",
-                "password": "LoadT3st!Pass",
-            })
+            resp = self.client.post(
+                "/auth/login",
+                json={
+                    "username": f"loaduser_{suffix}",
+                    "password": "LoadT3st!Pass",
+                },
+            )
             if resp.status_code == 200:
                 data = resp.json()
                 self.token = data["token"]

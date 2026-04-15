@@ -142,6 +142,7 @@ class UserResponse(BaseModel):
             return []
         if isinstance(v, str):
             import json
+
             try:
                 return json.loads(v)
             except (json.JSONDecodeError, TypeError):
@@ -217,6 +218,7 @@ class RoomMemberResponse(BaseModel):
             return []
         if isinstance(v, str):
             import json
+
             try:
                 return json.loads(v)
             except (json.JSONDecodeError, TypeError):

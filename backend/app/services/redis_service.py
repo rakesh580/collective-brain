@@ -34,6 +34,7 @@ class RedisService:
         if redis_url:
             try:
                 import redis.asyncio as aioredis
+
                 self._redis = aioredis.from_url(
                     redis_url,
                     decode_responses=True,
@@ -43,6 +44,7 @@ class RedisService:
                 # Safely log Redis host without credentials
                 try:
                     from urllib.parse import urlparse
+
                     parsed = urlparse(redis_url)
                     safe_host = f"{parsed.hostname}:{parsed.port}" if parsed.hostname else "unknown"
                 except Exception:
@@ -91,9 +93,7 @@ class RedisService:
         """Cache a value with TTL."""
         if self._redis:
             try:
-                await self._redis.setex(
-                    f"cache:{key}", ttl_seconds, json.dumps(value, default=str)
-                )
+                await self._redis.setex(f"cache:{key}", ttl_seconds, json.dumps(value, default=str))
                 return
             except Exception:
                 pass
@@ -185,9 +185,7 @@ class RedisService:
             return
         try:
             while True:
-                msg = await self._pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
+                msg = await self._pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if msg and msg["type"] == "message":
                     channel = msg["channel"]
                     callback = self._subscriptions.get(channel)
@@ -205,9 +203,7 @@ class RedisService:
 
     # ─── Rate Limiting ─────────────────────────────────────────
 
-    async def check_rate_limit(
-        self, key: str, max_requests: int, window_seconds: int = 60
-    ) -> tuple[bool, int]:
+    async def check_rate_limit(self, key: str, max_requests: int, window_seconds: int = 60) -> tuple[bool, int]:
         """Check if a rate limit is exceeded.
 
         Returns (allowed: bool, remaining: int).
@@ -231,9 +227,7 @@ class RedisService:
 
         # In-memory fallback
         now = time.time()
-        _memory_rate[key] = [
-            t for t in _memory_rate[key] if t > now - window_seconds
-        ]
+        _memory_rate[key] = [t for t in _memory_rate[key] if t > now - window_seconds]
         _memory_rate[key].append(now)
         count = len(_memory_rate[key])
         remaining = max(0, max_requests - count)

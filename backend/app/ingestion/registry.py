@@ -17,9 +17,7 @@ _REGISTRY: dict[str, type[BaseConnector]] = {
 def get_connector(source_type: str, **kwargs) -> BaseConnector:
     cls = _REGISTRY.get(source_type)
     if not cls:
-        raise ValueError(
-            f"Unknown source type: {source_type}. Available: {list(_REGISTRY.keys())}"
-        )
+        raise ValueError(f"Unknown source type: {source_type}. Available: {list(_REGISTRY.keys())}")
     return cls(**kwargs)
 
 

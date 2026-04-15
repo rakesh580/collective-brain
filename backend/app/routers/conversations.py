@@ -36,12 +36,7 @@ async def list_conversations(request: Request, room_id: str | None = None, limit
         if room_id:
             query = query.filter(ConversationRecord.room_id == room_id)
         total = query.count()
-        conversations = (
-            query.order_by(ConversationRecord.updated_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        conversations = query.order_by(ConversationRecord.updated_at.desc()).offset(offset).limit(limit).all()
         return {
             "conversations": [
                 {
@@ -68,11 +63,7 @@ async def get_conversation(conversation_id: str, request: Request):
     user = get_current_user(request)
     db = _get_db()
     try:
-        conv = (
-            db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conversation_id)
-            .first()
-        )
+        conv = db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -127,11 +118,7 @@ async def delete_conversation(conversation_id: str, request: Request):
     user = get_current_user(request)
     db = _get_db()
     try:
-        conv = (
-            db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conversation_id)
-            .first()
-        )
+        conv = db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -139,12 +126,8 @@ async def delete_conversation(conversation_id: str, request: Request):
         if conv.owner_user_id and conv.owner_user_id != user.id:
             raise HTTPException(status_code=403, detail="Only the owner can delete this conversation")
 
-        db.query(ConversationParticipant).filter(
-            ConversationParticipant.conversation_id == conversation_id
-        ).delete()
-        db.query(MessageRecord).filter(
-            MessageRecord.conversation_id == conversation_id
-        ).delete()
+        db.query(ConversationParticipant).filter(ConversationParticipant.conversation_id == conversation_id).delete()
+        db.query(MessageRecord).filter(MessageRecord.conversation_id == conversation_id).delete()
         db.delete(conv)
         db.commit()
         return {"status": "deleted"}
@@ -153,19 +136,13 @@ async def delete_conversation(conversation_id: str, request: Request):
 
 
 @router.post("/{conversation_id}/share")
-async def share_conversation(
-    conversation_id: str, body: ShareConversationRequest, request: Request
-):
+async def share_conversation(conversation_id: str, body: ShareConversationRequest, request: Request):
     from app.dependencies import get_current_user
 
     user = get_current_user(request)
     db = _get_db()
     try:
-        conv = (
-            db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conversation_id)
-            .first()
-        )
+        conv = db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
         if conv.owner_user_id and conv.owner_user_id != user.id:
@@ -200,11 +177,7 @@ async def list_participants(conversation_id: str, request: Request):
     db = _get_db()
     try:
         # Verify the conversation exists and user has access
-        conv = (
-            db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conversation_id)
-            .first()
-        )
+        conv = db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -222,9 +195,7 @@ async def list_participants(conversation_id: str, request: Request):
                 raise HTTPException(status_code=403, detail="Not authorized to view this conversation")
 
         participants = (
-            db.query(ConversationParticipant)
-            .filter(ConversationParticipant.conversation_id == conversation_id)
-            .all()
+            db.query(ConversationParticipant).filter(ConversationParticipant.conversation_id == conversation_id).all()
         )
         result = []
         for p in participants:
@@ -251,11 +222,7 @@ async def remove_participant(conversation_id: str, user_id: str, request: Reques
     current_user = get_current_user(request)
     db = _get_db()
     try:
-        conv = (
-            db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conversation_id)
-            .first()
-        )
+        conv = db.query(ConversationRecord).filter(ConversationRecord.id == conversation_id).first()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
         if current_user.id != conv.owner_user_id and current_user.id != user_id:

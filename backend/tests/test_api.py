@@ -21,6 +21,7 @@ def client():
 
     # Cleanup
     import shutil
+
     for path in ["./data/test_brain.db", "./data/test_chroma"]:
         if os.path.exists(path):
             if os.path.isdir(path):

@@ -107,9 +107,7 @@ class TestRecovery:
 
     @pytest.mark.asyncio
     async def test_half_open_success_closes(self):
-        cb = CircuitBreaker(
-            "test", failure_threshold=1, recovery_timeout=0.1, success_threshold=1
-        )
+        cb = CircuitBreaker("test", failure_threshold=1, recovery_timeout=0.1, success_threshold=1)
 
         async def failing():
             raise ValueError("boom")

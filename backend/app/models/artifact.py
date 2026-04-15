@@ -9,9 +9,7 @@ class ArtifactRecord(Base):
     __tablename__ = "artifacts"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     source_type = Column(String, nullable=False, index=True)
     source_path = Column(String, nullable=False)
     title = Column(String, nullable=True)

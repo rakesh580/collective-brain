@@ -5,12 +5,15 @@ import pytest
 
 @pytest.fixture()
 def second_user(app_client):
-    resp = app_client.post("/auth/register", json={
-        "username": "bob",
-        "email": "bob@test.com",
-        "password": "Str0ngPass!",
-        "display_name": "Bob",
-    })
+    resp = app_client.post(
+        "/auth/register",
+        json={
+            "username": "bob",
+            "email": "bob@test.com",
+            "password": "Str0ngPass!",
+            "display_name": "Bob",
+        },
+    )
     data = resp.json()
     return data["user"], data["token"]
 
@@ -63,9 +66,7 @@ class TestConversationSharing:
 
 
 class TestConversationAccessControl:
-    def test_cannot_access_others_private_conversation(
-        self, app_client, auth_headers, second_user
-    ):
+    def test_cannot_access_others_private_conversation(self, app_client, auth_headers, second_user):
         # Alice creates a conversation
         resp = app_client.post(
             "/query",
@@ -79,9 +80,7 @@ class TestConversationAccessControl:
         resp = app_client.get(f"/conversations/{conv_id}", headers=bob_headers)
         assert resp.status_code == 403
 
-    def test_cannot_delete_others_conversation(
-        self, app_client, auth_headers, second_user
-    ):
+    def test_cannot_delete_others_conversation(self, app_client, auth_headers, second_user):
         resp = app_client.post(
             "/query",
             headers=auth_headers,

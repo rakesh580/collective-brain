@@ -23,19 +23,25 @@ class TestStatelessAPI:
     def test_no_server_side_session_state(self, app_client):
         """Two different users should not share session state."""
         # Register user A
-        a = app_client.post("/auth/register", json={
-            "username": "stateless_a",
-            "email": "sla@test.com",
-            "password": "Str0ngPass!",
-        })
+        a = app_client.post(
+            "/auth/register",
+            json={
+                "username": "stateless_a",
+                "email": "sla@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         a_headers = {"Authorization": f"Bearer {a.json()['token']}"}
 
         # Register user B
-        b = app_client.post("/auth/register", json={
-            "username": "stateless_b",
-            "email": "slb@test.com",
-            "password": "Str0ngPass!",
-        })
+        b = app_client.post(
+            "/auth/register",
+            json={
+                "username": "stateless_b",
+                "email": "slb@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         b_headers = {"Authorization": f"Bearer {b.json()['token']}"}
 
         # A creates data
@@ -72,9 +78,13 @@ class TestIdempotency:
         """Repeated queries should return the same response structure."""
         results = []
         for _ in range(3):
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "Who is the top contributor?",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "Who is the top contributor?",
+                },
+            )
             assert resp.status_code == 200
             data = resp.json()
             assert "answer" in data
@@ -90,9 +100,13 @@ class TestIdempotency:
         """POST to create a member is NOT idempotent — each call creates a new one."""
         ids = set()
         for _ in range(3):
-            resp = app_client.post("/members", headers=auth_headers, json={
-                "name": "Duplicate Name",
-            })
+            resp = app_client.post(
+                "/members",
+                headers=auth_headers,
+                json={
+                    "name": "Duplicate Name",
+                },
+            )
             assert resp.status_code == 201
             ids.add(resp.json()["id"])
         assert len(ids) == 3  # Three distinct members created
@@ -117,9 +131,13 @@ class TestConcurrency:
         """Creating members concurrently should not cause data corruption."""
 
         def create(i):
-            return app_client.post("/members", headers=auth_headers, json={
-                "name": f"Concurrent_{i}",
-            })
+            return app_client.post(
+                "/members",
+                headers=auth_headers,
+                json={
+                    "name": f"Concurrent_{i}",
+                },
+            )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
             futures = [pool.submit(create, i) for i in range(5)]
@@ -196,9 +214,13 @@ class TestScalabilityIndicators:
     def test_database_handles_many_records(self, app_client, auth_headers):
         """Create many members and verify listing still works."""
         for i in range(20):
-            app_client.post("/members", headers=auth_headers, json={
-                "name": f"Scale_{i}",
-            })
+            app_client.post(
+                "/members",
+                headers=auth_headers,
+                json={
+                    "name": f"Scale_{i}",
+                },
+            )
 
         resp = app_client.get("/members", headers=auth_headers)
         assert resp.status_code == 200
@@ -212,10 +234,13 @@ class TestRetrySafety:
     def test_retried_login_is_safe(self, app_client, registered_user):
         """Retrying a login should give the same result."""
         for _ in range(3):
-            resp = app_client.post("/auth/login", json={
-                "username": "alice",
-                "password": "Str0ngPass!",
-            })
+            resp = app_client.post(
+                "/auth/login",
+                json={
+                    "username": "alice",
+                    "password": "Str0ngPass!",
+                },
+            )
             assert resp.status_code == 200
             assert "token" in resp.json()
 
@@ -234,9 +259,13 @@ class TestRetrySafety:
         """Each new query (without conv_id) should create a new conversation."""
         conv_ids = set()
         for _ in range(3):
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "Retry test question",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "Retry test question",
+                },
+            )
             assert resp.status_code == 200
             conv_ids.add(resp.json()["conversation_id"])
 
@@ -250,10 +279,14 @@ class TestDataIntegrity:
     def test_member_crud_cycle(self, app_client, auth_headers):
         """Full CRUD cycle should maintain data integrity."""
         # Create
-        create = app_client.post("/members", headers=auth_headers, json={
-            "name": "Integrity User",
-            "expertise_tags": ["python"],
-        })
+        create = app_client.post(
+            "/members",
+            headers=auth_headers,
+            json={
+                "name": "Integrity User",
+                "expertise_tags": ["python"],
+            },
+        )
         assert create.status_code == 201
         member_id = create.json()["id"]
 
@@ -263,9 +296,13 @@ class TestDataIntegrity:
         assert read.json()["name"] == "Integrity User"
 
         # Update
-        update = app_client.put(f"/members/{member_id}", headers=auth_headers, json={
-            "name": "Updated Integrity User",
-        })
+        update = app_client.put(
+            f"/members/{member_id}",
+            headers=auth_headers,
+            json={
+                "name": "Updated Integrity User",
+            },
+        )
         assert update.status_code == 200
         assert update.json()["name"] == "Updated Integrity User"
 
@@ -280,16 +317,24 @@ class TestDataIntegrity:
     def test_conversation_message_ordering(self, app_client, auth_headers):
         """Messages in a conversation should maintain chronological order."""
         # Create conversation with first message
-        resp1 = app_client.post("/query", headers=auth_headers, json={
-            "question": "First question",
-        })
+        resp1 = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "First question",
+            },
+        )
         conv_id = resp1.json()["conversation_id"]
 
         # Continue conversation
-        resp2 = app_client.post("/query", headers=auth_headers, json={
-            "question": "Second question",
-            "conversation_id": conv_id,
-        })
+        resp2 = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Second question",
+                "conversation_id": conv_id,
+            },
+        )
 
         # Fetch conversation
         conv = app_client.get(f"/conversations/{conv_id}", headers=auth_headers)

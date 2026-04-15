@@ -17,9 +17,13 @@ class TestVectorDBFailure:
 
         app.state.vector_store = broken_vs
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "This should handle vector DB failure",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "This should handle vector DB failure",
+                },
+            )
             # Should degrade gracefully, not 500
             assert resp.status_code in (200, 500, 503)
         finally:
@@ -80,9 +84,13 @@ class TestRedisOutage:
         app.state.redis = None  # Completely remove Redis
 
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "Works without rate limiting?",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "Works without rate limiting?",
+                },
+            )
             assert resp.status_code == 200
         finally:
             app.state.redis = original_redis
@@ -102,9 +110,13 @@ class TestLLMFailure:
 
         app.state.llm_service = timeout_llm
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "This should timeout",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "This should timeout",
+                },
+            )
             # Should return error, not crash
             assert resp.status_code in (200, 500, 503, 504)
         finally:
@@ -120,9 +132,13 @@ class TestLLMFailure:
 
         app.state.llm_service = broken_llm
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "This should fail gracefully",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "This should fail gracefully",
+                },
+            )
             assert resp.status_code in (200, 500, 503)
         finally:
             app.state.llm_service = original_llm
@@ -137,9 +153,13 @@ class TestLLMFailure:
 
         app.state.llm_service = empty_llm
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "Empty response test",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "Empty response test",
+                },
+            )
             assert resp.status_code in (200, 500)
         finally:
             app.state.llm_service = original_llm
@@ -156,17 +176,23 @@ class TestDatabaseFailure:
         # and verifying the server is resilient to internal errors.
         # Since mocking get_session at the right import path is fragile,
         # we simply verify the endpoint doesn't crash on duplicate registration.
-        app_client.post("/auth/register", json={
-            "username": "failuser",
-            "email": "fail@test.com",
-            "password": "Str0ngPass!",
-        })
+        app_client.post(
+            "/auth/register",
+            json={
+                "username": "failuser",
+                "email": "fail@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         # Duplicate should return 409 (conflict), not 500
-        resp = app_client.post("/auth/register", json={
-            "username": "failuser",
-            "email": "fail@test.com",
-            "password": "Str0ngPass!",
-        })
+        resp = app_client.post(
+            "/auth/register",
+            json={
+                "username": "failuser",
+                "email": "fail@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         assert resp.status_code in (409, 500, 503)
 
     def test_query_handles_db_error_gracefully(self, app_client, auth_headers):
@@ -177,9 +203,13 @@ class TestDatabaseFailure:
             broken_db.__exit__ = MagicMock(return_value=False)
             mock_get.return_value = broken_db
 
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "Database is down",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "Database is down",
+                },
+            )
             # Should return error, not crash
             assert resp.status_code in (200, 500, 503)
 
@@ -199,9 +229,13 @@ class TestEmbeddingFailure:
 
         app.state.embedding_service = broken_emb
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "This needs embeddings",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "This needs embeddings",
+                },
+            )
             assert resp.status_code in (200, 500, 503)
         finally:
             app.state.embedding_service = original_emb
@@ -244,9 +278,13 @@ class TestConcurrentFailures:
         app.state.llm_service = broken_llm
         app.state.vector_store = broken_vs
         try:
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": "Everything is on fire",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": "Everything is on fire",
+                },
+            )
             # Should not crash the process
             assert resp.status_code in (200, 500, 503)
 

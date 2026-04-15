@@ -1,4 +1,5 @@
 """Organizations router — CRUD, membership management, SSO config, audit log."""
+
 import secrets
 import uuid
 from datetime import datetime
@@ -16,6 +17,7 @@ from app.services.audit_service import AuditService
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class OrgCreateRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
@@ -78,12 +80,13 @@ class InviteMemberRequest(BaseModel):
 
 class SSOConfigRequest(BaseModel):
     """SAML 2.0 IdP settings stored in org.settings_json under 'sso' key."""
+
     idp_metadata_url: str | None = None
     idp_entity_id: str | None = None
     idp_sso_url: str | None = None
-    idp_certificate: str | None = None   # Base64-encoded X.509 cert
+    idp_certificate: str | None = None  # Base64-encoded X.509 cert
     allowed_domains: list[str] = Field(default_factory=list)
-    enforce_sso: bool = False             # If True, block password login for org users
+    enforce_sso: bool = False  # If True, block password login for org users
 
 
 class SSOConfigResponse(BaseModel):
@@ -97,27 +100,37 @@ class SSOConfigResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _get_org_or_404(db: Session, org_id: str) -> OrganizationRecord:
-    org = db.query(OrganizationRecord).filter(
-        OrganizationRecord.id == org_id,
-        OrganizationRecord.is_active == True,  # noqa: E712
-    ).first()
+    org = (
+        db.query(OrganizationRecord)
+        .filter(
+            OrganizationRecord.id == org_id,
+            OrganizationRecord.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
     return org
 
 
 def _require_org_role(db: Session, org_id: str, user_id: str, *roles: str) -> OrganizationMembership:
-    membership = db.query(OrganizationMembership).filter(
-        OrganizationMembership.organization_id == org_id,
-        OrganizationMembership.user_id == user_id,
-    ).first()
+    membership = (
+        db.query(OrganizationMembership)
+        .filter(
+            OrganizationMembership.organization_id == org_id,
+            OrganizationMembership.user_id == user_id,
+        )
+        .first()
+    )
     if not membership or membership.role not in roles:
         raise HTTPException(status_code=403, detail="Insufficient organization permissions")
     return membership
 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("", status_code=201, response_model=OrgResponse)
 def create_organization(
@@ -150,8 +163,13 @@ def create_organization(
         db.refresh(org)
 
         AuditService.log(
-            db, action="org.created", user_id=user.id, organization_id=org.id,
-            actor=user.username, target_type="org", target_id=org.id,
+            db,
+            action="org.created",
+            user_id=user.id,
+            organization_id=org.id,
+            actor=user.username,
+            target_type="org",
+            target_id=org.id,
             **AuditService.from_request(request),
         )
         count = db.query(OrganizationMembership).filter_by(organization_id=org.id).count()
@@ -210,8 +228,13 @@ def update_organization(
         db.commit()
         db.refresh(org)
         AuditService.log(
-            db, action="org.updated", user_id=user.id, organization_id=org.id,
-            actor=user.username, target_type="org", target_id=org.id,
+            db,
+            action="org.updated",
+            user_id=user.id,
+            organization_id=org.id,
+            actor=user.username,
+            target_type="org",
+            target_id=org.id,
             **AuditService.from_request(request),
         )
         count = db.query(OrganizationMembership).filter_by(organization_id=org.id).count()
@@ -229,14 +252,19 @@ def delete_organization(org_id: str, request: Request, user=Depends(get_current_
         org.is_active = False
         db.commit()
         AuditService.log(
-            db, action="org.deleted", user_id=user.id, organization_id=org_id,
-            actor=user.username, **AuditService.from_request(request),
+            db,
+            action="org.deleted",
+            user_id=user.id,
+            organization_id=org_id,
+            actor=user.username,
+            **AuditService.from_request(request),
         )
     finally:
         db.close()
 
 
 # ── Membership ────────────────────────────────────────────────────────────────
+
 
 @router.get("/{org_id}/members", response_model=list[MembershipResponse])
 def list_members(org_id: str, user=Depends(get_current_user)):
@@ -263,9 +291,7 @@ def invite_member(
         if not target:
             raise HTTPException(status_code=404, detail="User not found")
 
-        existing = db.query(OrganizationMembership).filter_by(
-            organization_id=org_id, user_id=body.user_id
-        ).first()
+        existing = db.query(OrganizationMembership).filter_by(organization_id=org_id, user_id=body.user_id).first()
         if existing:
             raise HTTPException(status_code=409, detail="User is already a member")
 
@@ -280,8 +306,13 @@ def invite_member(
         db.refresh(m)
 
         AuditService.log(
-            db, action="org.member_added", user_id=user.id, organization_id=org_id,
-            actor=user.username, target_type="user", target_id=body.user_id,
+            db,
+            action="org.member_added",
+            user_id=user.id,
+            organization_id=org_id,
+            actor=user.username,
+            target_type="user",
+            target_id=body.user_id,
             **AuditService.from_request(request),
         )
         return m
@@ -306,17 +337,20 @@ def remove_member(
         if caller_m.role == "member" and user_id != user.id:
             raise HTTPException(status_code=403, detail="Members can only remove themselves")
 
-        m = db.query(OrganizationMembership).filter_by(
-            organization_id=org_id, user_id=user_id
-        ).first()
+        m = db.query(OrganizationMembership).filter_by(organization_id=org_id, user_id=user_id).first()
         if not m:
             raise HTTPException(status_code=404, detail="Member not found")
 
         db.delete(m)
         db.commit()
         AuditService.log(
-            db, action="org.member_removed", user_id=user.id, organization_id=org_id,
-            actor=user.username, target_type="user", target_id=user_id,
+            db,
+            action="org.member_removed",
+            user_id=user.id,
+            organization_id=org_id,
+            actor=user.username,
+            target_type="user",
+            target_id=user_id,
             **AuditService.from_request(request),
         )
     finally:
@@ -324,6 +358,7 @@ def remove_member(
 
 
 # ── SSO / SAML Config ─────────────────────────────────────────────────────────
+
 
 @router.get("/{org_id}/sso", response_model=SSOConfigResponse)
 def get_sso_config(org_id: str, user=Depends(get_current_user)):
@@ -374,8 +409,13 @@ def configure_sso(
         db.commit()
 
         AuditService.log(
-            db, action="org.sso_configured", user_id=user.id, organization_id=org.id,
-            actor=user.username, target_type="org", target_id=org.id,
+            db,
+            action="org.sso_configured",
+            user_id=user.id,
+            organization_id=org.id,
+            actor=user.username,
+            target_type="org",
+            target_id=org.id,
             detail={"idp_entity_id": body.idp_entity_id, "enforce_sso": body.enforce_sso},
             **AuditService.from_request(request),
         )
@@ -414,8 +454,12 @@ def rotate_scim_token(
         db.commit()
 
         AuditService.log(
-            db, action="org.scim_token_rotated", user_id=user.id, organization_id=org.id,
-            actor=user.username, **AuditService.from_request(request),
+            db,
+            action="org.scim_token_rotated",
+            user_id=user.id,
+            organization_id=org.id,
+            actor=user.username,
+            **AuditService.from_request(request),
         )
         return {"scim_token": token, "warning": "Store this token — it will not be shown again."}
     finally:
@@ -423,6 +467,7 @@ def rotate_scim_token(
 
 
 # ── Audit Log ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/{org_id}/audit-log")
 def get_audit_log(
@@ -435,9 +480,7 @@ def get_audit_log(
     db = get_db()
     try:
         _require_org_role(db, org_id, user.id, "owner", "admin")
-        entries = AuditService.list(
-            db, organization_id=org_id, action=action, limit=limit, offset=offset
-        )
+        entries = AuditService.list(db, organization_id=org_id, action=action, limit=limit, offset=offset)
         return [
             {
                 "id": e.id,

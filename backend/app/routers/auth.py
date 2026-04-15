@@ -32,9 +32,7 @@ async def _rate_limit(request: Request, key: str, max_requests: int, window: int
     """Rate-limit by key. Uses Redis if available, in-memory fallback otherwise."""
     redis = getattr(request.app.state, "redis", None)
     if redis is not None:
-        allowed, remaining = await redis.check_rate_limit(
-            f"rate:{key}:{request.client.host}", max_requests, window
-        )
+        allowed, remaining = await redis.check_rate_limit(f"rate:{key}:{request.client.host}", max_requests, window)
         if allowed is not None:
             if not allowed:
                 raise HTTPException(status_code=429, detail="Too many requests")
@@ -49,9 +47,12 @@ async def _rate_limit(request: Request, key: str, max_requests: int, window: int
     _memory_rate_limits[mem_key].append(now)
     # Prevent unbounded memory growth
     if len(_memory_rate_limits) > _MAX_RATE_LIMIT_KEYS:
-        oldest_keys = sorted(_memory_rate_limits, key=lambda k: _memory_rate_limits[k][-1] if _memory_rate_limits[k] else 0)
-        for k in oldest_keys[:len(oldest_keys) // 2]:
+        oldest_keys = sorted(
+            _memory_rate_limits, key=lambda k: _memory_rate_limits[k][-1] if _memory_rate_limits[k] else 0
+        )
+        for k in oldest_keys[: len(oldest_keys) // 2]:
             del _memory_rate_limits[k]
+
 
 router = APIRouter()
 
@@ -77,9 +78,7 @@ async def register(body: RegisterRequest, request: Request):
     try:
         auth_svc = AuthService(request.app.state.settings)
         try:
-            user = auth_svc.register(
-                db, body.username, body.email, body.password, body.display_name
-            )
+            user = auth_svc.register(db, body.username, body.email, body.password, body.display_name)
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
         token = auth_svc.create_token(user.id)
@@ -124,9 +123,7 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
     try:
         auth_svc = AuthService(settings)
         try:
-            user = auth_svc.google_authenticate(
-                db, body.credential, settings.google_client_id
-            )
+            user = auth_svc.google_authenticate(db, body.credential, settings.google_client_id)
         except ValueError as e:
             raise HTTPException(status_code=401, detail=str(e))
         token = auth_svc.create_token(user.id)
@@ -152,9 +149,7 @@ async def google_access_token_auth(body: GoogleAccessTokenRequest, request: Requ
     try:
         auth_svc = AuthService(settings)
         try:
-            user = auth_svc.google_authenticate_access_token(
-                db, body.access_token
-            )
+            user = auth_svc.google_authenticate_access_token(db, body.access_token)
         except ValueError as e:
             raise HTTPException(status_code=401, detail=str(e))
         token = auth_svc.create_token(user.id)
@@ -201,9 +196,7 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
     try:
         auth_svc = AuthService(request.app.state.settings)
         try:
-            user = auth_svc.verify_reset_code(
-                db, body.email, body.code, body.new_password
-            )
+            user = auth_svc.verify_reset_code(db, body.email, body.code, body.new_password)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         token = auth_svc.create_token(user.id)
@@ -226,9 +219,8 @@ async def refresh_token(body: RefreshTokenRequest, request: Request):
     db = _get_db()
     try:
         from jose import jwt as _jwt
-        payload = _jwt.decode(
-            new_token, auth_svc.secret, algorithms=[auth_svc.algorithm]
-        )
+
+        payload = _jwt.decode(new_token, auth_svc.secret, algorithms=[auth_svc.algorithm])
         user_id = payload.get("sub")
         user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
         if not user or not user.is_active:

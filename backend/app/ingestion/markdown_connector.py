@@ -82,9 +82,7 @@ class MarkdownConnector(BaseConnector):
                 )
         return chunks
 
-    def _split_by_headings(
-        self, content: str, doc_title: str
-    ) -> list[tuple[str, str]]:
+    def _split_by_headings(self, content: str, doc_title: str) -> list[tuple[str, str]]:
         lines = content.split("\n")
         sections: list[tuple[str, str]] = []
         current_heading = doc_title

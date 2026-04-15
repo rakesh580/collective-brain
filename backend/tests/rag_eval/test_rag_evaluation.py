@@ -1,7 +1,6 @@
 """RAG evaluation tests — precision, recall, hallucination, groundedness."""
 
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -39,10 +38,7 @@ class TestRetrievalPrecision:
         assert len(results["documents"][0]) == 3
 
         # All docs mention auth and alice — precision is 1.0
-        relevant = sum(
-            1 for d in results["documents"][0]
-            if "auth" in d.lower() or "alice" in d.lower()
-        )
+        relevant = sum(1 for d in results["documents"][0] if "auth" in d.lower() or "alice" in d.lower())
         precision = relevant / len(results["documents"][0])
         assert precision == 1.0
 
@@ -109,10 +105,7 @@ class TestMetadataFiltering:
         all_docs = git_docs + slack_docs
         ids = [f"f-{i}" for i in range(len(all_docs))]
         embeddings = mock_embedder.embed_batch(all_docs)
-        metas = (
-            [{"source_type": "git"}] * len(git_docs)
-            + [{"source_type": "slack"}] * len(slack_docs)
-        )
+        metas = [{"source_type": "git"}] * len(git_docs) + [{"source_type": "slack"}] * len(slack_docs)
         vector_store.add_documents(ids, all_docs, embeddings, metas)
 
         results = vector_store.query(
@@ -126,7 +119,9 @@ class TestMetadataFiltering:
     def test_filter_returns_empty_on_mismatch(self, vector_store, mock_embedder):
         docs = ["Only git content here"]
         vector_store.add_documents(
-            ["fm-0"], docs, mock_embedder.embed_batch(docs),
+            ["fm-0"],
+            docs,
+            mock_embedder.embed_batch(docs),
             [{"source_type": "git"}],
         )
         results = vector_store.query(
@@ -145,9 +140,13 @@ class TestHallucinationDetection:
 
     def test_answer_uses_context_only(self, app_client, auth_headers):
         """The LLM should be called with context — response should be grounded."""
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "Who is the Python expert?",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Who is the Python expert?",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert "answer" in data
@@ -156,9 +155,13 @@ class TestHallucinationDetection:
 
     def test_empty_knowledge_base_still_responds(self, app_client, auth_headers):
         """When no data is ingested, pipeline should still return a response."""
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "What obscure topic does nobody know about?",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "What obscure topic does nobody know about?",
+            },
+        )
         assert resp.status_code == 200
         assert "answer" in resp.json()
 
@@ -171,18 +174,26 @@ class TestGroundedResponse:
 
     def test_sources_in_response(self, app_client, auth_headers):
         """Query response should include a sources list."""
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "What has the team been working on?",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "What has the team been working on?",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert "sources" in data
 
     def test_conversation_persists_messages(self, app_client, auth_headers):
         """Each query should persist the conversation with messages."""
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "Tell me about recent activity",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Tell me about recent activity",
+            },
+        )
         conv_id = resp.json()["conversation_id"]
 
         # Fetch the conversation — should have messages

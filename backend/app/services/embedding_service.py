@@ -73,6 +73,4 @@ class EmbeddingService:
     async def embed_batch_async(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
         """Non-blocking batch embedding — runs in thread pool."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, functools.partial(self.embed_batch, texts, batch_size)
-        )
+        return await loop.run_in_executor(None, functools.partial(self.embed_batch, texts, batch_size))

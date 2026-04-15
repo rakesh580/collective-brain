@@ -1,4 +1,5 @@
 """Unit tests for SCIM helper functions."""
+
 from datetime import UTC
 from unittest.mock import MagicMock
 
@@ -6,12 +7,14 @@ from unittest.mock import MagicMock
 class TestSlugifyUsername:
     def test_simple_email_prefix(self):
         from app.routers.scim import _slugify_username
+
         db = MagicMock()
         db.query.return_value.filter_by.return_value.first.return_value = None
         assert _slugify_username(db, "alice") == "alice"
 
     def test_strips_special_chars(self):
         from app.routers.scim import _slugify_username
+
         db = MagicMock()
         db.query.return_value.filter_by.return_value.first.return_value = None
         result = _slugify_username(db, "john.doe+test")
@@ -20,14 +23,17 @@ class TestSlugifyUsername:
 
     def test_deduplicates_on_collision(self):
         from app.routers.scim import _slugify_username
+
         db = MagicMock()
         # First call (username "alice") — already exists; second ("alice_1") — free
         call_count = {"n": 0}
+
         def _first():
             call_count["n"] += 1
             if call_count["n"] == 1:
-                return MagicMock()   # exists
-            return None              # free
+                return MagicMock()  # exists
+            return None  # free
+
         db.query.return_value.filter_by.return_value.first.side_effect = _first
         result = _slugify_username(db, "alice")
         assert result == "alice_1"

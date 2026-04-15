@@ -8,6 +8,7 @@ Endpoints:
 The python3-saml library handles XML parsing, signature verification, and
 assertion decryption.  We only need to wire it into FastAPI.
 """
+
 import uuid
 from datetime import UTC, datetime
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/sso/saml", tags=["sso"])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _build_saml_settings(org: OrganizationRecord, base_url: str) -> dict:
     """Build python3-saml settings dict from org.settings_json['sso']."""
@@ -70,6 +72,7 @@ def _base_url(request: Request) -> str:
 
 # ── Metadata endpoint ─────────────────────────────────────────────────────────
 
+
 @router.get("/{org_slug}/metadata", response_class=Response)
 def sp_metadata(org_slug: str, request: Request):
     """Return SP metadata XML — give this URL to your IdP (Okta, Azure AD, etc.)."""
@@ -94,6 +97,7 @@ def sp_metadata(org_slug: str, request: Request):
 
 # ── Login initiation ──────────────────────────────────────────────────────────
 
+
 @router.get("/{org_slug}/login")
 def saml_login(org_slug: str, request: Request):
     """Redirect the browser to the IdP's SSO URL with a SAML AuthnRequest."""
@@ -115,6 +119,7 @@ def saml_login(org_slug: str, request: Request):
 
 
 # ── ACS (Assertion Consumer Service) ─────────────────────────────────────────
+
 
 @router.post("/{org_slug}/acs", response_class=HTMLResponse)
 async def saml_acs(
@@ -144,7 +149,10 @@ async def saml_acs(
 
         if errors or not auth.is_authenticated():
             AuditService.log(
-                db, action="auth.saml_login", result="fail", organization_id=org.id,
+                db,
+                action="auth.saml_login",
+                result="fail",
+                organization_id=org.id,
                 detail={"errors": errors, "reason": auth.get_last_error_reason()},
                 **AuditService.from_request(request),
             )
@@ -157,9 +165,7 @@ async def saml_acs(
         attributes: dict = auth.get_attributes()
 
         # Find or create the user by SAML NameID (email)
-        user = db.query(UserRecord).filter(
-            (UserRecord.saml_nameid == nameid) | (UserRecord.email == nameid)
-        ).first()
+        user = db.query(UserRecord).filter((UserRecord.saml_nameid == nameid) | (UserRecord.email == nameid)).first()
 
         if not user:
             # Auto-provision a new user from SAML attributes
@@ -198,13 +204,18 @@ async def saml_acs(
         refresh_token = auth_svc.create_refresh_token(user.id)
 
         AuditService.log(
-            db, action="auth.saml_login", user_id=user.id, organization_id=org.id,
-            actor=user.username, result="ok",
+            db,
+            action="auth.saml_login",
+            user_id=user.id,
+            organization_id=org.id,
+            actor=user.username,
+            result="ok",
             **AuditService.from_request(request),
         )
 
         # Redirect to frontend with tokens — validate RelayState to prevent open redirect
         from urllib.parse import urlparse
+
         frontend_url = RelayState or "/"
         parsed = urlparse(frontend_url)
         # Only allow relative URLs (no scheme/netloc) to prevent open redirect
@@ -219,6 +230,7 @@ async def saml_acs(
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
+
 
 def _prepare_saml_request(request: Request, post_data: dict | None = None) -> dict:
     """Build the python3-saml request dict from a FastAPI Request."""
@@ -247,6 +259,7 @@ def _attr(attributes: dict, *keys: str, default: str = "") -> str:
 def _slugify_username(db: Session, base: str) -> str:
     """Derive a unique username from the email local part."""
     import re
+
     slug = re.sub(r"[^a-z0-9_]", "_", base.lower())[:30]
     candidate = slug
     i = 1

@@ -142,9 +142,7 @@ class GraphBuilderMixin:
             )
 
         # ---- CONTRIBUTED_TO edges ----------------------------------------
-        artifact_contributors: dict[str, dict[str, float]] = defaultdict(
-            lambda: defaultdict(float)
-        )
+        artifact_contributors: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
         for c in contribs:
             if c.artifact_id and c.artifact_id in artifact_map:
                 weight = _temporal_decay(c.timestamp, now)
@@ -161,9 +159,7 @@ class GraphBuilderMixin:
                     )
 
         # ---- Topic nodes from contributions ------------------------------
-        topic_member_weights: dict[str, dict[str, float]] = defaultdict(
-            lambda: defaultdict(float)
-        )
+        topic_member_weights: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
         topic_artifact: dict[str, set[str]] = defaultdict(set)
 
         for c in contribs:
@@ -187,8 +183,10 @@ class GraphBuilderMixin:
             for art_id in topic_artifact.get(topic, set()):
                 if art_id in artifact_map:
                     G.add_edge(
-                        f"artifact-{art_id}", tid,
-                        edge_type="COVERS_TOPIC", weight=1.0,
+                        f"artifact-{art_id}",
+                        tid,
+                        edge_type="COVERS_TOPIC",
+                        weight=1.0,
                     )
 
         # ---- Topics from expertise_tags ----------------------------------
@@ -296,17 +294,13 @@ class GraphBuilderMixin:
     def _query_members(self):
         if self.room_id:
             member_ids = [
-                mid for (mid,) in
-                self.db.query(ContributionRecord.member_id)
+                mid
+                for (mid,) in self.db.query(ContributionRecord.member_id)
                 .filter(ContributionRecord.room_id == self.room_id)
                 .distinct()
                 .all()
             ]
-            return (
-                self.db.query(MemberRecord)
-                .filter(MemberRecord.id.in_(member_ids))
-                .all()
-            ) if member_ids else []
+            return (self.db.query(MemberRecord).filter(MemberRecord.id.in_(member_ids)).all()) if member_ids else []
         return self.db.query(MemberRecord).all()
 
     def _query_artifacts(self):
@@ -340,9 +334,7 @@ class GraphBuilderMixin:
 
     def _get_topic_member_map(self) -> dict[str, dict[str, int]]:
         contribs = self._query_contributions()
-        topic_members: dict[str, dict[str, int]] = defaultdict(
-            lambda: defaultdict(int)
-        )
+        topic_members: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for c in contribs:
             for topic in c.topics or []:
                 topic_members[topic][c.member_id] += 1

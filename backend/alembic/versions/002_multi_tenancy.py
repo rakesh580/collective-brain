@@ -4,6 +4,7 @@ Revision ID: 002_multi_tenancy
 Revises: 001_initial_schema
 Create Date: 2026-04-07
 """
+
 from collections.abc import Sequence
 from typing import Union
 

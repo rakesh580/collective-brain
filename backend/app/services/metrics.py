@@ -27,7 +27,7 @@ HTTP_REQUESTS_TOTAL = Counter(
 LLM_REQUESTS_TOTAL = Counter(
     "cb_llm_requests_total",
     "Total LLM API calls",
-    ["provider", "model", "status"],   # status: success | error | circuit_open
+    ["provider", "model", "status"],  # status: success | error | circuit_open
 )
 
 LLM_LATENCY = Histogram(
@@ -48,7 +48,7 @@ LLM_TOKENS_ESTIMATED = Counter(
 EMBEDDING_LATENCY = Histogram(
     "cb_embedding_duration_seconds",
     "Embedding inference duration in seconds",
-    ["model", "batch"],    # batch: "true" | "false"
+    ["model", "batch"],  # batch: "true" | "false"
     buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
 )
 
@@ -78,7 +78,7 @@ VECTOR_SEARCH_TOTAL = Counter(
 INGESTION_RUNS_TOTAL = Counter(
     "cb_ingestion_runs_total",
     "Total ingestion jobs",
-    ["source_type", "status", "org_id"],   # status: success | error
+    ["source_type", "status", "org_id"],  # status: success | error
 )
 
 INGESTION_CHUNKS_TOTAL = Counter(
@@ -99,7 +99,7 @@ INGESTION_LATENCY = Histogram(
 DB_QUERY_LATENCY = Histogram(
     "cb_db_query_duration_seconds",
     "Database query duration in seconds",
-    ["operation"],   # e.g. "select_members", "insert_contribution"
+    ["operation"],  # e.g. "select_members", "insert_contribution"
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
 )
 

@@ -10,9 +10,7 @@ class ContributionRecord(Base):
     __tablename__ = "contributions"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     member_id = Column(String, ForeignKey("members.id", ondelete="CASCADE"), index=True)
     artifact_id = Column(String, ForeignKey("artifacts.id"))
     contribution_type = Column(String)

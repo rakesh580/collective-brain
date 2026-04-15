@@ -40,20 +40,22 @@ class SlackConnector(BaseConnector):
         for uid, info in users.items():
             name = info.get("real_name") or info.get("display_name") or info.get("name", uid)
             slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-            members.append({
-                "id": slug,
-                "name": name,
-                "aliases": list(
-                    {
-                        name.lower(),
-                        info.get("display_name", "").lower(),
-                        info.get("name", "").lower(),
-                        slug,
-                    }
-                    - {""}
-                ),
-                "email": info.get("profile", {}).get("email"),
-            })
+            members.append(
+                {
+                    "id": slug,
+                    "name": name,
+                    "aliases": list(
+                        {
+                            name.lower(),
+                            info.get("display_name", "").lower(),
+                            info.get("name", "").lower(),
+                            slug,
+                        }
+                        - {""}
+                    ),
+                    "email": info.get("profile", {}).get("email"),
+                }
+            )
         return members
 
     def _load_users(self, export_dir: Path) -> dict:
@@ -64,9 +66,7 @@ class SlackConnector(BaseConnector):
             users_list = json.load(f)
         return {u["id"]: u for u in users_list}
 
-    def _parse_channel(
-        self, channel_dir: Path, channel_name: str, users: dict
-    ) -> list[ParsedChunk]:
+    def _parse_channel(self, channel_dir: Path, channel_name: str, users: dict) -> list[ParsedChunk]:
         messages = []
         for json_file in sorted(channel_dir.glob("*.json")):
             with open(json_file, encoding="utf-8") as f:
@@ -114,19 +114,14 @@ class SlackConnector(BaseConnector):
 
             user_id = msg.get("user", "unknown")
             user_info = users.get(user_id, {})
-            username = (
-                user_info.get("real_name")
-                or user_info.get("display_name")
-                or user_info.get("name", user_id)
-            )
+            username = user_info.get("real_name") or user_info.get("display_name") or user_info.get("name", user_id)
             ts = datetime.fromtimestamp(float(msg.get("ts", 0)))
             text = self._clean_message_text(msg["text"], users)
 
             if (
                 current_group
                 and current_group["user_id"] == user_id
-                and (ts - current_group["last_ts"]).total_seconds()
-                < self.time_window_seconds
+                and (ts - current_group["last_ts"]).total_seconds() < self.time_window_seconds
             ):
                 current_group["texts"].append(text)
                 current_group["last_ts"] = ts

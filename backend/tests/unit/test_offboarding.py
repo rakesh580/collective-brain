@@ -1,4 +1,5 @@
 """Unit tests for OffboardingService and public KB publish logic."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,7 +16,10 @@ from app.services.offboarding_service import (
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _make_member(member_id: str, name: str, expertise_tags: list[str] | None = None, status: str = "active") -> MagicMock:
+
+def _make_member(
+    member_id: str, name: str, expertise_tags: list[str] | None = None, status: str = "active"
+) -> MagicMock:
     m = MagicMock(spec=MemberRecord)
     m.id = member_id
     m.name = name
@@ -34,6 +38,7 @@ def _make_contribution(member_id: str, artifact_id: str, topics: list[str] | Non
 
 
 # ── _compute_risk ──────────────────────────────────────────────────────────────
+
 
 class TestComputeRisk:
     def test_no_unique_no_sole_is_low(self):
@@ -58,6 +63,7 @@ class TestComputeRisk:
 
 
 # ── _find_candidates ───────────────────────────────────────────────────────────
+
 
 class TestFindCandidates:
     def test_exact_match_returned(self):
@@ -89,6 +95,7 @@ class TestFindCandidates:
 
 # ── _build_summary ─────────────────────────────────────────────────────────────
 
+
 class TestBuildSummary:
     def test_no_unique_expertise_says_well_distributed(self):
         m = _make_member("m1", "Dave")
@@ -114,6 +121,7 @@ class TestBuildSummary:
 
 # ── OffboardingService ─────────────────────────────────────────────────────────
 
+
 class TestOffboardingService:
     def _make_db(self, member, contributions, other_members, contributions_for_artifact=None):
         db = MagicMock()
@@ -129,8 +137,7 @@ class TestOffboardingService:
             elif model is ContributionRecord:
                 filter_mock = MagicMock()
                 filter_mock.all.return_value = (
-                    contributions_for_artifact if contributions_for_artifact is not None
-                    else contributions
+                    contributions_for_artifact if contributions_for_artifact is not None else contributions
                 )
                 q.filter.return_value = filter_mock
             return q
@@ -183,7 +190,7 @@ class TestOffboardingService:
                 if call_count[0] == 1:
                     f.first.return_value = member  # get_member
                 else:
-                    f.all.return_value = [other]   # get other members
+                    f.all.return_value = [other]  # get other members
                 q.filter.return_value = f
             else:
                 f = MagicMock()
@@ -243,25 +250,36 @@ class TestOffboardingService:
 
 # ── PublishResponse schema (smoke test) ────────────────────────────────────────
 
+
 class TestPublishSchemas:
     def test_publish_response_fields(self):
         from app.routers.public_kb import PublishResponse
+
         r = PublishResponse(id="art-1", is_public=True, message="Published")
         assert r.id == "art-1"
         assert r.is_public is True
 
     def test_public_artifact_response_fields(self):
         from app.routers.public_kb import PublicArtifactResponse
+
         r = PublicArtifactResponse(
-            id="a1", title="My doc", source_type="notion",
-            source_url="https://notion.so/abc", ingested_at="2026-01-01T00:00:00"
+            id="a1",
+            title="My doc",
+            source_type="notion",
+            source_url="https://notion.so/abc",
+            ingested_at="2026-01-01T00:00:00",
         )
         assert r.source_type == "notion"
 
     def test_public_insight_response_fields(self):
         from app.routers.public_kb import PublicInsightResponse
+
         r = PublicInsightResponse(
-            id="i1", title="Pattern", body="We found X", insight_type="pattern",
-            generated_at="2026-01-01T00:00:00", confidence=0.9
+            id="i1",
+            title="Pattern",
+            body="We found X",
+            insight_type="pattern",
+            generated_at="2026-01-01T00:00:00",
+            confidence=0.9,
         )
         assert r.confidence == 0.9

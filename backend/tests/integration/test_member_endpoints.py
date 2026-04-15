@@ -1,14 +1,17 @@
 """Integration tests for member management endpoints."""
 
 
-
 class TestMemberCRUD:
     def test_create_member(self, app_client, auth_headers):
-        resp = app_client.post("/members", headers=auth_headers, json={
-            "name": "Dave",
-            "email": "dave@company.com",
-            "expertise_tags": ["python", "ml"],
-        })
+        resp = app_client.post(
+            "/members",
+            headers=auth_headers,
+            json={
+                "name": "Dave",
+                "email": "dave@company.com",
+                "expertise_tags": ["python", "ml"],
+            },
+        )
         assert resp.status_code == 201
         assert resp.json()["name"] == "Dave"
 
@@ -21,10 +24,14 @@ class TestMemberCRUD:
         assert len(resp.json()) >= 2
 
     def test_get_member_detail(self, app_client, auth_headers):
-        create = app_client.post("/members", headers=auth_headers, json={
-            "name": "Grace",
-            "expertise_tags": ["react"],
-        })
+        create = app_client.post(
+            "/members",
+            headers=auth_headers,
+            json={
+                "name": "Grace",
+                "expertise_tags": ["react"],
+            },
+        )
         member_id = create.json()["id"]
         resp = app_client.get(f"/members/{member_id}", headers=auth_headers)
         assert resp.status_code == 200
@@ -33,10 +40,14 @@ class TestMemberCRUD:
     def test_update_member(self, app_client, auth_headers):
         create = app_client.post("/members", headers=auth_headers, json={"name": "Hank"})
         member_id = create.json()["id"]
-        resp = app_client.put(f"/members/{member_id}", headers=auth_headers, json={
-            "name": "Hank Updated",
-            "expertise_tags": ["devops", "k8s"],
-        })
+        resp = app_client.put(
+            f"/members/{member_id}",
+            headers=auth_headers,
+            json={
+                "name": "Hank Updated",
+                "expertise_tags": ["devops", "k8s"],
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["name"] == "Hank Updated"
 

@@ -23,6 +23,7 @@ def init_db(settings=None):
 
     if settings is None:
         from app.config import get_settings
+
         settings = get_settings()
 
     db_url = settings.effective_database_url
@@ -33,6 +34,7 @@ def init_db(settings=None):
     # Try PostgreSQL first
     try:
         from sqlalchemy import text as sa_text
+
         logger.info("Connecting to PostgreSQL (Supabase)")
         _engine = create_engine(
             db_url,
@@ -58,9 +60,11 @@ def init_db(settings=None):
         logger.info("Falling back to local SQLite database for development")
 
         import os
+
         sqlite_path = os.path.join(os.path.dirname(__file__), "..", "..", "collective_brain_dev.db")
         sqlite_url = f"sqlite:///{os.path.abspath(sqlite_path)}"
         from sqlalchemy.pool import StaticPool
+
         _engine = create_engine(
             sqlite_url,
             connect_args={"check_same_thread": False},
@@ -89,9 +93,7 @@ def _run_alembic_migrations(settings):
 
         alembic_cfg = Config()
         # Locate alembic.ini relative to this file: backend/alembic.ini
-        ini_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "alembic.ini"
-        )
+        ini_path = os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini")
         alembic_cfg.set_main_option("config_file_name", os.path.abspath(ini_path))
         alembic_cfg.set_main_option(
             "script_location",
@@ -109,6 +111,7 @@ def _run_alembic_migrations(settings):
 # ---------------------------------------------------------------------------
 # ORM-based helper functions
 # ---------------------------------------------------------------------------
+
 
 def save_digest_config(
     db: Session,
@@ -175,17 +178,19 @@ def get_digest_config(db: Session, workspace_id: str) -> list[dict]:
 
     results = []
     for row in rows:
-        results.append({
-            "id": row.id,
-            "workspace_id": row.workspace_id,
-            "channel_id": row.channel_id,
-            "channel_name": row.channel_name or "",
-            "schedule_day": row.schedule_day,
-            "schedule_hour": row.schedule_hour,
-            "enabled": bool(row.enabled),
-            "last_sent_at": row.last_sent_at.isoformat() if row.last_sent_at else None,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-        })
+        results.append(
+            {
+                "id": row.id,
+                "workspace_id": row.workspace_id,
+                "channel_id": row.channel_id,
+                "channel_name": row.channel_name or "",
+                "schedule_day": row.schedule_day,
+                "schedule_hour": row.schedule_hour,
+                "enabled": bool(row.enabled),
+                "last_sent_at": row.last_sent_at.isoformat() if row.last_sent_at else None,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+        )
     return results
 
 
@@ -271,16 +276,18 @@ def get_help_requests(
         else:
             topics_parsed = topics_raw or []
 
-        results.append({
-            "id": row.id,
-            "requester_user_id": row.requester_user_id,
-            "expert_member_id": row.expert_member_id,
-            "query": row.query,
-            "topics": topics_parsed,
-            "status": row.status,
-            "created_at": row.created_at,
-            "resolved_at": row.resolved_at,
-        })
+        results.append(
+            {
+                "id": row.id,
+                "requester_user_id": row.requester_user_id,
+                "expert_member_id": row.expert_member_id,
+                "query": row.query,
+                "topics": topics_parsed,
+                "status": row.status,
+                "created_at": row.created_at,
+                "resolved_at": row.resolved_at,
+            }
+        )
     return results
 
 
@@ -361,28 +368,26 @@ def get_health_snapshots(db: Session, days: int = 90) -> list[dict]:
         else:
             risk_parsed = risk_raw or {}
 
-        results.append({
-            "id": row.id,
-            "timestamp": row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp),
-            "bus_factor_count": row.bus_factor_count,
-            "coverage_pct": row.coverage_pct,
-            "collab_density": row.collab_density,
-            "active_member_pct": row.active_member_pct,
-            "avg_breadth": row.avg_breadth,
-            "health_score": row.health_score,
-            "risk_summary": risk_parsed,
-        })
+        results.append(
+            {
+                "id": row.id,
+                "timestamp": row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp),
+                "bus_factor_count": row.bus_factor_count,
+                "coverage_pct": row.coverage_pct,
+                "collab_density": row.collab_density,
+                "active_member_pct": row.active_member_pct,
+                "avg_breadth": row.avg_breadth,
+                "health_score": row.health_score,
+                "risk_summary": risk_parsed,
+            }
+        )
     return results
 
 
 def get_latest_health_snapshot(db: Session) -> dict | None:
     from app.models.health_snapshot import HealthSnapshot
 
-    row = (
-        db.query(HealthSnapshot)
-        .order_by(HealthSnapshot.timestamp.desc())
-        .first()
-    )
+    row = db.query(HealthSnapshot).order_by(HealthSnapshot.timestamp.desc()).first()
 
     if not row:
         return None

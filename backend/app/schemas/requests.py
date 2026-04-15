@@ -5,17 +5,11 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 def _validate_password_complexity(password: str) -> str:
     if not re.search(r"[A-Z]", password):
-        raise ValueError(
-            "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
-        )
+        raise ValueError("Password must contain at least one uppercase letter, one lowercase letter, and one digit")
     if not re.search(r"[a-z]", password):
-        raise ValueError(
-            "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
-        )
+        raise ValueError("Password must contain at least one uppercase letter, one lowercase letter, and one digit")
     if not re.search(r"\d", password):
-        raise ValueError(
-            "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
-        )
+        raise ValueError("Password must contain at least one uppercase letter, one lowercase letter, and one digit")
     return password
 
 
@@ -173,8 +167,10 @@ class RoomAIQueryRequest(BaseModel):
 
 # ── Phase 5: External integration ingest requests ─────────────────────────────
 
+
 class NotionIngestRequest(BaseModel):
     """Ingest from a Notion database or a single page."""
+
     database_id: str | None = Field(default=None, description="Notion database ID")
     page_id: str | None = Field(default=None, description="Notion page ID")
     room_id: str | None = None
@@ -189,6 +185,7 @@ class NotionIngestRequest(BaseModel):
 
 class GoogleDocsIngestRequest(BaseModel):
     """Ingest from Google Docs (list of doc IDs or a folder)."""
+
     document_ids: list[str] | None = Field(default=None, description="List of Google Doc IDs")
     folder_id: str | None = Field(default=None, description="Google Drive folder ID")
     room_id: str | None = None
@@ -203,6 +200,7 @@ class GoogleDocsIngestRequest(BaseModel):
 
 class ConfluenceIngestRequest(BaseModel):
     """Ingest from a Confluence space or specific pages."""
+
     space_key: str | None = Field(default=None, description="Confluence space key (e.g. ENG)")
     page_ids: list[str] | None = Field(default=None, description="Specific Confluence page IDs")
     room_id: str | None = None

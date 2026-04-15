@@ -9,9 +9,7 @@ class InsightRecord(Base):
     __tablename__ = "insights"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     insight_type = Column(String, index=True)
     title = Column(String)
     body = Column(Text)
@@ -27,9 +25,7 @@ class InsightRecord(Base):
     # "pending" | "verified" | "outdated" | "disputed"
     verification_status = Column(String(20), nullable=True, default="pending", index=True)
     verified_at = Column(DateTime(timezone=True), nullable=True)
-    verified_by = Column(
-        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    verified_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     # Artifact IDs that back this insight
     source_artifact_ids = Column(JSON, default=list)
     # How many days since the supporting artifacts were last updated

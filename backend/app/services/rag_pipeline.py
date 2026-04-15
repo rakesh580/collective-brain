@@ -25,8 +25,7 @@ logger = logging.getLogger("collective_brain.rag")
 
 LLM_TIMEOUT_SECONDS = 90
 FALLBACK_RESPONSE = (
-    "I'm sorry, the AI service is temporarily unavailable or took too long to respond. "
-    "Please try again in a moment."
+    "I'm sorry, the AI service is temporarily unavailable or took too long to respond. Please try again in a moment."
 )
 
 
@@ -101,11 +100,7 @@ class RAGPipeline:
         )
 
     def _ensure_conversation(self, conv_id: str, question: str, owner_user_id: str | None = None):
-        existing = (
-            self.db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conv_id)
-            .first()
-        )
+        existing = self.db.query(ConversationRecord).filter(ConversationRecord.id == conv_id).first()
         if not existing:
             conv = ConversationRecord(
                 id=conv_id,
@@ -119,8 +114,13 @@ class RAGPipeline:
             self.db.commit()
 
     def _save_messages(
-        self, conv_id: str, user_content: str, response_text: str, results: dict,
-        sender_user_id: str | None = None, sender_name: str | None = None,
+        self,
+        conv_id: str,
+        user_content: str,
+        response_text: str,
+        results: dict,
+        sender_user_id: str | None = None,
+        sender_name: str | None = None,
     ):
         now = datetime.now(UTC)
         user_msg = MessageRecord(
@@ -139,13 +139,15 @@ class RAGPipeline:
         metadatas = results.get("metadatas", [[]])[0]
         distances = results.get("distances", [[]])[0]
         for chunk_id, doc, meta, dist in zip(ids, docs, metadatas, distances):
-            sources_data.append({
-                "chunk_id": chunk_id,
-                "text": doc[:300],
-                "source_type": meta.get("source_type", "unknown"),
-                "source_ref": meta.get("source_ref", ""),
-                "score": round(1 - dist, 3),
-            })
+            sources_data.append(
+                {
+                    "chunk_id": chunk_id,
+                    "text": doc[:300],
+                    "source_type": meta.get("source_type", "unknown"),
+                    "source_ref": meta.get("source_ref", ""),
+                    "score": round(1 - dist, 3),
+                }
+            )
 
         related = self._extract_related_members(response_text)
         related_data = [{"id": r.id, "name": r.name, "relevance": r.relevance} for r in related]
@@ -162,33 +164,19 @@ class RAGPipeline:
         self.db.add(user_msg)
         self.db.add(assistant_msg)
 
-        conv = (
-            self.db.query(ConversationRecord)
-            .filter(ConversationRecord.id == conv_id)
-            .first()
-        )
+        conv = self.db.query(ConversationRecord).filter(ConversationRecord.id == conv_id).first()
         if conv:
             conv.updated_at = now
-            msg_count = (
-                self.db.query(MessageRecord)
-                .filter(MessageRecord.conversation_id == conv_id)
-                .count()
-            )
+            msg_count = self.db.query(MessageRecord).filter(MessageRecord.conversation_id == conv_id).count()
             conv.message_count = msg_count + 2
 
         self.db.commit()
 
     def _classify_intent(self, question: str) -> str:
         q = question.lower()
-        if any(
-            w in q
-            for w in ["who should", "best person", "who can", "assign", "who knows"]
-        ):
+        if any(w in q for w in ["who should", "best person", "who can", "assign", "who knows"]):
             return "member_recommendation"
-        if any(
-            w in q
-            for w in ["pattern", "keep causing", "recurring", "why do we", "bottleneck"]
-        ):
+        if any(w in q for w in ["pattern", "keep causing", "recurring", "why do we", "bottleneck"]):
             return "pattern_analysis"
         if any(
             w in q
@@ -209,9 +197,7 @@ class RAGPipeline:
             return None
         conditions = []
         if "source_types" in filters and filters["source_types"]:
-            conditions.append(
-                {"source_type": {"$in": filters["source_types"]}}
-            )
+            conditions.append({"source_type": {"$in": filters["source_types"]}})
         if "members" in filters and filters["members"]:
             conditions.append({"author": {"$in": filters["members"]}})
         if not conditions:
@@ -261,8 +247,7 @@ class RAGPipeline:
         context = CONTEXT_TEMPLATE.format(chunks=chunks_text, question=question)
         if user_skills and user_skills != "(No user skill profiles yet)":
             context = context.replace(
-                "=== QUESTION ===",
-                f"=== TEAM SKILL PROFILES ===\n{user_skills}\n\n=== QUESTION ==="
+                "=== QUESTION ===", f"=== TEAM SKILL PROFILES ===\n{user_skills}\n\n=== QUESTION ==="
             )
         return context
 
@@ -312,26 +297,15 @@ class RAGPipeline:
                 .all()
             )
             mid_list = [mid for (mid,) in member_ids if mid]
-            members = (
-                self.db.query(MemberRecord)
-                .filter(MemberRecord.id.in_(mid_list))
-                .all()
-            ) if mid_list else []
+            members = (self.db.query(MemberRecord).filter(MemberRecord.id.in_(mid_list)).all()) if mid_list else []
         else:
             # Limit to active members (those with contributions)
-            members = (
-                self.db.query(MemberRecord)
-                .filter(MemberRecord.total_contributions > 0)
-                .limit(100)
-                .all()
-            )
+            members = self.db.query(MemberRecord).filter(MemberRecord.total_contributions > 0).limit(100).all()
         mentioned = []
         response_lower = response_text.lower()
         for m in members:
             if m.name.lower() in response_lower:
-                mentioned.append(
-                    RelatedMember(id=m.id, name=m.name, relevance="mentioned in answer")
-                )
+                mentioned.append(RelatedMember(id=m.id, name=m.name, relevance="mentioned in answer"))
         return mentioned
 
     def _get_member_expertise_summary(self) -> str:
@@ -344,7 +318,9 @@ class RAGPipeline:
                 .all()
             )
             member_id_list = [mid for (mid,) in member_ids]
-            members = self.db.query(MemberRecord).filter(MemberRecord.id.in_(member_id_list)).all() if member_id_list else []
+            members = (
+                self.db.query(MemberRecord).filter(MemberRecord.id.in_(member_id_list)).all() if member_id_list else []
+            )
         else:
             members = self.db.query(MemberRecord).all()
         if not members:
@@ -371,11 +347,8 @@ class RAGPipeline:
         room_id = getattr(self, "room_id", None)
         if room_id:
             from app.models.room import ChatRoomMember
-            user_ids = (
-                self.db.query(ChatRoomMember.user_id)
-                .filter(ChatRoomMember.room_id == room_id)
-                .all()
-            )
+
+            user_ids = self.db.query(ChatRoomMember.user_id).filter(ChatRoomMember.room_id == room_id).all()
             uid_list = [uid for (uid,) in user_ids]
             users = self.db.query(UserRecord).filter(UserRecord.id.in_(uid_list)).all() if uid_list else []
         else:
@@ -401,7 +374,5 @@ class RAGPipeline:
             return "(No contributions tracked yet)"
         parts = []
         for c in contribs:
-            parts.append(
-                f"- [{c.contribution_type}] {c.description} (by {c.member_id}, {c.timestamp})"
-            )
+            parts.append(f"- [{c.contribution_type}] {c.description} (by {c.member_id}, {c.timestamp})")
         return "\n".join(parts)

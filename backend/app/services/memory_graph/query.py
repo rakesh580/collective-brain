@@ -64,8 +64,11 @@ class GraphQueryMixin:
             label = self._edge_label(etype, weight)
             edges.append(
                 GraphEdge(
-                    source=u, target=v, type=etype,
-                    weight=weight, label=label,
+                    source=u,
+                    target=v,
+                    type=etype,
+                    weight=weight,
+                    label=label,
                 )
             )
 
@@ -111,12 +114,8 @@ class GraphQueryMixin:
         """Return a member x topic matrix for heatmap visualization."""
         G = self._get_or_build_nx_graph()
 
-        member_nodes = [
-            (nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "member"
-        ]
-        topic_nodes = [
-            (nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "topic"
-        ]
+        member_nodes = [(nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "member"]
+        topic_nodes = [(nid, d) for nid, d in G.nodes(data=True) if d.get("node_type") == "topic"]
 
         all_topics = sorted(d["label"] for _, d in topic_nodes)
         topic_id_map = {d["label"]: nid for nid, d in topic_nodes}
@@ -136,11 +135,13 @@ class GraphQueryMixin:
                         scores[topic_label] = w
                 else:
                     scores[topic_label] = 0.0
-            member_data.append({
-                "id": mid,
-                "name": mdata.get("label", mid),
-                "scores": scores,
-            })
+            member_data.append(
+                {
+                    "id": mid,
+                    "name": mdata.get("label", mid),
+                    "scores": scores,
+                }
+            )
 
         # Normalize scores per topic
         if member_data and all_topics:
@@ -154,9 +155,7 @@ class GraphQueryMixin:
 
     # ---- Sub-graphs ------------------------------------------------------
 
-    def get_member_subgraph(
-        self, member_id: str
-    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+    def get_member_subgraph(self, member_id: str) -> tuple[list[GraphNode], list[GraphEdge]]:
         """1-hop neighbourhood around a member."""
         G = self._get_or_build_nx_graph()
         if member_id not in G:
@@ -168,9 +167,7 @@ class GraphQueryMixin:
         sub = G.subgraph(neighbors)
         return self._nx_to_response(sub)
 
-    def get_topic_subgraph(
-        self, topic: str
-    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+    def get_topic_subgraph(self, topic: str) -> tuple[list[GraphNode], list[GraphEdge]]:
         """2-hop neighbourhood: topic -> members -> their artifacts."""
         G = self._get_or_build_nx_graph()
         topic_id = f"topic-{topic}"
@@ -192,9 +189,7 @@ class GraphQueryMixin:
         sub = G.subgraph(hop2)
         return self._nx_to_response(sub)
 
-    def _nx_to_response(
-        self, G: nx.Graph
-    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+    def _nx_to_response(self, G: nx.Graph) -> tuple[list[GraphNode], list[GraphEdge]]:
         """Convert a NetworkX (sub)graph to response format."""
         nodes = []
         edges = []
@@ -219,18 +214,28 @@ class GraphQueryMixin:
                 props["community"] = data["community"]
 
             size = self._compute_node_size(ntype, data)
-            nodes.append(GraphNode(
-                id=nid, type=ntype, label=data.get("label", nid),
-                properties=props, size=size,
-            ))
+            nodes.append(
+                GraphNode(
+                    id=nid,
+                    type=ntype,
+                    label=data.get("label", nid),
+                    properties=props,
+                    size=size,
+                )
+            )
 
         for u, v, data in G.edges(data=True):
             etype = data.get("edge_type", "UNKNOWN")
             weight = data.get("weight", 1.0)
-            edges.append(GraphEdge(
-                source=u, target=v, type=etype,
-                weight=weight, label=self._edge_label(etype, weight),
-            ))
+            edges.append(
+                GraphEdge(
+                    source=u,
+                    target=v,
+                    type=etype,
+                    weight=weight,
+                    label=self._edge_label(etype, weight),
+                )
+            )
 
         return nodes, edges
 
@@ -253,8 +258,6 @@ class GraphQueryMixin:
         if topic_scores:
             max_score = max(topic_scores.values())
             if max_score > 0:
-                topic_scores = {
-                    k: round(v / max_score, 2) for k, v in topic_scores.items()
-                }
+                topic_scores = {k: round(v / max_score, 2) for k, v in topic_scores.items()}
 
         return topic_scores

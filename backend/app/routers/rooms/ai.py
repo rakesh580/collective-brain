@@ -62,22 +62,29 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
         db.commit()
 
         # Broadcast user's question
-        await _broadcast(room_id, {
-            "type": "new_message",
-            "message": _msg_to_dict(user_msg),
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "new_message",
+                "message": _msg_to_dict(user_msg),
+            },
+        )
 
         # Send typing indicator for AI
-        await _broadcast(room_id, {
-            "type": "typing",
-            "user_id": "ai-agent",
-            "username": "AI Agent",
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "typing",
+                "user_id": "ai-agent",
+                "username": "AI Agent",
+            },
+        )
 
         # Run AI pipeline
         settings = request.app.state.settings
         if settings.agent_mode == "langgraph":
             from app.services.agent_pipeline import AgentPipeline
+
             pipeline = AgentPipeline(
                 db=db,
                 settings=settings,
@@ -86,6 +93,7 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             )
         else:
             from app.services.rag_pipeline import RAGPipeline
+
             pipeline = RAGPipeline(
                 llm=request.app.state.llm_service,
                 embedder=request.app.state.embedding_service,
@@ -106,9 +114,7 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
         )
         recent_msgs.reverse()
 
-        room_context = "\n".join(
-            f"{m.sender_name}: {m.content}" for m in recent_msgs
-        )
+        room_context = "\n".join(f"{m.sender_name}: {m.content}" for m in recent_msgs)
 
         # Build room member skills context
         room_member_users = (
@@ -165,16 +171,22 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
         ai_msg_dict = _msg_to_dict(ai_msg)
 
         # Broadcast AI response
-        await _broadcast(room_id, {
-            "type": "new_message",
-            "message": ai_msg_dict,
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "new_message",
+                "message": ai_msg_dict,
+            },
+        )
 
         # Clear typing indicator
-        await _broadcast(room_id, {
-            "type": "typing_stop",
-            "user_id": "ai-agent",
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "typing_stop",
+                "user_id": "ai-agent",
+            },
+        )
 
         return ai_msg_dict
     except HTTPException:
@@ -196,17 +208,23 @@ async def ai_query(room_id: str, body: RoomAIQueryRequest, request: Request):
             room.message_count = (room.message_count or 0) + 1
             db.commit()
 
-            await _broadcast(room_id, {
-                "type": "new_message",
-                "message": _msg_to_dict(error_msg),
-            })
+            await _broadcast(
+                room_id,
+                {
+                    "type": "new_message",
+                    "message": _msg_to_dict(error_msg),
+                },
+            )
         except Exception:
             logger.error("Failed to save error message in room %s", room_id)
 
-        await _broadcast(room_id, {
-            "type": "typing_stop",
-            "user_id": "ai-agent",
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "typing_stop",
+                "user_id": "ai-agent",
+            },
+        )
 
         raise HTTPException(status_code=500, detail="AI query failed")
     finally:

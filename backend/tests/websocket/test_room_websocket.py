@@ -7,10 +7,14 @@ from starlette.websockets import WebSocketDisconnect
 
 class TestRoomCreation:
     def test_create_room(self, app_client, auth_headers):
-        resp = app_client.post("/rooms", headers=auth_headers, json={
-            "name": "general",
-            "description": "General chat",
-        })
+        resp = app_client.post(
+            "/rooms",
+            headers=auth_headers,
+            json={
+                "name": "general",
+                "description": "General chat",
+            },
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "general"
@@ -31,12 +35,15 @@ class TestRoomCreation:
 class TestRoomMembers:
     def test_add_member_to_room(self, app_client, auth_headers, registered_user):
         # Create a second user
-        resp2 = app_client.post("/auth/register", json={
-            "username": "charlie",
-            "email": "charlie@test.com",
-            "password": "Str0ngPass!",
-            "display_name": "Charlie",
-        })
+        resp2 = app_client.post(
+            "/auth/register",
+            json={
+                "username": "charlie",
+                "email": "charlie@test.com",
+                "password": "Str0ngPass!",
+                "display_name": "Charlie",
+            },
+        )
         charlie_id = resp2.json()["user"]["id"]
 
         # Create room
@@ -94,11 +101,14 @@ class TestRoomMessages:
         room_id = room.json()["id"]
 
         # Register a new user who is NOT a member of the room
-        other = app_client.post("/auth/register", json={
-            "username": "outsider",
-            "email": "outsider@test.com",
-            "password": "Str0ngPass!",
-        })
+        other = app_client.post(
+            "/auth/register",
+            json={
+                "username": "outsider",
+                "email": "outsider@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
 
         resp = app_client.post(
@@ -114,11 +124,14 @@ class TestRoomWebSocket:
         """Connecting without sending a valid token should disconnect."""
         room_resp = None
         # We need a valid room; create via REST first
-        reg = app_client.post("/auth/register", json={
-            "username": "wsuser",
-            "email": "wsuser@test.com",
-            "password": "Str0ngPass!",
-        })
+        reg = app_client.post(
+            "/auth/register",
+            json={
+                "username": "wsuser",
+                "email": "wsuser@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         token = reg.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
         room_resp = app_client.post("/rooms", headers=headers, json={"name": "ws-room"})
@@ -137,11 +150,14 @@ class TestRoomWebSocket:
 
     def test_websocket_message_broadcast(self, app_client):
         """A message sent via WebSocket should be receivable."""
-        reg = app_client.post("/auth/register", json={
-            "username": "wsmsg",
-            "email": "wsmsg@test.com",
-            "password": "Str0ngPass!",
-        })
+        reg = app_client.post(
+            "/auth/register",
+            json={
+                "username": "wsmsg",
+                "email": "wsmsg@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         token = reg.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -155,20 +171,27 @@ class TestRoomWebSocket:
             ack = json.loads(ws.receive_text())
 
             # Send a message
-            ws.send_text(json.dumps({
-                "type": "message",
-                "content": "Hello via WebSocket!",
-            }))
+            ws.send_text(
+                json.dumps(
+                    {
+                        "type": "message",
+                        "content": "Hello via WebSocket!",
+                    }
+                )
+            )
             response = json.loads(ws.receive_text())
             assert response.get("type") in ("new_message", "message", "error")
 
     def test_websocket_typing_indicator(self, app_client):
         """Typing indicators should be transmitted."""
-        reg = app_client.post("/auth/register", json={
-            "username": "wstype",
-            "email": "wstype@test.com",
-            "password": "Str0ngPass!",
-        })
+        reg = app_client.post(
+            "/auth/register",
+            json={
+                "username": "wstype",
+                "email": "wstype@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         token = reg.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -185,11 +208,14 @@ class TestRoomWebSocket:
 
     def test_websocket_ping_pong(self, app_client):
         """Ping should get a pong response."""
-        reg = app_client.post("/auth/register", json={
-            "username": "wsping",
-            "email": "wsping@test.com",
-            "password": "Str0ngPass!",
-        })
+        reg = app_client.post(
+            "/auth/register",
+            json={
+                "username": "wsping",
+                "email": "wsping@test.com",
+                "password": "Str0ngPass!",
+            },
+        )
         token = reg.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 

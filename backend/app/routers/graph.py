@@ -31,7 +31,9 @@ async def get_full_graph(request: Request, room_id: str | None = None, user=Depe
 
 
 @router.get("/member/{member_id}", response_model=GraphResponse)
-async def get_member_graph(member_id: str, request: Request, room_id: str | None = None, user=Depends(get_current_user)):
+async def get_member_graph(
+    member_id: str, request: Request, room_id: str | None = None, user=Depends(get_current_user)
+):
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)

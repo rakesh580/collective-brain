@@ -27,14 +27,9 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Use the direct (session-mode) URL for migrations
-db_url = (
-    os.environ.get("CB_MIGRATION_DATABASE_URL")
-    or os.environ.get("CB_DATABASE_URL")
-)
+db_url = os.environ.get("CB_MIGRATION_DATABASE_URL") or os.environ.get("CB_DATABASE_URL")
 if not db_url:
-    raise RuntimeError(
-        "Set CB_MIGRATION_DATABASE_URL (port 5432 direct URL) before running migrations."
-    )
+    raise RuntimeError("Set CB_MIGRATION_DATABASE_URL (port 5432 direct URL) before running migrations.")
 config.set_main_option("sqlalchemy.url", db_url)
 
 

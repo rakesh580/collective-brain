@@ -28,11 +28,13 @@ async def query_brain(body: QueryRequest, request: Request, user=Depends(get_cur
     db = create_session()
     settings = request.app.state.settings
     import logging as _logging
+
     _logger = _logging.getLogger(__name__)
     try:
         if settings.agent_mode == "langgraph":
             try:
                 from app.services.agent_pipeline import AgentPipeline
+
                 pipeline = AgentPipeline(
                     db=db,
                     settings=settings,

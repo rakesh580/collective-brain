@@ -4,6 +4,7 @@ Revision ID: 004_enterprise
 Revises: 003_pgvector
 Create Date: 2026-04-08
 """
+
 from collections.abc import Sequence
 from typing import Union
 
@@ -51,7 +52,7 @@ def upgrade() -> None:
             index=True,
         ),
         sa.Column("action", sa.String(100), nullable=False),  # e.g. "auth.login"
-        sa.Column("actor", sa.String(), nullable=True),       # username or "scim"
+        sa.Column("actor", sa.String(), nullable=True),  # username or "scim"
         sa.Column("target_type", sa.String(50), nullable=True),  # "user", "org", etc.
         sa.Column("target_id", sa.String(), nullable=True),
         sa.Column("ip_address", sa.String(45), nullable=True),

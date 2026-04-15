@@ -1,4 +1,5 @@
 """Slack Bot service — handles OAuth, signature verification, and message processing."""
+
 import hashlib
 import hmac
 import logging

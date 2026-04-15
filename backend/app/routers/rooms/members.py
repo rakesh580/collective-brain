@@ -79,13 +79,19 @@ async def add_members(room_id: str, body: AddRoomMembersRequest, request: Reques
             room.last_message_at = datetime.now(UTC)
             db.commit()
 
-            await _broadcast(room_id, {
-                "type": "new_message",
-                "message": _msg_to_dict(sys_msg),
-            })
-            await _broadcast(room_id, {
-                "type": "members_changed",
-            })
+            await _broadcast(
+                room_id,
+                {
+                    "type": "new_message",
+                    "message": _msg_to_dict(sys_msg),
+                },
+            )
+            await _broadcast(
+                room_id,
+                {
+                    "type": "members_changed",
+                },
+            )
 
         return {"added": len(added)}
     finally:
@@ -132,7 +138,11 @@ async def remove_member(room_id: str, user_id: str, request: Request):
         target_info = _get_user_info(db, user_id)
         db.delete(target)
 
-        action = "left" if current_user.id == user_id else "was removed by " + (current_user.display_name or current_user.username)
+        action = (
+            "left"
+            if current_user.id == user_id
+            else "was removed by " + (current_user.display_name or current_user.username)
+        )
         sys_msg = ChatRoomMessage(
             id=str(uuid4()),
             room_id=room_id,
@@ -147,10 +157,13 @@ async def remove_member(room_id: str, user_id: str, request: Request):
         room.last_message_at = datetime.now(UTC)
         db.commit()
 
-        await _broadcast(room_id, {
-            "type": "new_message",
-            "message": _msg_to_dict(sys_msg),
-        })
+        await _broadcast(
+            room_id,
+            {
+                "type": "new_message",
+                "message": _msg_to_dict(sys_msg),
+            },
+        )
         await _broadcast(room_id, {"type": "members_changed"})
 
         return {"status": "removed"}

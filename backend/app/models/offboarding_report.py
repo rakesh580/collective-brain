@@ -9,12 +9,8 @@ class OffboardingReport(Base):
     __tablename__ = "offboarding_reports"
 
     id = Column(String, primary_key=True)
-    member_id = Column(
-        String, ForeignKey("members.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    created_by = Column(
-        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    member_id = Column(String, ForeignKey("members.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

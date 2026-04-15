@@ -141,6 +141,7 @@ async def list_threads(
     offset: int = 0,
 ):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -177,28 +178,25 @@ async def list_threads(
             query = query.filter(DiscussionThread.status == status)
 
         total = query.count()
-        rows = (
-            query.order_by(DiscussionThread.updated_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        rows = query.order_by(DiscussionThread.updated_at.desc()).offset(offset).limit(limit).all()
 
         result = []
         for t, author_username, author_display_name, msg_count in rows:
-            result.append({
-                "id": t.id,
-                "title": t.title,
-                "created_by_user_id": t.created_by_user_id,
-                "created_by_username": author_username or "unknown",
-                "created_by_display_name": author_display_name,
-                "status": t.status,
-                "context_type": t.context_type,
-                "context_id": t.context_id,
-                "message_count": msg_count or 0,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
-                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-            })
+            result.append(
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "created_by_user_id": t.created_by_user_id,
+                    "created_by_username": author_username or "unknown",
+                    "created_by_display_name": author_display_name,
+                    "status": t.status,
+                    "context_type": t.context_type,
+                    "context_id": t.context_id,
+                    "message_count": msg_count or 0,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                    "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+                }
+            )
 
         return {"threads": result, "total": total}
     finally:
@@ -208,15 +206,12 @@ async def list_threads(
 @router.get("/{thread_id}")
 async def get_thread(thread_id: str, request: Request):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
     try:
-        thread = (
-            db.query(DiscussionThread)
-            .filter(DiscussionThread.id == thread_id)
-            .first()
-        )
+        thread = db.query(DiscussionThread).filter(DiscussionThread.id == thread_id).first()
         if not thread:
             raise HTTPException(status_code=404, detail="Thread not found")
 
@@ -247,19 +242,13 @@ async def get_thread(thread_id: str, request: Request):
 
 
 @router.post("/{thread_id}/messages")
-async def add_message(
-    thread_id: str, body: CreateDiscussionMessageRequest, request: Request
-):
+async def add_message(thread_id: str, body: CreateDiscussionMessageRequest, request: Request):
     from app.dependencies import get_current_user
 
     user = get_current_user(request)
     db = _get_db()
     try:
-        thread = (
-            db.query(DiscussionThread)
-            .filter(DiscussionThread.id == thread_id)
-            .first()
-        )
+        thread = db.query(DiscussionThread).filter(DiscussionThread.id == thread_id).first()
         if not thread:
             raise HTTPException(status_code=404, detail="Thread not found")
 
@@ -384,11 +373,7 @@ async def discussion_websocket(websocket: WebSocket, thread_id: str):
     # Verify thread exists before allowing connection
     db = _get_db()
     try:
-        thread = (
-            db.query(DiscussionThread)
-            .filter(DiscussionThread.id == thread_id)
-            .first()
-        )
+        thread = db.query(DiscussionThread).filter(DiscussionThread.id == thread_id).first()
         if not thread:
             await websocket.close(code=4004, reason="Thread not found")
             return
@@ -405,6 +390,7 @@ async def discussion_websocket(websocket: WebSocket, thread_id: str):
     is_first_in_thread = len(_ws_connections[thread_id]) == 1
 
     if redis and redis.is_connected and is_first_in_thread:
+
         async def _on_redis_message(data: dict):
             """Deliver Redis pub/sub messages to local WebSocket connections."""
             await _broadcast_local(thread_id, data)

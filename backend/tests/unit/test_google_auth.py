@@ -105,9 +105,14 @@ class TestAuthenticateErrors:
     def test_oauth_only_user(self, db_session, settings):
         svc = AuthService(settings)
         from uuid import uuid4
+
         user = UserRecord(
-            id=str(uuid4()), username="guser", email="g@test.com",
-            password_hash=None, auth_provider="google", is_active=True,
+            id=str(uuid4()),
+            username="guser",
+            email="g@test.com",
+            password_hash=None,
+            auth_provider="google",
+            is_active=True,
             created_at=datetime.now(UTC),
         )
         db_session.add(user)

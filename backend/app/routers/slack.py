@@ -1,4 +1,5 @@
 """Slack bot integration endpoints — OAuth, Events API, slash commands, digest."""
+
 import logging
 from uuid import uuid4
 
@@ -25,6 +26,7 @@ def _get_db():
 async def slack_status(request: Request):
     """Check whether Slack integration is configured on the server."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     settings = request.app.state.settings
@@ -42,6 +44,7 @@ async def slack_status(request: Request):
 async def slack_install(request: Request):
     """Start Slack app installation — redirects to Slack OAuth."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     settings = request.app.state.settings
@@ -49,6 +52,7 @@ async def slack_install(request: Request):
         raise HTTPException(status_code=400, detail="Slack integration is not configured")
 
     from app.services.slack_service import SlackService
+
     slack = SlackService(settings)
 
     # Build redirect URI based on request origin
@@ -58,6 +62,7 @@ async def slack_install(request: Request):
     # Generate state token for CSRF protection
     import secrets
     import time as _time
+
     state = secrets.token_urlsafe(32)
 
     # Store state with expiry — use Redis if available, else in-memory with TTL
@@ -68,9 +73,7 @@ async def slack_install(request: Request):
         _states = getattr(request.app.state, "_slack_oauth_states", {})
         # Clean up expired states (older than 10 minutes)
         now = _time.time()
-        request.app.state._slack_oauth_states = {
-            k: v for k, v in _states.items() if now - v < 600
-        }
+        request.app.state._slack_oauth_states = {k: v for k, v in _states.items() if now - v < 600}
         request.app.state._slack_oauth_states[state] = now
 
     url = slack.get_install_url(redirect_uri, state)
@@ -101,6 +104,7 @@ async def slack_oauth_callback(request: Request, code: str, state: str):
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
     from app.services.slack_service import SlackService
+
     slack = SlackService(settings)
 
     base_url = str(request.base_url).rstrip("/")
@@ -131,6 +135,7 @@ async def slack_oauth_callback(request: Request, code: str, state: str):
 async def list_workspaces(request: Request):
     """List connected Slack workspaces."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -155,6 +160,7 @@ async def list_workspaces(request: Request):
 async def disconnect_workspace(workspace_id: str, request: Request):
     """Disconnect a Slack workspace."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -164,9 +170,7 @@ async def disconnect_workspace(workspace_id: str, request: Request):
             raise HTTPException(status_code=404, detail="Workspace not found")
         workspace.is_active = False
         # Deactivate all channel syncs
-        db.query(SlackChannelSync).filter(
-            SlackChannelSync.workspace_id == workspace_id
-        ).update({"is_active": False})
+        db.query(SlackChannelSync).filter(SlackChannelSync.workspace_id == workspace_id).update({"is_active": False})
         db.commit()
         return {"status": "disconnected"}
     finally:
@@ -180,6 +184,7 @@ async def disconnect_workspace(workspace_id: str, request: Request):
 async def list_slack_channels(workspace_id: str, request: Request):
     """List available Slack channels for syncing."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -190,15 +195,14 @@ async def list_slack_channels(workspace_id: str, request: Request):
 
         settings = request.app.state.settings
         from app.services.slack_service import SlackService
+
         slack = SlackService(settings)
         channels = await slack.list_channels(workspace.bot_token)
 
         # Mark which channels are already synced
         synced = {
             s.slack_channel_id: s
-            for s in db.query(SlackChannelSync)
-            .filter(SlackChannelSync.workspace_id == workspace_id)
-            .all()
+            for s in db.query(SlackChannelSync).filter(SlackChannelSync.workspace_id == workspace_id).all()
         }
 
         return {
@@ -229,6 +233,7 @@ async def sync_channel(
 ):
     """Start syncing a Slack channel to Collective Brain."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -256,6 +261,7 @@ async def sync_channel(
         # Get channel name
         settings = request.app.state.settings
         from app.services.slack_service import SlackService
+
         slack = SlackService(settings)
         channels = await slack.list_channels(workspace.bot_token)
         channel_name = next(
@@ -283,6 +289,7 @@ async def sync_channel(
 async def stop_sync(sync_id: str, request: Request):
     """Stop syncing a Slack channel."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -301,6 +308,7 @@ async def stop_sync(sync_id: str, request: Request):
 async def backfill_sync(sync_id: str, request: Request, limit: int = 200):
     """Backfill historical messages from a synced Slack channel."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -321,9 +329,7 @@ async def backfill_sync(sync_id: str, request: Request, limit: int = 200):
             vector_store=request.app.state.vector_store,
         )
 
-        count = await processor.backfill_channel(
-            sync.workspace_id, sync.slack_channel_id, limit=limit
-        )
+        count = await processor.backfill_channel(sync.workspace_id, sync.slack_channel_id, limit=limit)
         return {"status": "backfilled", "messages_ingested": count}
     finally:
         db.close()
@@ -337,6 +343,7 @@ async def slack_events(request: Request):
     """Handle Slack Events API — URL verification and message events."""
     body = await request.body()
     import json
+
     try:
         payload = json.loads(body)
     except json.JSONDecodeError:
@@ -352,6 +359,7 @@ async def slack_events(request: Request):
         timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
         signature = request.headers.get("X-Slack-Signature", "")
         from app.services.slack_service import SlackService
+
         slack = SlackService(settings)
         if not slack.verify_signature(timestamp, body, signature):
             raise HTTPException(status_code=401, detail="Invalid signature")
@@ -407,9 +415,7 @@ async def slack_events(request: Request):
                     )
 
                     # Reply in Slack thread
-                    await slack_svc.post_message(
-                        bot_token, channel_id, answer.answer, thread_ts=thread_ts
-                    )
+                    await slack_svc.post_message(bot_token, channel_id, answer.answer, thread_ts=thread_ts)
         finally:
             db.close()
 
@@ -431,6 +437,7 @@ async def slack_commands(request: Request):
         timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
         signature = request.headers.get("X-Slack-Signature", "")
         from app.services.slack_service import SlackService
+
         slack = SlackService(settings)
         if not slack.verify_signature(timestamp, body, signature):
             raise HTTPException(status_code=401, detail="Invalid signature")
@@ -482,6 +489,7 @@ async def slack_commands(request: Request):
 
         # Run RAG pipeline
         from app.services.rag_pipeline import RAGPipeline
+
         pipeline = RAGPipeline(
             llm=request.app.state.llm_service,
             embedder=request.app.state.embedding_service,
@@ -535,6 +543,7 @@ class DigestConfigureRequest(BaseModel):
 async def digest_send(body: DigestSendRequest, request: Request):
     """Manually trigger a weekly digest send to a specified Slack channel."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     from app.services.digest_service import send_digest_to_slack
@@ -560,6 +569,7 @@ async def digest_send(body: DigestSendRequest, request: Request):
 async def digest_preview(request: Request):
     """Preview the weekly digest content as JSON and plain text (does not send to Slack)."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     from app.services.digest_service import (
@@ -580,10 +590,7 @@ async def digest_preview(request: Request):
             "period_start": digest_data.get("period_start", ""),
             "period_end": digest_data.get("period_end", ""),
             "summary": text_version.split("\n\n")[0] if text_version else "",
-            "highlights": [
-                t["topic"] + f" ({t['count']} mentions)"
-                for t in digest_data.get("top_topics", [])[:5]
-            ],
+            "highlights": [t["topic"] + f" ({t['count']} mentions)" for t in digest_data.get("top_topics", [])[:5]],
             "metrics": {
                 "total_members": gs.get("members", 0),
                 "total_artifacts": gs.get("artifacts", 0),
@@ -595,9 +602,7 @@ async def digest_preview(request: Request):
                 {"name": tc.get("name", ""), "contributions": tc.get("count", 0)}
                 for tc in digest_data.get("top_contributors", [])
             ],
-            "trending_topics": [
-                t["topic"] for t in digest_data.get("top_topics", [])[:10]
-            ],
+            "trending_topics": [t["topic"] for t in digest_data.get("top_topics", [])[:10]],
         }
 
         return {
@@ -617,6 +622,7 @@ async def digest_preview(request: Request):
 async def digest_configure(body: DigestConfigureRequest, request: Request):
     """Save or update digest schedule configuration for a workspace + channel."""
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     from app.db.database import save_digest_config
@@ -655,6 +661,7 @@ async def digest_get_config(request: Request, workspace_id: str = ""):
     Also returns a single ``config`` key (first result or null) for frontend compatibility.
     """
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     from app.db.database import get_digest_config

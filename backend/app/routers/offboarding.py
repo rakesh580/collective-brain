@@ -1,4 +1,5 @@
 """Offboarding router — generate/retrieve risk reports, transition member status."""
+
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
@@ -16,14 +17,17 @@ _svc = OffboardingService()
 
 def _require_admin(request: Request):
     from app.dependencies import get_current_user
+
     user = get_current_user(request)
     if getattr(user, "role", "member") not in ("admin", "owner"):
         from fastapi import HTTPException as _H
+
         raise _H(status_code=403, detail="Admin role required for offboarding operations")
     return user
 
 
 # ── Response schemas ───────────────────────────────────────────────────────────
+
 
 class TransferRecommendation(BaseModel):
     topic: str
@@ -43,10 +47,7 @@ class OffboardingReportResponse(BaseModel):
 
     @classmethod
     def from_record(cls, r: OffboardingReport) -> "OffboardingReportResponse":
-        recs = [
-            TransferRecommendation(**rec)
-            for rec in (r.transfer_recommendations or [])
-        ]
+        recs = [TransferRecommendation(**rec) for rec in (r.transfer_recommendations or [])]
         return cls(
             id=r.id,
             member_id=r.member_id,
@@ -67,6 +68,7 @@ class MemberStatusResponse(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/members/{member_id}/offboard",
     response_model=OffboardingReportResponse,
@@ -78,9 +80,7 @@ def offboard_member(member_id: str, request: Request):
     db = create_session()
     try:
         llm = getattr(request.app.state, "llm_service", None)
-        report = _svc.generate_report(
-            db, member_id=member_id, created_by=current_user.id, llm_service=llm
-        )
+        report = _svc.generate_report(db, member_id=member_id, created_by=current_user.id, llm_service=llm)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     finally:

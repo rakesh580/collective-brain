@@ -20,6 +20,7 @@ async def list_artifacts(
     offset: int = 0,
 ):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
@@ -30,12 +31,7 @@ async def list_artifacts(
         if source_type:
             query = query.filter(ArtifactRecord.source_type == source_type)
         total = query.count()
-        artifacts = (
-            query.order_by(ArtifactRecord.ingested_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        artifacts = query.order_by(ArtifactRecord.ingested_at.desc()).offset(offset).limit(limit).all()
         return {
             "artifacts": [
                 {
@@ -59,15 +55,12 @@ async def list_artifacts(
 @router.get("/{artifact_id}")
 async def get_artifact(artifact_id: str, request: Request):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
     try:
-        artifact = (
-            db.query(ArtifactRecord)
-            .filter(ArtifactRecord.id == artifact_id)
-            .first()
-        )
+        artifact = db.query(ArtifactRecord).filter(ArtifactRecord.id == artifact_id).first()
         if not artifact:
             raise HTTPException(status_code=404, detail="Artifact not found")
         return {
@@ -87,22 +80,17 @@ async def get_artifact(artifact_id: str, request: Request):
 @router.delete("/{artifact_id}")
 async def delete_artifact(artifact_id: str, request: Request):
     from app.dependencies import get_current_user
+
     get_current_user(request)
 
     db = _get_db()
     try:
-        artifact = (
-            db.query(ArtifactRecord)
-            .filter(ArtifactRecord.id == artifact_id)
-            .first()
-        )
+        artifact = db.query(ArtifactRecord).filter(ArtifactRecord.id == artifact_id).first()
         if not artifact:
             raise HTTPException(status_code=404, detail="Artifact not found")
 
         # Delete contributions linked to this artifact
-        db.query(ContributionRecord).filter(
-            ContributionRecord.artifact_id == artifact_id
-        ).delete()
+        db.query(ContributionRecord).filter(ContributionRecord.artifact_id == artifact_id).delete()
 
         # Delete vector chunks for this artifact
         vs = request.app.state.vector_store

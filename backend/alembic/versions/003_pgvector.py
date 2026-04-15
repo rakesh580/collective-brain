@@ -4,6 +4,7 @@ Revision ID: 003_pgvector
 Revises: 002_multi_tenancy
 Create Date: 2026-04-07
 """
+
 from collections.abc import Sequence
 from typing import Union
 
@@ -48,13 +49,15 @@ def upgrade() -> None:
         sa.Column("content", sa.Text(), nullable=False),
         # Use raw DDL for the vector column — SQLAlchemy doesn't know this type
         # without pgvector registered; the HNSW index is created separately below.
-        sa.Column("embedding", sa.Text(), nullable=True),   # placeholder, altered below
+        sa.Column("embedding", sa.Text(), nullable=True),  # placeholder, altered below
         sa.Column("metadata_json", sa.JSON(), server_default="{}"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
     # Alter the placeholder TEXT column to vector(VECTOR_DIM)
-    op.execute(f"ALTER TABLE knowledge_embeddings ALTER COLUMN embedding TYPE vector({VECTOR_DIM}) USING embedding::vector({VECTOR_DIM})")
+    op.execute(
+        f"ALTER TABLE knowledge_embeddings ALTER COLUMN embedding TYPE vector({VECTOR_DIM}) USING embedding::vector({VECTOR_DIM})"
+    )
 
     # Indexes
     op.create_index("ix_knowledge_embeddings_org_id", "knowledge_embeddings", ["organization_id"])

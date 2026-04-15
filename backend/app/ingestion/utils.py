@@ -1,4 +1,5 @@
 """Shared utilities for ingestion connectors."""
+
 import hashlib
 import re
 

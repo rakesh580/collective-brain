@@ -4,6 +4,7 @@ Usage:
     from app.services.audit_service import AuditService
     AuditService.log(db, action="auth.login", user_id=user.id, ...)
 """
+
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -17,7 +18,6 @@ logger = logging.getLogger("collective_brain.audit")
 
 
 class AuditService:
-
     @staticmethod
     def log(
         db: Session,
@@ -63,9 +63,7 @@ class AuditService:
         ip = None
         if request:
             forwarded = request.headers.get("x-forwarded-for")
-            ip = forwarded.split(",")[0].strip() if forwarded else (
-                request.client.host if request.client else None
-            )
+            ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else None)
         return {
             "ip_address": ip,
             "user_agent": request.headers.get("user-agent") if request else None,

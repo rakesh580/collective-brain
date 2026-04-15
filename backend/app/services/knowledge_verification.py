@@ -12,6 +12,7 @@ Verification statuses (stored on InsightRecord.verification_status):
   "outdated" — supporting artifacts are stale (> staleness_threshold_days)
   "disputed" — LLM spot-check contradicts the insight
 """
+
 import logging
 from datetime import UTC, datetime
 
@@ -73,15 +74,9 @@ class KnowledgeVerificationService:
             staleness_days = delta
             if delta > self._threshold:
                 status = "outdated"
-                reasons.append(
-                    f"Insight is {delta} days old and has no linked source artifacts."
-                )
+                reasons.append(f"Insight is {delta} days old and has no linked source artifacts.")
         else:
-            artifacts = (
-                db.query(ArtifactRecord)
-                .filter(ArtifactRecord.id.in_(artifact_ids))
-                .all()
-            )
+            artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.id.in_(artifact_ids)).all()
             if not artifacts:
                 status = "outdated"
                 reasons.append("All linked source artifacts have been deleted.")
@@ -102,9 +97,7 @@ class KnowledgeVerificationService:
 
         # ── 2. Coverage check ──────────────────────────────────────────────────
         if len(artifact_ids) < 2 and status == "verified":
-            reasons.append(
-                "Insight is backed by fewer than 2 source artifacts — low confidence."
-            )
+            reasons.append("Insight is backed by fewer than 2 source artifacts — low confidence.")
             # Don't fail, but flag in reasons
 
         # ── 3. LLM spot-check (optional) ──────────────────────────────────────
@@ -133,7 +126,9 @@ class KnowledgeVerificationService:
 
         logger.info(
             "Insight %s verified: status=%s staleness=%s days",
-            insight.id, status, staleness_days,
+            insight.id,
+            status,
+            staleness_days,
         )
         return VerificationResult(
             status=status,
@@ -153,9 +148,7 @@ class KnowledgeVerificationService:
 
         Returns a summary dict: {status: count}.
         """
-        q = db.query(InsightRecord).filter(
-            InsightRecord.verification_status.in_(["pending", "outdated"])
-        )
+        q = db.query(InsightRecord).filter(InsightRecord.verification_status.in_(["pending", "outdated"]))
         if organization_id:
             q = q.filter(InsightRecord.organization_id == organization_id)
         insights = q.limit(limit).all()
@@ -207,6 +200,7 @@ class KnowledgeVerificationService:
 
 
 # ── Utility ────────────────────────────────────────────────────────────────────
+
 
 def _ensure_tz(dt: datetime) -> datetime:
     """Ensure a datetime is timezone-aware (UTC if naive)."""

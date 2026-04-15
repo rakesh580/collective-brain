@@ -34,11 +34,13 @@ def setup_telemetry(service_name: str = "collective-brain", version: str = "0.3.
     if _tracer_provider is not None:
         return
 
-    resource = Resource.create({
-        SERVICE_NAME: service_name,
-        SERVICE_VERSION: version,
-        "deployment.environment": "production" if os.getenv("CB_DEV_MODE") != "1" else "development",
-    })
+    resource = Resource.create(
+        {
+            SERVICE_NAME: service_name,
+            SERVICE_VERSION: version,
+            "deployment.environment": "production" if os.getenv("CB_DEV_MODE") != "1" else "development",
+        }
+    )
 
     provider = TracerProvider(resource=resource)
 
@@ -47,6 +49,7 @@ def setup_telemetry(service_name: str = "collective-brain", version: str = "0.3.
     if otlp_endpoint:
         try:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
             exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
             provider.add_span_processor(BatchSpanProcessor(exporter))
             logger.info("OpenTelemetry: exporting traces to %s", otlp_endpoint)
@@ -62,6 +65,7 @@ def setup_telemetry(service_name: str = "collective-brain", version: str = "0.3.
     # Auto-instrument FastAPI (adds span per request, propagates context)
     try:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
         FastAPIInstrumentor().instrument()
         logger.info("OpenTelemetry: FastAPI instrumented")
     except ImportError:
@@ -70,6 +74,7 @@ def setup_telemetry(service_name: str = "collective-brain", version: str = "0.3.
     # Auto-instrument SQLAlchemy (adds span per query)
     try:
         from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
         SQLAlchemyInstrumentor().instrument()
         logger.info("OpenTelemetry: SQLAlchemy instrumented")
     except ImportError:
@@ -78,6 +83,7 @@ def setup_telemetry(service_name: str = "collective-brain", version: str = "0.3.
     # Auto-instrument httpx (adds span per outbound HTTP call — LLM APIs)
     try:
         from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
         HTTPXClientInstrumentor().instrument()
         logger.info("OpenTelemetry: httpx instrumented")
     except ImportError:

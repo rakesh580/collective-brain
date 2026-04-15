@@ -10,10 +10,13 @@ class TestResponseTimes:
 
     def test_auth_login_under_500ms(self, app_client, registered_user):
         start = time.perf_counter()
-        resp = app_client.post("/auth/login", json={
-            "username": "alice",
-            "password": "Str0ngPass!",
-        })
+        resp = app_client.post(
+            "/auth/login",
+            json={
+                "username": "alice",
+                "password": "Str0ngPass!",
+            },
+        )
         elapsed = time.perf_counter() - start
         assert resp.status_code == 200
         assert elapsed < 0.5, f"Login took {elapsed:.2f}s (expected < 0.5s)"
@@ -35,9 +38,13 @@ class TestResponseTimes:
     def test_query_under_5s(self, app_client, auth_headers):
         """AI query with mocked LLM should complete quickly."""
         start = time.perf_counter()
-        resp = app_client.post("/query", headers=auth_headers, json={
-            "question": "Who is the best developer?",
-        })
+        resp = app_client.post(
+            "/query",
+            headers=auth_headers,
+            json={
+                "question": "Who is the best developer?",
+            },
+        )
         elapsed = time.perf_counter() - start
         assert resp.status_code == 200
         assert elapsed < 5.0, f"Query took {elapsed:.2f}s (expected < 5s)"
@@ -50,12 +57,15 @@ class TestConcurrentQueries:
         """Multiple users registering simultaneously should all succeed."""
 
         def register(i):
-            return app_client.post("/auth/register", json={
-                "username": f"concurrent_{i}",
-                "email": f"conc{i}@test.com",
-                "password": "Str0ngPass!",
-                "display_name": f"User {i}",
-            })
+            return app_client.post(
+                "/auth/register",
+                json={
+                    "username": f"concurrent_{i}",
+                    "email": f"conc{i}@test.com",
+                    "password": "Str0ngPass!",
+                    "display_name": f"User {i}",
+                },
+            )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
             futures = [pool.submit(register, i) for i in range(5)]
@@ -68,9 +78,13 @@ class TestConcurrentQueries:
         """Multiple AI queries from the same user should all complete."""
 
         def query(q):
-            return app_client.post("/query", headers=auth_headers, json={
-                "question": q,
-            })
+            return app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": q,
+                },
+            )
 
         questions = [
             "Who writes Python?",
@@ -104,7 +118,18 @@ class TestBulkIngestion:
     def test_bulk_markdown_upload(self, app_client, auth_headers):
         """Upload 10 markdown files at once."""
         files = [
-            ("files", (f"doc_{i}.md", io.BytesIO(f"# Doc {i}\nContent for document {i} " * 50 + b"\n" if isinstance(f"# Doc {i}\nContent for document {i} " * 50, str) else b"content"), "text/markdown"))
+            (
+                "files",
+                (
+                    f"doc_{i}.md",
+                    io.BytesIO(
+                        f"# Doc {i}\nContent for document {i} " * 50 + b"\n"
+                        if isinstance(f"# Doc {i}\nContent for document {i} " * 50, str)
+                        else b"content"
+                    ),
+                    "text/markdown",
+                ),
+            )
             for i in range(10)
         ]
         # Fix: properly create BytesIO objects
@@ -143,10 +168,13 @@ class TestRateLimiting:
         """
         results = []
         for i in range(15):
-            resp = app_client.post("/auth/login", json={
-                "username": "nobody",
-                "password": "wrongpass",
-            })
+            resp = app_client.post(
+                "/auth/login",
+                json={
+                    "username": "nobody",
+                    "password": "wrongpass",
+                },
+            )
             results.append(resp.status_code)
 
         # Either all 401 (no Redis) or some 429s mixed in
@@ -159,9 +187,13 @@ class TestRateLimiting:
         """
         results = []
         for i in range(15):
-            resp = app_client.post("/query", headers=auth_headers, json={
-                "question": f"Question {i}",
-            })
+            resp = app_client.post(
+                "/query",
+                headers=auth_headers,
+                json={
+                    "question": f"Question {i}",
+                },
+            )
             results.append(resp.status_code)
 
         assert all(s in (200, 429) for s in results)

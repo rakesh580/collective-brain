@@ -105,9 +105,7 @@ class TaskQueue:
             kwargs=kwargs,
             callback=callback,
         )
-        self._results[task_id] = TaskResult(
-            task_id=task_id, status=TaskStatus.PENDING
-        )
+        self._results[task_id] = TaskResult(task_id=task_id, status=TaskStatus.PENDING)
         await self._queue.put(entry)
         logger.info("Task enqueued: %s", task_id)
         return task_id
@@ -151,8 +149,7 @@ class TaskQueue:
         # Hard cap: if still too many, remove oldest completed/failed
         if len(self._results) > _MAX_RESULTS:
             terminal = sorted(
-                [(k, v) for k, v in self._results.items()
-                 if v.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)],
+                [(k, v) for k, v in self._results.items() if v.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)],
                 key=lambda x: x[1].updated_at,
             )
             for k, _ in terminal[: len(self._results) - _MAX_RESULTS]:
@@ -175,9 +172,7 @@ class TaskQueue:
                 break
 
             task_id = entry.task_id
-            self._results[task_id] = TaskResult(
-                task_id=task_id, status=TaskStatus.RUNNING
-            )
+            self._results[task_id] = TaskResult(task_id=task_id, status=TaskStatus.RUNNING)
             logger.info("[%s] Processing task: %s", worker_name, task_id)
 
             try:
@@ -198,7 +193,10 @@ class TaskQueue:
                 self._results[task_id] = task_result
                 logger.error(
                     "[%s] Task failed: %s — %s\n%s",
-                    worker_name, task_id, e, traceback.format_exc(),
+                    worker_name,
+                    task_id,
+                    e,
+                    traceback.format_exc(),
                 )
 
             # Fire callback

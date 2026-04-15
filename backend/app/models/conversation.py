@@ -10,9 +10,7 @@ class ConversationRecord(Base):
     __tablename__ = "conversations"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
@@ -49,9 +47,7 @@ class MessageRecord(Base):
 
 class ConversationParticipant(Base):
     __tablename__ = "conversation_participants"
-    __table_args__ = (
-        UniqueConstraint("conversation_id", "user_id", name="uq_participant_conv_user"),
-    )
+    __table_args__ = (UniqueConstraint("conversation_id", "user_id", name="uq_participant_conv_user"),)
 
     id = Column(String, primary_key=True)
     conversation_id = Column(String, ForeignKey("conversations.id", ondelete="CASCADE"), index=True)

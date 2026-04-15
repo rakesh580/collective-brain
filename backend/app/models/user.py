@@ -10,9 +10,7 @@ class UserRecord(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True)
-    organization_id = Column(
-        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     username = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=True)  # nullable for OAuth-only users
@@ -33,7 +31,7 @@ class UserRecord(Base):
 
     # ── SAML / SSO (Phase 4) ──────────────────────────────────────────────────
     saml_nameid = Column(String, nullable=True, index=True)
-    saml_provider = Column(String, nullable=True)   # IdP entity ID
+    saml_provider = Column(String, nullable=True)  # IdP entity ID
 
     # ── SCIM provisioning (Phase 4) ───────────────────────────────────────────
     scim_external_id = Column(String, nullable=True, index=True)

@@ -9,6 +9,7 @@ Source input:  dict with keys:
 
 Requires:  google-api-python-client, google-auth
 """
+
 import logging
 from datetime import datetime
 
@@ -27,8 +28,7 @@ def _build_services(service_account_file: str | None, access_token: str | None):
         from googleapiclient.discovery import build
     except ImportError:
         raise RuntimeError(
-            "google-api-python-client is not installed. "
-            "Run: pip install google-api-python-client google-auth"
+            "google-api-python-client is not installed. Run: pip install google-api-python-client google-auth"
         )
 
     scopes = [
@@ -37,15 +37,11 @@ def _build_services(service_account_file: str | None, access_token: str | None):
     ]
 
     if service_account_file:
-        creds = service_account.Credentials.from_service_account_file(
-            service_account_file, scopes=scopes
-        )
+        creds = service_account.Credentials.from_service_account_file(service_account_file, scopes=scopes)
     elif access_token:
         creds = Credentials(token=access_token)
     else:
-        raise ValueError(
-            "Provide either CB_GOOGLE_SERVICE_ACCOUNT_FILE or CB_GOOGLE_ACCESS_TOKEN"
-        )
+        raise ValueError("Provide either CB_GOOGLE_SERVICE_ACCOUNT_FILE or CB_GOOGLE_ACCESS_TOKEN")
 
     docs = build("docs", "v1", credentials=creds, cache_discovery=False)
     drive = build("drive", "v3", credentials=creds, cache_discovery=False)
@@ -83,11 +79,7 @@ class GoogleDocsConnector(BaseConnector):
         doc_ids = self._collect_doc_ids(source_input)
         for doc_id in doc_ids:
             try:
-                meta = (
-                    self._drive_svc.files()
-                    .get(fileId=doc_id, fields="lastModifyingUser,owners")
-                    .execute()
-                )
+                meta = self._drive_svc.files().get(fileId=doc_id, fields="lastModifyingUser,owners").execute()
                 for user in [meta.get("lastModifyingUser", {})] + meta.get("owners", []):
                     email = user.get("emailAddress", "")
                     name = user.get("displayName") or email.split("@")[0]
@@ -114,11 +106,7 @@ class GoogleDocsConnector(BaseConnector):
     def _list_folder_docs(self, folder_id: str) -> list[str]:
         ids = []
         page_token = None
-        query = (
-            f"'{folder_id}' in parents and "
-            "mimeType='application/vnd.google-apps.document' and "
-            "trashed=false"
-        )
+        query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false"
         while True:
             kwargs = {"q": query, "fields": "nextPageToken,files(id)", "pageSize": 100}
             if page_token:
@@ -140,11 +128,7 @@ class GoogleDocsConnector(BaseConnector):
         author = None
         last_modified = None
         try:
-            meta = (
-                self._drive_svc.files()
-                .get(fileId=doc_id, fields="lastModifyingUser,modifiedTime")
-                .execute()
-            )
+            meta = self._drive_svc.files().get(fileId=doc_id, fields="lastModifyingUser,modifiedTime").execute()
             user = meta.get("lastModifyingUser", {})
             author = user.get("displayName") or user.get("emailAddress")
             mod_time = meta.get("modifiedTime")
@@ -163,22 +147,24 @@ class GoogleDocsConnector(BaseConnector):
         parsed: list[ParsedChunk] = []
         for rc in raw_chunks:
             chunk_text = rc["text"]
-            parsed.append(ParsedChunk(
-                text=chunk_text,
-                source_type="google_docs",
-                source_ref=source_url,
-                author=author,
-                author_aliases=[author.lower()] if author else [],
-                timestamp=last_modified,
-                topics=topics,
-                chunk_metadata={
-                    "doc_id": doc_id,
-                    "title": title,
-                    "source_url": source_url,
-                    "content_hash": content_hash(chunk_text),
-                    **rc.get("metadata", {}),
-                },
-            ))
+            parsed.append(
+                ParsedChunk(
+                    text=chunk_text,
+                    source_type="google_docs",
+                    source_ref=source_url,
+                    author=author,
+                    author_aliases=[author.lower()] if author else [],
+                    timestamp=last_modified,
+                    topics=topics,
+                    chunk_metadata={
+                        "doc_id": doc_id,
+                        "title": title,
+                        "source_url": source_url,
+                        "content_hash": content_hash(chunk_text),
+                        **rc.get("metadata", {}),
+                    },
+                )
+            )
         return parsed
 
     @staticmethod

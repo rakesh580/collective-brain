@@ -56,11 +56,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         # Try by ID first, then by name (case-insensitive)
         member = db.query(MemberRecord).filter(MemberRecord.id == name_or_id).first()
         if not member:
-            member = (
-                db.query(MemberRecord)
-                .filter(MemberRecord.name.ilike(f"%{name_or_id}%"))
-                .first()
-            )
+            member = db.query(MemberRecord).filter(MemberRecord.name.ilike(f"%{name_or_id}%")).first()
         if not member:
             return f"No member found matching '{name_or_id}'."
 
@@ -127,7 +123,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
             topic_lower = topic.lower()
             matching_members: dict[str, int] = {}
             for c in all_contribs:
-                for t in (c.topics or []):
+                for t in c.topics or []:
                     if topic_lower in t.lower():
                         matching_members[c.member_id] = matching_members.get(c.member_id, 0) + 1
 
@@ -148,10 +144,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         seen_names = set()
         for mn in member_nodes:
             weight = next((e.weight for e in topic_edges if e.source == mn.id), 0)
-            output.append(
-                f"- {mn.label}: {int(weight)} contributions, "
-                f"tags: {mn.properties.get('expertise_tags', [])}"
-            )
+            output.append(f"- {mn.label}: {int(weight)} contributions, tags: {mn.properties.get('expertise_tags', [])}")
             seen_names.add(mn.label.lower())
 
         # Also check user-declared skills
@@ -164,9 +157,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
             user_skills = u.skills or []
             if any(topic_lower in s.lower() or s.lower() in topic_lower for s in user_skills):
                 role_str = f" ({u.role_title})" if u.role_title else ""
-                output.append(
-                    f"- {display}{role_str}: declared skill in [{', '.join(user_skills)}]"
-                )
+                output.append(f"- {display}{role_str}: declared skill in [{', '.join(user_skills)}]")
 
         return "\n".join(output)
 
@@ -176,11 +167,7 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         Returns their commits, messages, documents, and tasks from the specified time period.
         Use this to understand what someone has been working on recently."""
         # Find member
-        member = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.name.ilike(f"%{member_name}%"))
-            .first()
-        )
+        member = db.query(MemberRecord).filter(MemberRecord.name.ilike(f"%{member_name}%")).first()
         if not member:
             member = db.query(MemberRecord).filter(MemberRecord.id == member_name).first()
         if not member:
@@ -241,7 +228,9 @@ def create_tools(db: Session, embedder: EmbeddingService, vector_store: VectorSt
         output = [f"Knowledge network for '{topic}':"]
         output.append(f"\nNodes ({len(nodes)}):")
         for n in nodes:
-            output.append(f"  - [{n.type}] {n.label} (contributions: {n.properties.get('total_contributions', n.properties.get('member_count', 0))})")
+            output.append(
+                f"  - [{n.type}] {n.label} (contributions: {n.properties.get('total_contributions', n.properties.get('member_count', 0))})"
+            )
 
         output.append(f"\nConnections ({len(edges)}):")
         for e in edges:

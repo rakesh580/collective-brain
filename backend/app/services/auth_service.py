@@ -91,21 +91,13 @@ class AuthService:
         db.refresh(user)
         return user
 
-    def authenticate(
-        self, db: Session, username: str, password: str
-    ) -> UserRecord | None:
+    def authenticate(self, db: Session, username: str, password: str) -> UserRecord | None:
         """Authenticate by username/email + password.
 
         Returns the user on success, or raises ValueError with a specific
         message so the caller can tell the user what went wrong.
         """
-        user = (
-            db.query(UserRecord)
-            .filter(
-                (UserRecord.username == username) | (UserRecord.email == username)
-            )
-            .first()
-        )
+        user = db.query(UserRecord).filter((UserRecord.username == username) | (UserRecord.email == username)).first()
         if not user or not user.is_active or not user.password_hash:
             raise ValueError("Invalid credentials")
         if not self.verify_password(password, user.password_hash):
@@ -162,9 +154,7 @@ class AuthService:
             if not user.is_active:
                 raise ValueError("This account has been deactivated")
             user.google_id = google_sub
-            user.auth_provider = (
-                "google+local" if user.password_hash else "google"
-            )
+            user.auth_provider = "google+local" if user.password_hash else "google"
             user.last_login = datetime.now(UTC)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
@@ -248,9 +238,7 @@ class AuthService:
             if not user.is_active:
                 raise ValueError("This account has been deactivated")
             user.google_id = google_sub
-            user.auth_provider = (
-                "google+local" if user.password_hash else "google"
-            )
+            user.auth_provider = "google+local" if user.password_hash else "google"
             user.last_login = datetime.now(UTC)
             if picture and not user.avatar_url:
                 user.avatar_url = picture
@@ -298,20 +286,17 @@ class AuthService:
         if not user.is_active:
             raise ValueError("This account has been deactivated")
         if user.auth_provider == "google" and not user.password_hash:
-            raise ValueError(
-                "This account uses Google Sign-In and has no password to reset"
-            )
+            raise ValueError("This account uses Google Sign-In and has no password to reset")
 
         import secrets as _secrets
+
         code = "".join(_secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
         user.reset_code = pwd_context.hash(code)
         user.reset_code_expires = datetime.now(UTC) + timedelta(minutes=15)
         db.commit()
         return code
 
-    def verify_reset_code(
-        self, db: Session, email: str, code: str, new_password: str
-    ) -> UserRecord:
+    def verify_reset_code(self, db: Session, email: str, code: str, new_password: str) -> UserRecord:
         """Verify the reset code and update the password.
 
         Raises ValueError on any failure.

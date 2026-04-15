@@ -14,6 +14,7 @@ Implemented endpoints:
 
 The X-SCIM-Org header (or a separate URL prefix per org) carries the org slug.
 """
+
 import uuid
 from datetime import UTC, datetime
 
@@ -33,6 +34,7 @@ SCIM_CONTENT_TYPE = "application/scim+json"
 
 # ── SCIM auth ─────────────────────────────────────────────────────────────────
 
+
 def _authenticate_scim(authorization: str | None, db: Session) -> OrganizationRecord:
     """Validate the SCIM bearer token and return the corresponding organization."""
     if not authorization or not authorization.startswith("Bearer "):
@@ -46,6 +48,7 @@ def _authenticate_scim(authorization: str | None, db: Session) -> OrganizationRe
     orgs = db.query(OrganizationRecord).filter_by(is_active=True).all()
     for org in orgs:
         import hmac
+
         stored = (org.settings_json or {}).get("scim_token", "")
         if stored and hmac.compare_digest(stored, token):
             return org
@@ -56,6 +59,7 @@ def _authenticate_scim(authorization: str | None, db: Session) -> OrganizationRe
 
 
 # ── SCIM response helpers ─────────────────────────────────────────────────────
+
 
 def _scim_user(user: UserRecord, request: Request) -> dict:
     base = str(request.base_url).rstrip("/")
@@ -98,6 +102,7 @@ def _get_user_or_404(db: Session, user_id: str, org_id: str) -> UserRecord:
 
 def _slugify_username(db: Session, base: str) -> str:
     import re
+
     slug = re.sub(r"[^a-z0-9_]", "_", base.lower())[:30]
     candidate = slug
     i = 1
@@ -108,6 +113,7 @@ def _slugify_username(db: Session, base: str) -> str:
 
 
 # ── List Users ────────────────────────────────────────────────────────────────
+
 
 @router.get("/Users")
 def list_users(
@@ -147,6 +153,7 @@ def list_users(
 
 # ── Get User ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/Users/{user_id}")
 def get_user(
     user_id: str,
@@ -163,6 +170,7 @@ def get_user(
 
 
 # ── Provision User ────────────────────────────────────────────────────────────
+
 
 @router.post("/Users", status_code=201)
 async def provision_user(
@@ -185,10 +193,12 @@ async def provision_user(
         display_name = name.get("formatted") or name.get("givenName", "")
 
         # Idempotency: return existing user if already provisioned
-        existing = db.query(UserRecord).filter(
-            (UserRecord.scim_external_id == external_id) if external_id
-            else (UserRecord.email == email)
-        ).filter_by(organization_id=org.id).first()
+        existing = (
+            db.query(UserRecord)
+            .filter((UserRecord.scim_external_id == external_id) if external_id else (UserRecord.email == email))
+            .filter_by(organization_id=org.id)
+            .first()
+        )
 
         if existing:
             # Update and return
@@ -199,12 +209,17 @@ async def provision_user(
             db.commit()
             db.refresh(existing)
             AuditService.log(
-                db, action="scim.user_updated", organization_id=org.id,
-                actor="scim", target_type="user", target_id=existing.id,
+                db,
+                action="scim.user_updated",
+                organization_id=org.id,
+                actor="scim",
+                target_type="user",
+                target_id=existing.id,
                 detail={"email": email, "active": active},
             )
             return JSONResponse(
-                content=_scim_user(existing, request), status_code=200,
+                content=_scim_user(existing, request),
+                status_code=200,
                 media_type=SCIM_CONTENT_TYPE,
             )
 
@@ -225,12 +240,17 @@ async def provision_user(
         db.refresh(user)
 
         AuditService.log(
-            db, action="scim.user_provisioned", organization_id=org.id,
-            actor="scim", target_type="user", target_id=user.id,
+            db,
+            action="scim.user_provisioned",
+            organization_id=org.id,
+            actor="scim",
+            target_type="user",
+            target_id=user.id,
             detail={"email": email},
         )
         return JSONResponse(
-            content=_scim_user(user, request), status_code=201,
+            content=_scim_user(user, request),
+            status_code=201,
             media_type=SCIM_CONTENT_TYPE,
         )
     finally:
@@ -238,6 +258,7 @@ async def provision_user(
 
 
 # ── Full Replace (PUT) ────────────────────────────────────────────────────────
+
 
 @router.put("/Users/{user_id}")
 async def replace_user(
@@ -260,8 +281,12 @@ async def replace_user(
         db.commit()
         db.refresh(user)
         AuditService.log(
-            db, action="scim.user_updated", organization_id=org.id,
-            actor="scim", target_type="user", target_id=user.id,
+            db,
+            action="scim.user_updated",
+            organization_id=org.id,
+            actor="scim",
+            target_type="user",
+            target_id=user.id,
         )
         return JSONResponse(content=_scim_user(user, request), media_type=SCIM_CONTENT_TYPE)
     finally:
@@ -269,6 +294,7 @@ async def replace_user(
 
 
 # ── Partial Update (PATCH) ────────────────────────────────────────────────────
+
 
 @router.patch("/Users/{user_id}")
 async def patch_user(
@@ -306,8 +332,12 @@ async def patch_user(
 
         action = "scim.user_deprovisioned" if not user.is_active else "scim.user_updated"
         AuditService.log(
-            db, action=action, organization_id=org.id,
-            actor="scim", target_type="user", target_id=user.id,
+            db,
+            action=action,
+            organization_id=org.id,
+            actor="scim",
+            target_type="user",
+            target_id=user.id,
         )
         return JSONResponse(content=_scim_user(user, request), media_type=SCIM_CONTENT_TYPE)
     finally:
@@ -315,6 +345,7 @@ async def patch_user(
 
 
 # ── Delete (Deprovision) ──────────────────────────────────────────────────────
+
 
 @router.delete("/Users/{user_id}", status_code=204)
 def deprovision_user(
@@ -330,8 +361,12 @@ def deprovision_user(
         user.is_active = False
         db.commit()
         AuditService.log(
-            db, action="scim.user_deprovisioned", organization_id=org.id,
-            actor="scim", target_type="user", target_id=user_id,
+            db,
+            action="scim.user_deprovisioned",
+            organization_id=org.id,
+            actor="scim",
+            target_type="user",
+            target_id=user_id,
             detail={"email": user.email},
         )
     finally:
