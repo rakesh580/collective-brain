@@ -63,7 +63,7 @@ class VectorStoreService:
                                  content, embedding, metadata_json, created_at)
                             VALUES
                                 (:id, :org_id, :artifact_id, :room_id,
-                                 :content, :embedding::vector, :meta::jsonb, now())
+                                 :content, CAST(:embedding AS vector), CAST(:meta AS jsonb), now())
                             ON CONFLICT (id) DO UPDATE SET
                                 content         = EXCLUDED.content,
                                 embedding       = EXCLUDED.embedding,
@@ -149,10 +149,10 @@ class VectorStoreService:
             where_sql = ("WHERE " + " AND ".join(conditions)) if conditions else ""
             sql = f"""
                 SELECT id, content, metadata_json,
-                       1 - (embedding <=> :embedding::vector) AS similarity
+                       1 - (embedding <=> CAST(:embedding AS vector)) AS similarity
                 FROM knowledge_embeddings
                 {where_sql}
-                ORDER BY embedding <=> :embedding::vector
+                ORDER BY embedding <=> CAST(:embedding AS vector)
                 LIMIT :n
             """
 
