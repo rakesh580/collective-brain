@@ -19,6 +19,8 @@ const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const DiscussionsPage = lazy(() => import("./pages/DiscussionsPage"));
 const RoomChatPage = lazy(() => import("./pages/RoomChatPage"));
 const TeamHealthPage = lazy(() => import("./pages/TeamHealthPage"));
+const PublicKBPage = lazy(() => import("./pages/PublicKBPage"));
+const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage"));
 
 function PageFallback() {
   return (
@@ -64,6 +66,8 @@ export default function App() {
         <Route path="/rooms/:roomId" element={guarded(<RoomChatPage />, "Room Chat")} />
         <Route path="/discussions" element={guarded(<DiscussionsPage />, "Discussions")} />
         <Route path="/settings" element={guarded(<SettingsPage />, "Settings")} />
+        <Route path="/public-kb" element={guarded(<PublicKBPage />, "Public KB")} />
+        <Route path="/organizations" element={guarded(<OrganizationsPage />, "Organizations")} />
       </Route>
     </Routes>
   );

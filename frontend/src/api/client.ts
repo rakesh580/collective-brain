@@ -28,6 +28,16 @@ import type {
   DiscussionThreadDetail,
   DiscussionThreadListResponse,
   DiscussionMessage,
+  OffboardingReport,
+  MemberStatus,
+  PublicArtifact,
+  PublicInsight,
+  PublishResponse,
+  VerificationStatus,
+  HelpRequest,
+  Organization,
+  OrgMember,
+  AuditLogEntry,
   DiscoverRoomsResponse,
   ExpertiseMatrixData,
   ExpertRecommendation,
@@ -85,6 +95,31 @@ function clearAuthAndRedirect(): void {
   if (!authPages.includes(window.location.pathname)) {
     window.location.href = "/login";
   }
+}
+
+/** Shared file upload helper with token refresh on 401 */
+async function uploadWithAuth(url: string, form: FormData): Promise<Response> {
+  const doFetch = () => {
+    const headers: Record<string, string> = {};
+    const token = getAuthToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(url, { method: "POST", headers, body: form });
+  };
+  let res = await doFetch();
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      res = await doFetch();
+    } else {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upload error ${res.status}: ${text}`);
+  }
+  return res;
 }
 
 async function request<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
@@ -281,64 +316,24 @@ export const api = {
       body: JSON.stringify({ directory_path: directoryPath, room_id: roomId }),
     }),
   ingestMarkdownFiles: async (files: File[], roomId?: string): Promise<IngestionJob> => {
-    const token = getAuthToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
     const form = new FormData();
-    for (const f of files) {
-      form.append("files", f);
-    }
+    for (const f of files) form.append("files", f);
     const q = roomId ? `?room_id=${roomId}` : "";
-    const res = await fetch(`${API_BASE}/ingest/markdown-upload${q}`, {
-      method: "POST",
-      headers,
-      body: form,
-    });
-    if (res.status === 401) clearAuthAndRedirect();
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Upload error ${res.status}: ${text}`);
-    }
+    const res = await uploadWithAuth(`${API_BASE}/ingest/markdown-upload${q}`, form);
     return res.json();
   },
   ingestDocuments: async (files: File[], roomId?: string): Promise<IngestionJob> => {
-    const token = getAuthToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
     const form = new FormData();
-    for (const f of files) {
-      form.append("files", f);
-    }
+    for (const f of files) form.append("files", f);
     const q = roomId ? `?room_id=${roomId}` : "";
-    const res = await fetch(`${API_BASE}/ingest/documents${q}`, {
-      method: "POST",
-      headers,
-      body: form,
-    });
-    if (res.status === 401) clearAuthAndRedirect();
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Upload error ${res.status}: ${text}`);
-    }
+    const res = await uploadWithAuth(`${API_BASE}/ingest/documents${q}`, form);
     return res.json();
   },
   ingestFile: async (sourceType: string, file: File, roomId?: string): Promise<IngestionJob> => {
-    const token = getAuthToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
     const form = new FormData();
     form.append("file", file);
     const q = roomId ? `?room_id=${roomId}` : "";
-    const res = await fetch(`${API_BASE}/ingest/${sourceType}${q}`, {
-      method: "POST",
-      headers,
-      body: form,
-    });
-    if (res.status === 401) clearAuthAndRedirect();
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Upload error ${res.status}: ${text}`);
-    }
+    const res = await uploadWithAuth(`${API_BASE}/ingest/${sourceType}${q}`, form);
     return res.json();
   },
 
@@ -358,7 +353,7 @@ export const api = {
       body: JSON.stringify({ user_ids: userIds }),
     }),
   getParticipants: (id: string) =>
-    request<ConversationParticipant[]>(`/conversations/${id}/participants`),
+    request<{ participants: ConversationParticipant[]; total: number }>(`/conversations/${id}/participants`),
   removeParticipant: (conversationId: string, userId: string) =>
     request<{ status: string }>(`/conversations/${conversationId}/participants/${userId}`, {
       method: "DELETE",
@@ -558,4 +553,51 @@ export const api = {
     request<{ predictions: HealthPrediction[] }>("/analytics/health/predictions"),
   saveHealthSnapshot: () =>
     request<{ success: boolean }>("/analytics/health/snapshot", { method: "POST" }),
+
+  // ── Offboarding ──
+  generateOffboardingReport: (memberId: string) =>
+    request<OffboardingReport>(`/members/${memberId}/offboard`, { method: "POST" }),
+  getOffboardingReport: (memberId: string) =>
+    request<OffboardingReport>(`/members/${memberId}/offboarding-report`),
+  completeOffboarding: (memberId: string) =>
+    request<MemberStatus>(`/members/${memberId}/offboard/complete`, { method: "POST" }),
+  getMemberStatus: (memberId: string) =>
+    request<MemberStatus>(`/members/${memberId}/status`),
+
+  // ── Public Knowledge Base ──
+  publishArtifact: (artifactId: string) =>
+    request<PublishResponse>(`/artifacts/${artifactId}/publish`, { method: "POST" }),
+  unpublishArtifact: (artifactId: string) =>
+    request<PublishResponse>(`/artifacts/${artifactId}/publish`, { method: "DELETE" }),
+  publishInsight: (insightId: string) =>
+    request<PublishResponse>(`/insights/${insightId}/publish`, { method: "POST" }),
+  unpublishInsight: (insightId: string) =>
+    request<PublishResponse>(`/insights/${insightId}/publish`, { method: "DELETE" }),
+  getPublicArtifacts: () =>
+    request<PublicArtifact[]>("/public/artifacts", { headers: {} }),
+  getPublicInsights: () =>
+    request<PublicInsight[]>("/public/insights", { headers: {} }),
+
+  // ── Knowledge Verification ──
+  verifyInsight: (insightId: string) =>
+    request<{ id: string; verified: boolean }>(`/insights/${insightId}/verify`, { method: "POST" }),
+  getVerificationStatus: () =>
+    request<VerificationStatus>("/insights/verification-status"),
+
+  // ── Help Requests ──
+  getHelpRequests: () =>
+    request<{ requests: HelpRequest[] }>("/experts/requests"),
+
+  // ── Organizations ──
+  getOrganizations: () => request<Organization[]>("/organizations"),
+  createOrganization: (data: { name: string; slug: string }) =>
+    request<Organization>("/organizations", { method: "POST", body: JSON.stringify(data) }),
+  getOrganization: (id: string) => request<Organization>(`/organizations/${id}`),
+  getOrgMembers: (orgId: string) => request<OrgMember[]>(`/organizations/${orgId}/members`),
+  inviteOrgMember: (orgId: string, email: string, role: string) =>
+    request<OrgMember>(`/organizations/${orgId}/members`, { method: "POST", body: JSON.stringify({ email, role }) }),
+  removeOrgMember: (orgId: string, userId: string) =>
+    request<{ success: boolean }>(`/organizations/${orgId}/members/${userId}`, { method: "DELETE" }),
+  getAuditLog: (orgId: string) =>
+    request<{ entries: AuditLogEntry[] }>(`/organizations/${orgId}/audit-log`),
 };

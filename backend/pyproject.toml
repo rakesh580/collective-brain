@@ -7,6 +7,9 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+# Exclude locust load tests from default pytest runs (locust monkey-patches
+# gevent/ssl which conflicts with Python 3.11+).  Run load tests directly
+# via: locust -f tests/load_test.py
 
 [tool.ruff]
 target-version = "py311"

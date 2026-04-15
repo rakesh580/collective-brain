@@ -1,10 +1,11 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.schemas.responses import GraphResponse
 from app.services.memory_graph import MemoryGraph
 from app.db.database import create_session
+from app.dependencies import get_current_user
 
 logger = logging.getLogger("collective_brain.graph")
 
@@ -16,10 +17,7 @@ def _get_db():
 
 
 @router.get("/full", response_model=GraphResponse)
-async def get_full_graph(request: Request, room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
+async def get_full_graph(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
@@ -33,10 +31,7 @@ async def get_full_graph(request: Request, room_id: str | None = None):
 
 
 @router.get("/member/{member_id}", response_model=GraphResponse)
-async def get_member_graph(member_id: str, request: Request, room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
+async def get_member_graph(member_id: str, request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
@@ -50,10 +45,7 @@ async def get_member_graph(member_id: str, request: Request, room_id: str | None
 
 
 @router.get("/topic/{topic}", response_model=GraphResponse)
-async def get_topic_graph(topic: str, request: Request, room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
+async def get_topic_graph(topic: str, request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
@@ -67,10 +59,7 @@ async def get_topic_graph(topic: str, request: Request, room_id: str | None = No
 
 
 @router.get("/stats")
-async def get_graph_stats(request: Request, room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
+async def get_graph_stats(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
@@ -83,10 +72,7 @@ async def get_graph_stats(request: Request, room_id: str | None = None):
 
 
 @router.get("/expertise-matrix")
-async def get_expertise_matrix(request: Request, room_id: str | None = None):
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
+async def get_expertise_matrix(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
@@ -99,11 +85,8 @@ async def get_expertise_matrix(request: Request, room_id: str | None = None):
 
 
 @router.get("/clusters")
-async def get_clusters(request: Request, room_id: str | None = None):
+async def get_clusters(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     """Get detailed community/cluster information."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)
@@ -116,11 +99,8 @@ async def get_clusters(request: Request, room_id: str | None = None):
 
 
 @router.get("/expertise-gaps")
-async def get_expertise_gaps(request: Request, room_id: str | None = None):
+async def get_expertise_gaps(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     """Identify expertise gaps and bus factor risks."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         graph = MemoryGraph(db, room_id=room_id)

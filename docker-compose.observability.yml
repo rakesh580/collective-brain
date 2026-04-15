@@ -1,0 +1,86 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Collective Brain — Observability Stack
+# Run alongside the main docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Or standalone for local monitoring:
+#   docker compose -f docker-compose.observability.yml up -d
+#
+# Dashboards:  http://localhost:3001  (Grafana, admin/admin)
+# Metrics:     http://localhost:9090  (Prometheus)
+# Traces:      http://localhost:16686 (Jaeger)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Prometheus — scrapes /metrics every 15s ──────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ── Grafana — dashboards ─────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ── Jaeger — distributed trace UI (receives OTLP from the app) ───────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16686:16686"   # Jaeger UI
+      - "127.0.0.1:4317:4317"     # OTLP gRPC — set CB_OTEL_ENDPOINT=http://localhost:4317
+      - "127.0.0.1:4318:4318"     # OTLP HTTP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  prometheus_data:
+  grafana_data:

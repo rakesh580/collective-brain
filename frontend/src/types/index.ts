@@ -488,3 +488,102 @@ export interface HealthPrediction {
   risk_level: "low" | "medium" | "high";
   description: string;
 }
+
+// Offboarding
+export interface TransferRecommendation {
+  topic: string;
+  recommended_member_id: string;
+  recommended_member_name: string;
+}
+
+export interface OffboardingReport {
+  id: string;
+  member_id: string;
+  created_at: string;
+  risk_level: "low" | "medium" | "high" | "critical" | null;
+  unique_expertise: string[];
+  sole_contributor_artifact_ids: string[];
+  transfer_recommendations: TransferRecommendation[];
+  summary: string | null;
+}
+
+export interface MemberStatus {
+  id: string;
+  name: string;
+  status: "active" | "offboarding" | "offboarded" | null;
+}
+
+// Public Knowledge Base
+export interface PublicArtifact {
+  id: string;
+  title: string | null;
+  source_type: string;
+  source_url: string | null;
+  ingested_at: string;
+}
+
+export interface PublicInsight {
+  id: string;
+  title: string | null;
+  body: string | null;
+  insight_type: string | null;
+  generated_at: string;
+  confidence: number | null;
+}
+
+export interface PublishResponse {
+  id: string;
+  is_public: boolean;
+  message: string;
+}
+
+// Knowledge Verification
+export interface VerificationStatus {
+  total_insights: number;
+  verified: number;
+  unverified: number;
+  expired: number;
+  verification_rate: number;
+}
+
+// Help Requests
+export interface HelpRequest {
+  id: string;
+  requester_user_id: string;
+  requester_name: string;
+  expert_member_id: string;
+  expert_name: string;
+  query: string;
+  topics: string[];
+  status: "pending" | "accepted" | "completed" | "declined";
+  created_at: string;
+}
+
+// Organizations
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+  member_count: number;
+  sso_enabled: boolean;
+}
+
+export interface OrgMember {
+  user_id: string;
+  username: string;
+  email: string;
+  role: string;
+  joined_at: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  actor_id: string;
+  actor_name: string;
+  target_type: string;
+  target_id: string;
+  details: string;
+  timestamp: string;
+}

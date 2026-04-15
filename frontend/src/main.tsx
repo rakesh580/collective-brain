@@ -6,6 +6,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
 import { GoogleAuthEnabledContext } from "./hooks/useGoogleAuth";
+import { GoogleClientIdProvider } from "./GoogleClientIdContext";
 import { api } from "./api/client";
 import "./index.css";
 import App from "./App.tsx";
@@ -59,21 +60,22 @@ function Root() {
     </QueryClientProvider>
   );
 
-  // Expose client ID for fallback Google Sign-In button (iframe contexts)
-  if (googleClientId) {
-    (window as any).__GOOGLE_CLIENT_ID__ = googleClientId;
-  }
-
   // Only wrap with GoogleOAuthProvider when client ID is available
   if (googleClientId) {
     return (
-      <GoogleAuthEnabledContext.Provider value={true}>
-        <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider>
-      </GoogleAuthEnabledContext.Provider>
+      <GoogleClientIdProvider value={googleClientId}>
+        <GoogleAuthEnabledContext.Provider value={true}>
+          <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider>
+        </GoogleAuthEnabledContext.Provider>
+      </GoogleClientIdProvider>
     );
   }
 
-  return <GoogleAuthEnabledContext.Provider value={false}>{app}</GoogleAuthEnabledContext.Provider>;
+  return (
+    <GoogleClientIdProvider value="">
+      <GoogleAuthEnabledContext.Provider value={false}>{app}</GoogleAuthEnabledContext.Provider>
+    </GoogleClientIdProvider>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(

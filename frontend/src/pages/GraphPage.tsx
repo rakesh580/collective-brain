@@ -24,10 +24,10 @@ function PatternCard({ pattern }: { pattern: Insight }) {
   return (
     <div
       className={`p-3 rounded-lg border transition-all hover:shadow-sm ${
-        isRisk
-          ? "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 hover:border-red-300 dark:hover:border-red-500/30"
-          : "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20 hover:border-indigo-300 dark:hover:border-indigo-500/30"
-      }`}
+ isRisk
+ ? " hover:border-red-300 "
+ : " hover:border-indigo-300 "
+ }`}
     >
       <div className="flex items-start gap-2">
         {isRisk ? (
@@ -36,25 +36,25 @@ function PatternCard({ pattern }: { pattern: Insight }) {
           <TrendingUp size={14} className="text-indigo-500 mt-0.5 shrink-0" />
         )}
         <div className="min-w-0">
-          <p className={`text-xs font-semibold ${isRisk ? "text-red-700 dark:text-red-400" : "text-indigo-700 dark:text-indigo-400"}`}>
+          <p className={`text-xs font-semibold ${isRisk ? "text-red-500" : "text-indigo-700 "}`}>
             {pattern.title}
           </p>
-          <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+          <p className="text-[11px] mt-0.5 leading-relaxed">
             {pattern.body}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
             <span
               className={`text-2xs font-medium px-1.5 py-0.5 rounded-full ${
-                isRisk
-                  ? "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
-                  : "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400"
-              }`}
+ isRisk
+ ? "bg-red-100 text-red-500"
+ : " text-indigo-400"
+ }`}
             >
               {isRisk ? "Risk" : "Pattern"}
             </span>
             {/* Confidence bar */}
             <div className="flex items-center gap-1">
-              <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="w-12 h-1.5 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full ${isRisk ? "bg-red-400" : "bg-indigo-400"}`}
                   style={{ width: `${pattern.confidence * 100}%` }}
@@ -76,10 +76,10 @@ function QuickStat({ icon: Icon, label, value, color }: {
   icon: LucideIcon; label: string; value: string | number; color: string;
 }) {
   return (
-    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
+    <div className="/50 rounded-lg p-2.5 text-center">
       <Icon size={14} className={`mx-auto mb-1 ${color}`} />
-      <p className="text-lg font-bold text-slate-800 dark:text-white tabular-nums">{value}</p>
-      <p className="text-2xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-lg font-bold tabular-nums">{value}</p>
+      <p className="text-2xs ">{label}</p>
     </div>
   );
 }
@@ -159,7 +159,7 @@ export default function GraphPage() {
   return (
     <div className="flex flex-col h-screen">
       {/* Header bar with tabs + stats */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-default ">
         <div className="flex items-center gap-1">
           {VIEWS.map((view) => {
             const Icon = view.icon;
@@ -168,10 +168,10 @@ export default function GraphPage() {
                 key={view.id}
                 onClick={() => setActiveView(view.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeView === view.id
-                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-                }`}
+ activeView === view.id
+ ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20"
+ : " "
+ }`}
                 title={view.description}
               >
                 <Icon size={15} />
@@ -189,24 +189,24 @@ export default function GraphPage() {
           {/* Stats chips */}
           {graphStats && (
             <div className="hidden lg:flex items-center gap-3 mr-2">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-1.5 text-xs ">
                 <Users size={12} className="text-indigo-500" />
-                <span className="font-semibold text-slate-700 dark:text-slate-200">{graphStats.members}</span>
+                <span className="font-semibold ">{graphStats.members}</span>
                 <span>members</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-1.5 text-xs ">
                 <Brain size={12} className="text-emerald-500" />
-                <span className="font-semibold text-slate-700 dark:text-slate-200">{graphStats.topics}</span>
+                <span className="font-semibold ">{graphStats.topics}</span>
                 <span>topics</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-1.5 text-xs ">
                 <Boxes size={12} className="text-amber-500" />
-                <span className="font-semibold text-slate-700 dark:text-slate-200">{graphStats.artifacts}</span>
+                <span className="font-semibold ">{graphStats.artifacts}</span>
                 <span>artifacts</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-1.5 text-xs ">
                 <Link2 size={12} className="text-violet-500" />
-                <span className="font-semibold text-slate-700 dark:text-slate-200">{graphStats.communities}</span>
+                <span className="font-semibold ">{graphStats.communities}</span>
                 <span>clusters</span>
               </div>
             </div>
@@ -217,10 +217,10 @@ export default function GraphPage() {
             <button
               onClick={() => setShowInsights(!showInsights)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                showInsights
-                  ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
-                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
-              }`}
+ showInsights
+ ? " text-indigo-400"
+ : " hover:bg-slate-200 "
+ }`}
             >
               <Eye size={12} />
               <span className="hidden sm:inline">{risks.length} Risks · {insights.length} Patterns</span>
@@ -237,7 +237,7 @@ export default function GraphPage() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              className="p-1.5 text-slate-400 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh graph data"
             >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
@@ -245,14 +245,14 @@ export default function GraphPage() {
             <button
               onClick={handleExport}
               disabled={!graphData}
-              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              className="p-1.5 text-slate-400 rounded-lg transition-colors disabled:opacity-50"
               title="Export graph as JSON"
             >
               <Download size={14} />
             </button>
             <button
               onClick={toggleFullscreen}
-              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 rounded-lg transition-colors"
               title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -264,7 +264,7 @@ export default function GraphPage() {
       {/* Main content */}
       <div className="flex-1 overflow-hidden flex">
         {/* Graph view */}
-        <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900">
+        <div className="flex-1 overflow-hidden ">
           {activeView === "force" && <ForceGraphView graphData={graphData} loading={isLoading} />}
           {activeView === "mindmap" && <MindMapView graphData={graphData} loading={isLoading} />}
           {activeView === "heatmap" && <HeatmapView />}
@@ -272,16 +272,16 @@ export default function GraphPage() {
 
         {/* Insights side panel */}
         {showInsights && patterns.length > 0 && (
-          <div className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-700">
+          <div className="w-80 border-l border-default flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-subtle">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-bold flex items-center gap-2">
                   <Brain size={16} className="text-violet-500" />
                   Graph Insights
                 </h3>
                 <button
                   onClick={() => setShowInsights(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-lg"
+                  className="text-slate-400 text-lg"
                 >
                   &times;
                 </button>
@@ -300,25 +300,25 @@ export default function GraphPage() {
               {/* Top contributors */}
               {graphStats && graphStats.top_members.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-2xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">
+                  <p className="text-2xs font-semibold uppercase tracking-wide mb-1.5">
                     Top Contributors (PageRank)
                   </p>
                   <div className="space-y-1.5">
                     {graphStats.top_members.slice(0, 5).map((m, i) => (
                       <div key={m.id} className="flex items-center gap-2">
                         <span className={`text-2xs font-bold w-4 ${
-                          i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-slate-400"
-                        }`}>{i + 1}.</span>
+ i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-slate-400"
+ }`}>{i + 1}.</span>
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                          i === 0 ? "bg-gradient-to-br from-indigo-500 to-violet-500" : "bg-indigo-500"
-                        }`}>
+ i === 0 ? "bg-gradient-to-br from-indigo-500 to-violet-500" : "bg-indigo-500"
+ }`}>
                           <span className="text-[8px] font-bold text-white">
                             {m.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">{m.name}</span>
+                        <span className="text-xs flex-1 truncate">{m.name}</span>
                         {/* PageRank bar */}
-                        <div className="w-10 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div className="w-10 h-1.5 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-indigo-500 rounded-full"
                             style={{ width: `${Math.min(100, m.pagerank * 500)}%` }}
@@ -332,24 +332,24 @@ export default function GraphPage() {
 
               {/* Health score */}
               {graphStats && (
-                <div className="mt-3 p-2.5 bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-500/10 dark:to-violet-500/10 rounded-lg border border-indigo-100 dark:border-indigo-500/20">
+                <div className="mt-3 p-2.5 bg-gradient-to-r from-indigo-50 to-violet-50 rounded-lg border border-indigo-100 ">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Shield size={12} className="text-indigo-500" />
-                      <span className="text-2xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Knowledge Health</span>
+                      <span className="text-2xs font-semibold text-indigo-400 uppercase">Knowledge Health</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Zap size={10} className={risks.length > 3 ? "text-red-500" : risks.length > 0 ? "text-amber-500" : "text-emerald-500"} />
-                      <span className={`text-xs font-bold ${risks.length > 3 ? "text-red-600 dark:text-red-400" : risks.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      <span className={`text-xs font-bold ${risks.length > 3 ? "text-red-500" : risks.length > 0 ? "text-amber-400" : "text-emerald-400"}`}>
                         {risks.length === 0 ? "Excellent" : risks.length <= 2 ? "Good" : risks.length <= 5 ? "Fair" : "Needs Attention"}
                       </span>
                     </div>
                   </div>
-                  <div className="mt-1.5 w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className="mt-1.5 w-full h-1.5 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        risks.length === 0 ? "bg-emerald-500" : risks.length <= 2 ? "bg-emerald-400" : risks.length <= 5 ? "bg-amber-400" : "bg-red-400"
-                      }`}
+ risks.length === 0 ? "bg-emerald-500" : risks.length <= 2 ? "bg-emerald-400" : risks.length <= 5 ? "bg-amber-400" : "bg-red-400"
+ }`}
                       style={{ width: `${Math.max(10, 100 - risks.length * 15)}%` }}
                     />
                   </div>

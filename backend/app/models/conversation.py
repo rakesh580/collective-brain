@@ -8,12 +8,15 @@ class ConversationRecord(Base):
     __tablename__ = "conversations"
 
     id = Column(String, primary_key=True)
+    organization_id = Column(
+        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     title = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     message_count = Column(Integer, default=0)
     metadata_json = Column(JSON, default=dict)
-    owner_user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    owner_user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     visibility = Column(String, default="private")  # "private", "shared", "team"
     room_id = Column(String, ForeignKey("chat_rooms.id"), nullable=True, index=True)
 

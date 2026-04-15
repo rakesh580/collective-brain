@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import logging
+import time
 
 from sentence_transformers import SentenceTransformer
 
@@ -20,21 +21,52 @@ class EmbeddingService:
         return self._model
 
     def embed(self, text: str) -> list[float]:
-        """Synchronous embedding — use embed_async in async contexts."""
-        return self.model.encode(text, normalize_embeddings=True).tolist()
+        """Synchronous single-text embedding with span + metric."""
+        from app.services.telemetry import get_tracer
+        from app.services.metrics import EMBEDDING_LATENCY, EMBEDDING_TEXTS_TOTAL
+
+        tracer = get_tracer("collective_brain.embedding")
+        t0 = time.perf_counter()
+        with tracer.start_as_current_span(
+            "embedding.embed",
+            attributes={"embedding.model": self._model_name, "embedding.batch": False},
+        ):
+            result = self.model.encode(text, normalize_embeddings=True).tolist()
+
+        elapsed = time.perf_counter() - t0
+        EMBEDDING_LATENCY.labels(model=self._model_name, batch="false").observe(elapsed)
+        EMBEDDING_TEXTS_TOTAL.labels(model=self._model_name).inc()
+        return result
 
     def embed_batch(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
-        """Synchronous batch embedding — use embed_batch_async in async contexts."""
-        embeddings = self.model.encode(
-            texts,
-            batch_size=batch_size,
-            normalize_embeddings=True,
-            show_progress_bar=True,
-        )
-        return embeddings.tolist()
+        """Synchronous batch embedding with span + metric."""
+        from app.services.telemetry import get_tracer
+        from app.services.metrics import EMBEDDING_LATENCY, EMBEDDING_TEXTS_TOTAL
+
+        tracer = get_tracer("collective_brain.embedding")
+        t0 = time.perf_counter()
+        with tracer.start_as_current_span(
+            "embedding.embed_batch",
+            attributes={
+                "embedding.model": self._model_name,
+                "embedding.batch": True,
+                "embedding.count": len(texts),
+            },
+        ):
+            result = self.model.encode(
+                texts,
+                batch_size=batch_size,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            ).tolist()
+
+        elapsed = time.perf_counter() - t0
+        EMBEDDING_LATENCY.labels(model=self._model_name, batch="true").observe(elapsed)
+        EMBEDDING_TEXTS_TOTAL.labels(model=self._model_name).inc(len(texts))
+        return result
 
     async def embed_async(self, text: str) -> list[float]:
-        """Non-blocking embedding — runs in thread pool to avoid blocking the event loop."""
+        """Non-blocking embedding — runs in thread pool."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, functools.partial(self.embed, text))
 

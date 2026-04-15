@@ -107,17 +107,10 @@ class AuthService:
             )
             .first()
         )
-        if not user:
-            raise ValueError("No account found with that username or email")
-        if not user.is_active:
-            raise ValueError("This account has been deactivated")
-        if not user.password_hash:
-            # OAuth-only user — no password set
-            raise ValueError(
-                "This account uses Google Sign-In. Please use the Google button to log in"
-            )
+        if not user or not user.is_active or not user.password_hash:
+            raise ValueError("Invalid credentials")
         if not self.verify_password(password, user.password_hash):
-            raise ValueError("Incorrect password")
+            raise ValueError("Invalid credentials")
         user.last_login = datetime.now(timezone.utc)
         db.commit()
         return user

@@ -8,10 +8,13 @@ class ContributionRecord(Base):
     __tablename__ = "contributions"
 
     id = Column(String, primary_key=True)
-    member_id = Column(String, ForeignKey("members.id", ondelete="CASCADE"))
+    organization_id = Column(
+        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    member_id = Column(String, ForeignKey("members.id", ondelete="CASCADE"), index=True)
     artifact_id = Column(String, ForeignKey("artifacts.id"))
     contribution_type = Column(String)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     description = Column(Text)
     topics = Column(JSON, default=list)
     sentiment = Column(Float, nullable=True)

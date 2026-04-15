@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, cast, Date
 
 from app.models.member import MemberRecord
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.db.database import create_session
+from app.dependencies import get_current_user
 from app.services.team_health_service import (
     compute_health_snapshot,
     save_health_snapshot,
@@ -21,11 +22,8 @@ def _get_db():
 
 
 @router.get("/activity-timeline")
-async def get_activity_timeline(request: Request, days: int = 30, room_id: str | None = None):
+async def get_activity_timeline(request: Request, days: int = Query(default=30, ge=1, le=365), room_id: str | None = None, user=Depends(get_current_user)):
     """Daily contribution counts for the last N days using SQL aggregation."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -62,11 +60,8 @@ async def get_activity_timeline(request: Request, days: int = 30, room_id: str |
 
 
 @router.get("/source-breakdown")
-async def get_source_breakdown(request: Request, room_id: str | None = None):
+async def get_source_breakdown(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     """Artifact counts by source type using SQL aggregation."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         # SQL GROUP BY for source type counts
@@ -95,11 +90,8 @@ async def get_source_breakdown(request: Request, room_id: str | None = None):
 
 
 @router.get("/expertise-matrix")
-async def get_expertise_matrix(request: Request, room_id: str | None = None):
+async def get_expertise_matrix(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     """Member expertise scores as a matrix for heatmap visualization."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         if room_id:
@@ -150,11 +142,8 @@ async def get_expertise_matrix(request: Request, room_id: str | None = None):
 
 
 @router.get("/contribution-types")
-async def get_contribution_types(request: Request, room_id: str | None = None):
+async def get_contribution_types(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     """Contribution breakdown by type using SQL aggregation."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         query = db.query(
@@ -178,11 +167,8 @@ async def get_contribution_types(request: Request, room_id: str | None = None):
 
 
 @router.get("/member-activity")
-async def get_member_activity(request: Request, days: int = 30, room_id: str | None = None):
+async def get_member_activity(request: Request, days: int = Query(default=30, ge=1, le=365), room_id: str | None = None, user=Depends(get_current_user)):
     """Per-member contribution counts over last N days using SQL aggregation."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -227,11 +213,8 @@ async def get_member_activity(request: Request, days: int = 30, room_id: str | N
 
 
 @router.get("/topic-trends")
-async def get_topic_trends(request: Request, days: int = 30, room_id: str | None = None):
+async def get_topic_trends(request: Request, days: int = Query(default=30, ge=1, le=365), room_id: str | None = None, user=Depends(get_current_user)):
     """Most common topics in recent contributions."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -261,11 +244,8 @@ async def get_topic_trends(request: Request, days: int = 30, room_id: str | None
 
 
 @router.get("/health")
-async def get_health(request: Request):
+async def get_health(request: Request, user=Depends(get_current_user)):
     """Current health snapshot (computed live)."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         return compute_health_snapshot(db)
@@ -274,11 +254,8 @@ async def get_health(request: Request):
 
 
 @router.get("/health/trends")
-async def get_health_trends_endpoint(request: Request, days: int = 90):
+async def get_health_trends_endpoint(request: Request, days: int = Query(default=90, ge=1, le=365), user=Depends(get_current_user)):
     """Historical trend data for team health."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         return get_health_trends(db, period_days=days)
@@ -287,11 +264,8 @@ async def get_health_trends_endpoint(request: Request, days: int = 90):
 
 
 @router.get("/health/predictions")
-async def get_health_predictions(request: Request):
+async def get_health_predictions(request: Request, user=Depends(get_current_user)):
     """Risk predictions based on health trends."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         return predict_risks(db)
@@ -300,11 +274,8 @@ async def get_health_predictions(request: Request):
 
 
 @router.post("/health/snapshot")
-async def trigger_health_snapshot(request: Request):
+async def trigger_health_snapshot(request: Request, user=Depends(get_current_user)):
     """Manually trigger a health snapshot save."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         return save_health_snapshot(db)

@@ -1,0 +1,105 @@
+name: Database Migrations
+
+# Run migrations manually or on-demand — NEVER auto-triggered on push.
+# This keeps the migration step safe and auditable.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Alembic revision target (default: head)"
+        required: false
+        default: "head"
+      dry_run:
+        description: "Dry run — show pending migrations without applying"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      confirm:
+        description: "Type 'yes' to confirm you want to run migrations"
+        required: true
+        default: ""
+
+concurrency:
+  group: db-migrations
+  cancel-in-progress: false   # Never cancel a running migration
+
+jobs:
+  migrate:
+    name: Run Alembic Migrations
+    runs-on: ubuntu-latest
+    environment: production
+    # Safety guard: require explicit confirmation
+    if: github.event.inputs.confirm == 'yes'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends libpq-dev
+
+      - name: Install migration dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install alembic psycopg2-binary sqlalchemy pgvector
+
+      - name: Show current database revision
+        working-directory: backend
+        env:
+          CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
+          CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "Current revision:"
+          python -m alembic current
+          echo ""
+          echo "Migration history:"
+          python -m alembic history --indicate-current
+          echo "═══════════════════════════════════════"
+
+      - name: Check pending migrations
+        working-directory: backend
+        env:
+          CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
+          CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
+        run: |
+          PENDING=$(python -m alembic history --indicate-current | grep -v "(head)" | wc -l || true)
+          echo "Pending migrations to apply: $PENDING"
+
+      - name: Run migrations (or dry-run)
+        working-directory: backend
+        env:
+          CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
+          CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "DRY RUN — showing SQL that would run for target: $TARGET"
+            python -m alembic upgrade "$TARGET" --sql
+          else
+            echo "Upgrading to: $TARGET"
+            python -m alembic upgrade "$TARGET"
+            echo ""
+            echo "New revision:"
+            python -m alembic current
+            echo "✓ Migration complete."
+          fi
+
+      - name: Post-migration verification
+        if: github.event.inputs.dry_run == 'false'
+        working-directory: backend
+        env:
+          CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
+          CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
+        run: |
+          # Verify we're at the expected head
+          python -m alembic check && echo "✓ Database is up to date." || echo "⚠ Database is not at head."

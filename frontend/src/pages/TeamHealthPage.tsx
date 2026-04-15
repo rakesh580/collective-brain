@@ -38,9 +38,9 @@ function trendIcon(trend: string) {
 
 function riskBadge(level: string) {
   const styles: Record<string, string> = {
-    low: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-    medium: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
-    high: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+    low: "bg-emerald-100 text-emerald-700  ",
+    medium: "bg-amber-100 text-amber-700  ",
+    high: "bg-red-100 text-red-700  ",
   };
   return (
     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[level] || styles.low}`}>
@@ -62,7 +62,7 @@ function HealthGauge({ score }: { score: number }) {
           cx="70" cy="70" r={radius}
           fill="none"
           strokeWidth="10"
-          className="stroke-slate-200 dark:stroke-slate-700"
+          className="stroke-slate-200 "
         />
         <circle
           cx="70" cy="70" r={radius}
@@ -77,7 +77,7 @@ function HealthGauge({ score }: { score: number }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className={`text-3xl font-bold ${healthColor(score)}`}>{Math.round(score)}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">/ 100</span>
+        <span className="text-xs ">/ 100</span>
       </div>
     </div>
   );
@@ -85,9 +85,9 @@ function HealthGauge({ score }: { score: number }) {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 animate-pulse">
-      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-3" />
-      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-16" />
+    <div className="border border-default rounded-xl p-5 animate-pulse">
+      <div className="h-4 rounded w-24 mb-3" />
+      <div className="h-8 rounded w-16" />
     </div>
   );
 }
@@ -138,13 +138,13 @@ export default function TeamHealthPage() {
     return (
       <div className="p-6 space-y-6 max-w-6xl">
         <div className="flex items-center gap-2">
-          <div className="h-5 w-5 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
-          <div className="h-6 w-40 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+          <div className="h-5 w-5 rounded animate-pulse" />
+          <div className="h-6 w-40 rounded animate-pulse" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           <div className="md:col-span-2">
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 flex items-center justify-center animate-pulse">
-              <div className="w-36 h-36 rounded-full bg-slate-200 dark:bg-slate-700" />
+            <div className="border border-default rounded-xl p-8 flex items-center justify-center animate-pulse">
+              <div className="w-36 h-36 rounded-full " />
             </div>
           </div>
           <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -155,9 +155,9 @@ export default function TeamHealthPage() {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 animate-pulse">
-              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 mb-4" />
-              <div className="h-48 bg-slate-200 dark:bg-slate-700 rounded" />
+            <div key={i} className="border border-default rounded-xl p-5 animate-pulse">
+              <div className="h-4 rounded w-32 mb-4" />
+              <div className="h-48 rounded" />
             </div>
           ))}
         </div>
@@ -168,7 +168,7 @@ export default function TeamHealthPage() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-sm rounded-xl p-4">
+        <div className=" border text-red-500 text-sm rounded-xl p-4">
           {error}
         </div>
       </div>
@@ -184,7 +184,7 @@ export default function TeamHealthPage() {
       suffix: " topics",
       icon: AlertTriangle,
       color: "text-red-500",
-      bg: "bg-red-50 dark:bg-red-500/10",
+      bg: "",
     },
     {
       label: "Coverage",
@@ -192,7 +192,7 @@ export default function TeamHealthPage() {
       suffix: "%",
       icon: Shield,
       color: "text-indigo-500",
-      bg: "bg-indigo-50 dark:bg-indigo-500/10",
+      bg: "",
     },
     {
       label: "Collaboration",
@@ -200,7 +200,7 @@ export default function TeamHealthPage() {
       suffix: "%",
       icon: Network,
       color: "text-violet-500",
-      bg: "bg-violet-50 dark:bg-violet-500/10",
+      bg: "",
     },
     {
       label: "Active Members",
@@ -208,7 +208,7 @@ export default function TeamHealthPage() {
       suffix: "%",
       icon: Users,
       color: "text-emerald-500",
-      bg: "bg-emerald-50 dark:bg-emerald-500/10",
+      bg: "",
     },
     {
       label: "Avg Breadth",
@@ -216,7 +216,7 @@ export default function TeamHealthPage() {
       suffix: " topics",
       icon: BookOpen,
       color: "text-amber-500",
-      bg: "bg-amber-50 dark:bg-amber-500/10",
+      bg: "",
     },
   ];
 
@@ -232,13 +232,13 @@ export default function TeamHealthPage() {
     <div className="p-6 space-y-6 max-w-6xl">
       {/* Top Risk Banner */}
       {snapshot.top_risk && snapshot.top_risk.expert_count <= 1 && (
-        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+        <div className=" border rounded-xl p-4 flex items-start gap-3">
           <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+            <p className="text-sm font-semibold text-red-500">
               Critical Bus Factor Risk: {snapshot.top_risk.topic}
             </p>
-            <p className="text-sm text-red-600 dark:text-red-400/80 mt-0.5">
+            <p className="text-sm text-red-500/80 mt-0.5">
               {snapshot.top_risk.expert_count === 0
                 ? "No one has expertise on this topic. Knowledge is at risk."
                 : `Only ${snapshot.top_risk.experts.join(", ")} covers this topic. If they are unavailable, there is no coverage.`}
@@ -251,7 +251,7 @@ export default function TeamHealthPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Heart size={20} className="text-rose-500" />
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Team Health</h2>
+          <h2 className="text-lg font-bold ">Team Health</h2>
         </div>
         <button
           onClick={handleSaveSnapshot}
@@ -266,8 +266,8 @@ export default function TeamHealthPage() {
       {/* Health Score Card + Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
         {/* Health Score Gauge */}
-        <div className="md:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center">
-          <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-4">Overall Health</h3>
+        <div className="md:col-span-2 border border-default rounded-xl p-6 flex flex-col items-center justify-center">
+          <h3 className="text-sm font-semibold mb-4">Overall Health</h3>
           <HealthGauge score={snapshot.health_score} />
           <div className="mt-3 flex items-center gap-1.5">
             <div className={`w-2 h-2 rounded-full ${healthBg(snapshot.health_score)}`} />
@@ -280,14 +280,14 @@ export default function TeamHealthPage() {
         {/* 5 Metric Cards */}
         <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-3 gap-4">
           {metricCards.map((card) => (
-            <div key={card.label} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+            <div key={card.label} className="border border-default rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <div className={`p-1.5 rounded-lg ${card.bg}`}>
                   <card.icon size={14} className={card.color} />
                 </div>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{card.label}</span>
+                <span className="text-xs font-medium ">{card.label}</span>
               </div>
-              <p className="text-xl font-bold text-slate-800 dark:text-white">
+              <p className="text-xl font-bold ">
                 {typeof card.value === "number" && card.value % 1 !== 0 ? card.value.toFixed(1) : card.value}
                 <span className="text-sm font-normal text-slate-400 ml-0.5">{card.suffix}</span>
               </p>
@@ -299,17 +299,17 @@ export default function TeamHealthPage() {
       {/* Period Selector + Trend Charts */}
       <div className="flex items-center gap-2">
         <Activity size={16} className="text-slate-500" />
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Trends</h3>
+        <h3 className="text-sm font-semibold ">Trends</h3>
         <div className="ml-auto flex gap-1">
           {([30, 90, 180] as PeriodOption[]).map((d) => (
             <button
               key={d}
               onClick={() => setPeriod(d)}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                period === d
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
+ period === d
+ ? "bg-indigo-600 text-white"
+ : " hover:bg-slate-200 "
+ }`}
             >
               {d}d
             </button>
@@ -320,8 +320,8 @@ export default function TeamHealthPage() {
       {chartData.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Health Score Over Time */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Health Score</h4>
+          <div className="border border-default rounded-xl p-5">
+            <h4 className="text-sm font-semibold mb-4">Health Score</h4>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
@@ -334,8 +334,8 @@ export default function TeamHealthPage() {
           </div>
 
           {/* Coverage Over Time */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Knowledge Coverage %</h4>
+          <div className="border border-default rounded-xl p-5">
+            <h4 className="text-sm font-semibold mb-4">Knowledge Coverage %</h4>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={chartData}>
                 <defs>
@@ -354,8 +354,8 @@ export default function TeamHealthPage() {
           </div>
 
           {/* Bus Factor Over Time */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Bus Factor Count</h4>
+          <div className="border border-default rounded-xl p-5">
+            <h4 className="text-sm font-semibold mb-4">Bus Factor Count</h4>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
@@ -368,8 +368,8 @@ export default function TeamHealthPage() {
           </div>
 
           {/* Collaboration Density Over Time */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Collaboration Density %</h4>
+          <div className="border border-default rounded-xl p-5">
+            <h4 className="text-sm font-semibold mb-4">Collaboration Density %</h4>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.5} />
@@ -382,9 +382,9 @@ export default function TeamHealthPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center">
+        <div className="border border-default rounded-xl p-8 text-center">
           <Activity size={24} className="text-slate-400 mx-auto mb-2" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm ">
             No trend data yet. Click &quot;Save Snapshot&quot; to start recording health metrics over time.
           </p>
         </div>
@@ -395,30 +395,30 @@ export default function TeamHealthPage() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} className="text-slate-500" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Risk Predictions</h3>
+            <h3 className="text-sm font-semibold ">Risk Predictions</h3>
             <span className="text-xs text-slate-400 ml-1">next {predictions[0]?.horizon_days || 90} days</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {predictions.map((pred) => (
               <div
                 key={pred.metric}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4"
+                className="border border-default rounded-xl p-4"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{pred.metric}</h4>
+                  <h4 className="text-sm font-semibold ">{pred.metric}</h4>
                   {riskBadge(pred.risk_level)}
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg font-bold text-slate-800 dark:text-white">
+                  <span className="text-lg font-bold ">
                     {pred.current_value.toFixed(1)}
                   </span>
                   <span className="text-slate-400">&rarr;</span>
-                  <span className="text-lg font-bold text-slate-800 dark:text-white">
+                  <span className="text-lg font-bold ">
                     {pred.predicted_value.toFixed(1)}
                   </span>
                   {trendIcon(pred.trend)}
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{pred.description}</p>
+                <p className="text-xs leading-relaxed">{pred.description}</p>
               </div>
             ))}
           </div>

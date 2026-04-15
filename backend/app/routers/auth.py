@@ -1,5 +1,7 @@
 import logging
 import os
+import time
+from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -21,21 +23,35 @@ from app.db.database import create_session
 
 logger = logging.getLogger(__name__)
 
+# In-memory rate limit fallback when Redis is unavailable (LRU-bounded)
+_memory_rate_limits: dict[str, list[float]] = defaultdict(list)
+_MAX_RATE_LIMIT_KEYS = 10000
+
 
 async def _rate_limit(request: Request, key: str, max_requests: int, window: int = 60):
-    """Check rate limit via Redis (or in-memory fallback). Raises 429 if exceeded."""
+    """Rate-limit by key. Uses Redis if available, in-memory fallback otherwise."""
     redis = getattr(request.app.state, "redis", None)
-    if not redis:
-        return
-    client_ip = request.client.host if request.client else "unknown"
-    allowed, remaining = await redis.check_rate_limit(
-        f"{key}:{client_ip}", max_requests, window
-    )
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many requests. Please try again later.",
+    if redis is not None:
+        allowed, remaining = await redis.check_rate_limit(
+            f"rate:{key}:{request.client.host}", max_requests, window
         )
+        if allowed is not None:
+            if not allowed:
+                raise HTTPException(status_code=429, detail="Too many requests")
+            return
+
+    # Redis unavailable — use in-memory fallback
+    now = time.monotonic()
+    mem_key = f"rate:{key}:{request.client.host}"
+    _memory_rate_limits[mem_key] = [t for t in _memory_rate_limits[mem_key] if now - t < window]
+    if len(_memory_rate_limits[mem_key]) >= max_requests:
+        raise HTTPException(status_code=429, detail="Too many requests")
+    _memory_rate_limits[mem_key].append(now)
+    # Prevent unbounded memory growth
+    if len(_memory_rate_limits) > _MAX_RATE_LIMIT_KEYS:
+        oldest_keys = sorted(_memory_rate_limits, key=lambda k: _memory_rate_limits[k][-1] if _memory_rate_limits[k] else 0)
+        for k in oldest_keys[:len(oldest_keys) // 2]:
+            del _memory_rate_limits[k]
 
 router = APIRouter()
 

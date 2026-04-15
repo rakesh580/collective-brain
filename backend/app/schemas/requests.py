@@ -169,3 +169,47 @@ class RoomMessageRequest(BaseModel):
 
 class RoomAIQueryRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
+
+
+# ── Phase 5: External integration ingest requests ─────────────────────────────
+
+class NotionIngestRequest(BaseModel):
+    """Ingest from a Notion database or a single page."""
+    database_id: str | None = Field(default=None, description="Notion database ID")
+    page_id: str | None = Field(default=None, description="Notion page ID")
+    room_id: str | None = None
+
+    def to_source_input(self) -> dict:
+        if self.page_id:
+            return {"page_id": self.page_id}
+        if self.database_id:
+            return {"database_id": self.database_id}
+        raise ValueError("Provide database_id or page_id")
+
+
+class GoogleDocsIngestRequest(BaseModel):
+    """Ingest from Google Docs (list of doc IDs or a folder)."""
+    document_ids: list[str] | None = Field(default=None, description="List of Google Doc IDs")
+    folder_id: str | None = Field(default=None, description="Google Drive folder ID")
+    room_id: str | None = None
+
+    def to_source_input(self) -> dict:
+        if self.document_ids:
+            return {"document_ids": self.document_ids}
+        if self.folder_id:
+            return {"folder_id": self.folder_id}
+        raise ValueError("Provide document_ids or folder_id")
+
+
+class ConfluenceIngestRequest(BaseModel):
+    """Ingest from a Confluence space or specific pages."""
+    space_key: str | None = Field(default=None, description="Confluence space key (e.g. ENG)")
+    page_ids: list[str] | None = Field(default=None, description="Specific Confluence page IDs")
+    room_id: str | None = None
+
+    def to_source_input(self) -> dict:
+        if self.space_key:
+            return {"space_key": self.space_key}
+        if self.page_ids:
+            return {"page_ids": self.page_ids}
+        raise ValueError("Provide space_key or page_ids")

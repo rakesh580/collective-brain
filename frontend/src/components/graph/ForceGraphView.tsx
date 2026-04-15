@@ -1,6 +1,13 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import type { GraphData, GraphNode, GraphEdge } from "../../types";
+import type { GraphData, GraphEdge } from "../../types";
+import { EDGE_STYLES, EDGE_DEFAULT_COLOR, LABEL_COLORS } from "./graphConstants";
+import { getCommunityColor, useIsDark } from "./graphUtils";
+import { paintNode, paintNodePointerArea } from "./nodeCanvasRenderer";
+import GraphSearchBar from "./GraphSearchBar";
+import GraphLayerPanel from "./GraphLayerPanel";
+import GraphPhysicsControls from "./GraphPhysicsControls";
+import { FocusModeIndicator, ZoomControls, GraphStatsBadge, HoverTooltip } from "./GraphOverlays";
+import NodeDetailPanel from "./NodeDetailPanel";
 
 let ForceGraph2D: any = null;
 
@@ -9,103 +16,9 @@ interface Props {
   loading: boolean;
 }
 
-/**
- * Graph color tokens — single source of truth for canvas-rendered graph colors.
- * These values mirror the CSS custom properties defined in index.css under :root
- * (e.g. --graph-member, --graph-topic, etc.) so designers can grep either location.
- *
- * Canvas 2D context cannot read CSS variables at paint time without a perf penalty,
- * so we keep plain hex constants here and keep them in sync with the CSS variables.
- */
-
-// Community-based color palette (10 distinct colors)
-// CSS vars: --graph-community-0 … --graph-community-9
-const COMMUNITY_COLORS = [
-  "#6366f1", // --graph-community-0
-  "#10b981", // --graph-community-1
-  "#f59e0b", // --graph-community-2
-  "#ef4444", // --graph-community-3
-  "#8b5cf6", // --graph-community-4
-  "#06b6d4", // --graph-community-5
-  "#ec4899", // --graph-community-6
-  "#14b8a6", // --graph-community-7
-  "#f97316", // --graph-community-8
-  "#84cc16", // --graph-community-9
-];
-
-// Node type colors — CSS vars: --graph-member, --graph-topic, --graph-artifact
-const NODE_TYPE_COLORS: Record<string, string> = {
-  member: "#6366f1",   // --graph-member
-  topic: "#10b981",    // --graph-topic
-  artifact: "#f59e0b", // --graph-artifact
-};
-
-// Fallback node color — CSS var: --graph-node-fallback
-const NODE_FALLBACK_COLOR = "#94a3b8";
-
-// Badge accent — CSS var: --graph-badge
-const BADGE_COLOR = "#f59e0b";
-
-// Edge style colors — CSS vars: --graph-edge-*
-const EDGE_STYLES: Record<string, { color: string; dash: number[]; width: number }> = {
-  CONTRIBUTED_TO:    { color: "#f59e0b", dash: [],     width: 1.2 }, // --graph-edge-contributed
-  KNOWS_ABOUT:       { color: "#a5b4fc", dash: [4, 2], width: 1.0 }, // --graph-edge-knows
-  HAS_EXPERTISE:     { color: "#34d399", dash: [],     width: 2.0 }, // --graph-edge-expertise
-  COLLABORATED_WITH: { color: "#fbbf24", dash: [2, 2], width: 1.5 }, // --graph-edge-collaborated
-  DECLARED_SKILL:    { color: "#c4b5fd", dash: [6, 3], width: 1.0 }, // --graph-edge-declared-skill
-  COVERS_TOPIC:      { color: "#94a3b8", dash: [],     width: 0.8 }, // --graph-edge-covers-topic
-};
-
-// Default edge color — CSS var: --graph-edge-default
-const EDGE_DEFAULT_COLOR = "#cbd5e1";
-
-const LAYER_CONFIG = [
-  { id: "social", label: "Social Layer", types: ["member"], description: "Team members & collaboration", color: NODE_TYPE_COLORS.member },
-  { id: "concept", label: "Concept Layer", types: ["topic"], description: "Topics, skills & expertise", color: NODE_TYPE_COLORS.topic },
-  { id: "artifact", label: "Artifact Layer", types: ["artifact"], description: "Repos, docs & data sources", color: NODE_TYPE_COLORS.artifact },
-];
-
-const EDGE_LEGEND = [
-  { type: "HAS_EXPERTISE", color: EDGE_STYLES.HAS_EXPERTISE.color, label: "Has Expertise", style: "solid" },
-  { type: "KNOWS_ABOUT", color: EDGE_STYLES.KNOWS_ABOUT.color, label: "Knows About", style: "dashed" },
-  { type: "DECLARED_SKILL", color: EDGE_STYLES.DECLARED_SKILL.color, label: "Declared Skill", style: "dashed" },
-  { type: "COLLABORATED_WITH", color: EDGE_STYLES.COLLABORATED_WITH.color, label: "Collaborated", style: "dotted" },
-  { type: "CONTRIBUTED_TO", color: EDGE_STYLES.CONTRIBUTED_TO.color, label: "Contributed To", style: "solid" },
-  { type: "COVERS_TOPIC", color: EDGE_STYLES.COVERS_TOPIC.color, label: "Covers Topic", style: "solid" },
-];
-
-// Label colors — CSS vars: --graph-label-light / --graph-label-dark, --graph-label-dim-light / --graph-label-dim-dark
-const LABEL_COLORS = {
-  light: "#1e293b",    // --graph-label-light
-  dark: "#e2e8f0",     // --graph-label-dark
-  dimLight: "#94a3b8", // --graph-label-dim-light
-  dimDark: "#64748b",  // --graph-label-dim-dark
-};
-
-function getCommunityColor(node: any): string {
-  const community = node.community;
-  if (community !== undefined && community !== null) {
-    return COMMUNITY_COLORS[community % COMMUNITY_COLORS.length];
-  }
-  return NODE_TYPE_COLORS[node.type] || NODE_FALLBACK_COLOR;
-}
-
-function useIsDark() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    const check = () => setDark(document.documentElement.classList.contains("dark"));
-    check();
-    const obs = new MutationObserver(check);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
-  return dark;
-}
-
 export default function ForceGraphView({ graphData, loading }: Props) {
-  const navigate = useNavigate();
   const isDark = useIsDark();
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
   const [graphReady, setGraphReady] = useState(false);
   const [search, setSearch] = useState("");
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(new Set(["member", "topic", "artifact"]));
@@ -281,15 +194,10 @@ export default function ForceGraphView({ graphData, loading }: Props) {
   const handleNodeHover = useCallback((node: any, _prevNode: any) => {
     setHoverNode(node || null);
     if (node && containerRef.current) {
-      // Convert graph coords to screen - approximate
       const fg = fgRef.current;
       if (fg) {
         const coords = fg.graph2ScreenCoords(node.x, node.y);
-        setTooltip({
-          x: coords.x,
-          y: coords.y - 20,
-          node,
-        });
+        setTooltip({ x: coords.x, y: coords.y - 20, node });
       }
     } else {
       setTooltip(null);
@@ -314,9 +222,9 @@ export default function ForceGraphView({ graphData, loading }: Props) {
     return (
       <div className="text-center py-16">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 mb-4">
-          <span className="text-2xl">🌐</span>
+          <span className="text-2xl">&#x1F310;</span>
         </div>
-        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">No graph data yet</h3>
+        <h3 className="text-lg font-semibold text-slate-700">No graph data yet</h3>
         <p className="text-sm text-slate-500 mt-1">Ingest some data to build the knowledge graph.</p>
       </div>
     );
@@ -350,177 +258,39 @@ export default function ForceGraphView({ graphData, loading }: Props) {
       <div className="flex-1 relative">
         {/* Search + Layer Filters + Physics */}
         <div className="absolute top-4 left-4 z-10 space-y-2">
-          {/* Search */}
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
-            <div className="flex items-center gap-2 px-3 py-2">
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search nodes..."
-                className="text-sm bg-transparent border-none outline-none w-44 placeholder-slate-400 dark:text-white"
-              />
-              {(search || highlightNodes.size > 0) && (
-                <button onClick={clearHighlight} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
-              )}
-            </div>
-            {search && highlightNodes.size > 0 && (
-              <div className="px-3 pb-2 text-2xs text-indigo-500 font-medium">
-                {highlightNodes.size} nodes matched
-              </div>
-            )}
-          </div>
-
-          {/* Layer filters */}
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-700 shadow-lg">
-            <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-2">Knowledge Layers</p>
-            <div className="space-y-1.5">
-              {LAYER_CONFIG.map((layer) => {
-                const isActive = layer.types.every((t) => visibleLayers.has(t));
-                const count = layer.types.reduce((sum, t) => sum + (counts[t] || 0), 0);
-                return (
-                  <button
-                    key={layer.id}
-                    onClick={() => toggleLayer(layer.types)}
-                    className={`flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-left transition-all ${
-                      isActive ? "hover:bg-slate-50 dark:hover:bg-slate-700" : "opacity-35"
-                    }`}
-                  >
-                    <div
-                      className="w-3.5 h-3.5 rounded-md shrink-0 transition-opacity"
-                      style={{ backgroundColor: layer.color, opacity: isActive ? 1 : 0.3 }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{layer.label}</span>
-                      <p className="text-2xs text-slate-400 leading-tight">{layer.description}</p>
-                    </div>
-                    <span className="text-2xs font-mono text-slate-400 tabular-nums">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Edge legend */}
-            <div className="border-t border-slate-100 dark:border-slate-700 mt-2.5 pt-2.5">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Relationships</p>
-              {EDGE_LEGEND.map((item) => (
-                <div key={item.type} className="flex items-center gap-2 px-2 py-0.5">
-                  <div className="w-5 h-0 shrink-0 border-t-2" style={{
-                    borderColor: item.color,
-                    borderStyle: item.style === "dashed" ? "dashed" : item.style === "dotted" ? "dotted" : "solid",
-                  }} />
-                  <span className="text-2xs text-slate-500 dark:text-slate-400">{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Physics controls */}
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
-            <button
-              onClick={() => setShowPhysics(!showPhysics)}
-              className="flex items-center justify-between w-full px-3 py-2 text-2xs font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300"
-            >
-              <span>Physics</span>
-              <span className="text-2xs">{showPhysics ? "▲" : "▼"}</span>
-            </button>
-            {showPhysics && (
-              <div className="px-3 pb-3 space-y-2.5">
-                <div>
-                  <div className="flex justify-between text-2xs text-slate-500 mb-0.5">
-                    <span>Link Distance</span>
-                    <span className="font-mono">{linkDistance}</span>
-                  </div>
-                  <input type="range" min={50} max={300} value={linkDistance}
-                    onChange={(e) => setLinkDistance(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-indigo-500"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between text-2xs text-slate-500 mb-0.5">
-                    <span>Repulsion</span>
-                    <span className="font-mono">{Math.abs(chargeStrength)}</span>
-                  </div>
-                  <input type="range" min={30} max={300} value={Math.abs(chargeStrength)}
-                    onChange={(e) => setChargeStrength(-Number(e.target.value))}
-                    className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-violet-500"
-                  />
-                </div>
-                <button
-                  onClick={() => { setLinkDistance(120); setChargeStrength(-120); }}
-                  className="w-full text-2xs text-indigo-500 hover:text-indigo-600 font-medium"
-                >
-                  Reset defaults
-                </button>
-              </div>
-            )}
-          </div>
+          <GraphSearchBar
+            search={search}
+            onSearchChange={setSearch}
+            onClear={clearHighlight}
+            highlightCount={highlightNodes.size}
+            showClear={!!(search || highlightNodes.size > 0)}
+          />
+          <GraphLayerPanel
+            visibleLayers={visibleLayers}
+            counts={counts}
+            onToggleLayer={toggleLayer}
+          />
+          <GraphPhysicsControls
+            showPhysics={showPhysics}
+            onTogglePhysics={() => setShowPhysics(!showPhysics)}
+            linkDistance={linkDistance}
+            onLinkDistanceChange={setLinkDistance}
+            chargeStrength={chargeStrength}
+            onChargeStrengthChange={setChargeStrength}
+            onReset={() => { setLinkDistance(120); setChargeStrength(-120); }}
+          />
         </div>
 
-        {/* Focus mode indicator */}
-        {focusMode && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-indigo-600 text-white px-4 py-2 rounded-full text-xs font-medium shadow-lg flex items-center gap-2">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            Focus Mode — Double-click node or background to toggle
-            <button onClick={clearHighlight} className="ml-1 bg-white/20 rounded-full px-1.5 py-0.5 hover:bg-white/30">✕</button>
-          </div>
-        )}
+        {focusMode && <FocusModeIndicator onClear={clearHighlight} />}
+        <ZoomControls fgRef={fgRef} />
+        <GraphStatsBadge nodeCount={fgData.nodes.length} linkCount={fgData.links.length} />
 
-        {/* Zoom controls */}
-        <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-0.5 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
-          <button onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 300)} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-xl text-sm font-bold">+</button>
-          <div className="border-t border-slate-100 dark:border-slate-700" />
-          <button onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.3, 300)} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-bold">&minus;</button>
-          <div className="border-t border-slate-100 dark:border-slate-700" />
-          <button onClick={() => fgRef.current?.zoomToFit(400, 60)} className="px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-xl text-xs font-semibold">Fit</button>
-        </div>
-
-        {/* Node/edge count + focus mode badge */}
-        <div className="absolute top-4 right-4 z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-700 shadow-lg">
-          <p className="text-2xs text-slate-500 dark:text-slate-400 font-medium">
-            {fgData.nodes.length} nodes &middot; {fgData.links.length} edges
-          </p>
-          <p className="text-2xs text-slate-400 mt-0.5">Double-click to focus</p>
-        </div>
-
-        {/* Hover tooltip */}
         {tooltip && tooltip.node && (
-          <div
-            className="absolute z-20 bg-slate-900/95 text-white rounded-lg px-3 py-2 text-xs shadow-xl pointer-events-none max-w-48"
-            style={{
-              left: `${Math.min(tooltip.x, (containerRef.current?.clientWidth || 500) - 200)}px`,
-              top: `${Math.max(10, tooltip.y - 60)}px`,
-            }}
-          >
-            <p className="font-bold text-sm">{tooltip.node.label}</p>
-            <p className="text-slate-400 text-2xs capitalize">{tooltip.node.type}</p>
-            {tooltip.node.pagerank > 0 && (
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-slate-400">PageRank:</span>
-                <span className="font-mono text-indigo-300">{(tooltip.node.pagerank * 100).toFixed(1)}</span>
-              </div>
-            )}
-            {tooltip.node.total_contributions > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400">Contributions:</span>
-                <span className="font-mono text-emerald-300">{tooltip.node.total_contributions}</span>
-              </div>
-            )}
-            {tooltip.node.member_count > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400">Members:</span>
-                <span className="font-mono text-amber-300">{tooltip.node.member_count}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400">Connections:</span>
-              <span className="font-mono text-violet-300">{(nodeEdgeMap.get(tooltip.node.id) || []).length}</span>
-            </div>
-          </div>
+          <HoverTooltip
+            tooltip={tooltip}
+            containerWidth={containerRef.current?.clientWidth || 500}
+            nodeEdgeMap={nodeEdgeMap}
+          />
         )}
 
         {/* Force Graph */}
@@ -567,298 +337,30 @@ export default function ForceGraphView({ graphData, loading }: Props) {
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.25}
             nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-              // Guard against non-finite coordinates during force simulation init
-              if (!isFinite(node.x) || !isFinite(node.y)) return;
-
-              const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node.id);
-              const isHovered = hoverNode?.id === node.id;
-              const isFocused = focusNodeId === node.id;
-              const color = getCommunityColor(node);
-              const alpha = isHighlighted ? 1 : 0.15;
-
-              ctx.globalAlpha = alpha;
-
-              if (node.type === "member") {
-                const pr = node.pagerank || 0;
-                const baseRadius = 12;
-                const radius = Math.max(baseRadius, Math.min(24, baseRadius + pr * 600));
-
-                // Glow ring for focused/hovered
-                if (isHovered || isFocused) {
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, radius + 6, 0, 2 * Math.PI);
-                  ctx.fillStyle = color + "20";
-                  ctx.fill();
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, radius + 3, 0, 2 * Math.PI);
-                  ctx.fillStyle = color + "35";
-                  ctx.fill();
-                }
-
-                // Gradient fill
-                const grad = ctx.createRadialGradient(
-                  node.x - radius * 0.3, node.y - radius * 0.3, 0,
-                  node.x, node.y, radius
-                );
-                grad.addColorStop(0, color + "ee");
-                grad.addColorStop(1, color);
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-                ctx.fill();
-
-                // White border
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 2.5 / globalScale;
-                ctx.stroke();
-
-                // Initials
-                const initials = node.label.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-                const fontSize = Math.max(radius * 0.65, 4);
-                ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = "#ffffff";
-                ctx.fillText(initials, node.x, node.y);
-
-                // Label below
-                const labelSize = Math.max(11 / globalScale, 3);
-                ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "600" : "500"} ${labelSize}px Inter, system-ui, sans-serif`;
-                ctx.textBaseline = "top";
-                ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
-                ctx.fillText(node.label, node.x, node.y + radius + 4 / globalScale);
-
-              } else if (node.type === "topic") {
-                // Topics: Hexagon
-                const baseSize = 8;
-                const size = Math.max(baseSize, Math.min(16, baseSize + (node.member_count || 0) * 2));
-
-                if (isHovered) {
-                  ctx.beginPath();
-                  for (let i = 0; i < 6; i++) {
-                    const angle = (Math.PI / 3) * i - Math.PI / 6;
-                    const x = node.x + (size + 5) * Math.cos(angle);
-                    const y = node.y + (size + 5) * Math.sin(angle);
-                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                  }
-                  ctx.closePath();
-                  ctx.fillStyle = color + "15";
-                  ctx.fill();
-                }
-
-                // Gradient fill
-                const grad = ctx.createRadialGradient(
-                  node.x, node.y - size * 0.2, 0,
-                  node.x, node.y, size
-                );
-                grad.addColorStop(0, color + "dd");
-                grad.addColorStop(1, color);
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                for (let i = 0; i < 6; i++) {
-                  const angle = (Math.PI / 3) * i - Math.PI / 6;
-                  const x = node.x + size * Math.cos(angle);
-                  const y = node.y + size * Math.sin(angle);
-                  i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                }
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 1.5 / globalScale;
-                ctx.stroke();
-
-                // Member count badge
-                if ((node.member_count || 0) > 1) {
-                  const bx = node.x + size - 2;
-                  const by = node.y - size + 2;
-                  ctx.fillStyle = BADGE_COLOR;
-                  ctx.beginPath();
-                  ctx.arc(bx, by, 5, 0, 2 * Math.PI);
-                  ctx.fill();
-                  ctx.fillStyle = "#fff";
-                  ctx.font = `bold ${6}px Inter, system-ui, sans-serif`;
-                  ctx.textAlign = "center";
-                  ctx.textBaseline = "middle";
-                  ctx.fillText(String(node.member_count), bx, by);
-                }
-
-                // Label
-                const labelSize = Math.max(9 / globalScale, 2.5);
-                ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "600" : "400"} ${labelSize}px Inter, system-ui, sans-serif`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "top";
-                ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
-                ctx.fillText(node.label, node.x, node.y + size + 3 / globalScale);
-
-              } else {
-                // Artifacts: Rounded square with icon
-                const baseSize = 6;
-                const size = Math.max(baseSize, Math.min(12, baseSize + (node.member_count || 0)));
-                const r = 2 / globalScale;
-
-                if (isHovered) {
-                  ctx.fillStyle = color + "15";
-                  ctx.beginPath();
-                  ctx.roundRect(node.x - size - 4, node.y - size - 4, (size + 4) * 2, (size + 4) * 2, r + 2);
-                  ctx.fill();
-                }
-
-                const grad = ctx.createRadialGradient(
-                  node.x, node.y - size * 0.2, 0,
-                  node.x, node.y, size * 1.4
-                );
-                grad.addColorStop(0, color + "dd");
-                grad.addColorStop(1, color);
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.roundRect(node.x - size, node.y - size, size * 2, size * 2, r);
-                ctx.fill();
-
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 1 / globalScale;
-                ctx.stroke();
-
-                // File icon inside
-                const iconSize = size * 0.6;
-                ctx.fillStyle = "#ffffff80";
-                ctx.fillRect(node.x - iconSize * 0.4, node.y - iconSize * 0.5, iconSize * 0.8, iconSize);
-                ctx.fillRect(node.x - iconSize * 0.5, node.y - iconSize * 0.3, iconSize, iconSize * 0.15);
-                ctx.fillRect(node.x - iconSize * 0.5, node.y + iconSize * 0.05, iconSize, iconSize * 0.15);
-
-                // Label
-                const labelSize = Math.max(8 / globalScale, 2);
-                ctx.font = `400 ${labelSize}px Inter, system-ui, sans-serif`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "top";
-                ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
-                const truncLabel = node.label.length > 20 ? node.label.slice(0, 18) + "…" : node.label;
-                ctx.fillText(truncLabel, node.x, node.y + size + 3 / globalScale);
-              }
-
-              ctx.globalAlpha = 1;
+              paintNode(node, ctx, globalScale, {
+                highlightNodes,
+                hoverNodeId: hoverNode?.id ?? null,
+                focusNodeId,
+                labelColor,
+                dimLabelColor,
+              });
             }}
-            nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
-              const radius = node.type === "member" ? 16 : node.type === "topic" ? 12 : 10;
-              ctx.fillStyle = color;
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-              ctx.fill();
-            }}
+            nodePointerAreaPaint={paintNodePointerArea}
           />
         )}
       </div>
 
       {/* Node detail panel */}
       {selectedNode && (
-        <div className="w-72 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-5 h-5 ${selectedNode.type === "topic" ? "rotate-45" : ""} rounded-sm`}
-                style={{ backgroundColor: NODE_TYPE_COLORS[selectedNode.type] || NODE_FALLBACK_COLOR }}
-              />
-              <div>
-                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{selectedNode.type}</h3>
-              </div>
-            </div>
-            <button onClick={() => { setSelectedNode(null); clearHighlight(); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-lg leading-none">&times;</button>
-          </div>
-          <div className="flex-1 overflow-auto p-4">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-4">{selectedNode.label}</h2>
-
-            {/* Quick action buttons */}
-            <div className="flex gap-1.5 mb-4">
-              <button
-                onClick={() => { setFocusMode(true); setFocusNodeId(selectedNode.id); }}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-2xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                Focus
-              </button>
-            </div>
-
-            <div className="space-y-3 mb-4">
-              {Object.entries(selectedNode.properties).map(([key, value]) => {
-                if (key === "community" || key === "pagerank" || key === "betweenness") {
-                  return (
-                    <div key={key}>
-                      <span className="text-2xs font-bold text-slate-400 uppercase tracking-wide">{key}</span>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-sm font-mono text-slate-700 dark:text-slate-300">
-                          {typeof value === "number" ? value.toFixed(4) : String(value)}
-                        </p>
-                        {key === "pagerank" && typeof value === "number" && (
-                          <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, (value as number) * 500)}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={key}>
-                    <span className="text-2xs font-bold text-slate-400 uppercase tracking-wide">{key.replace(/_/g, " ")}</span>
-                    {Array.isArray(value) ? (
-                      <div className="flex gap-1 flex-wrap mt-1">
-                        {(value as string[]).map((v) => (
-                          <span key={v} className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full">{v}</span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">{String(value)}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {connectedNodes.length > 0 && (
-              <div>
-                <h4 className="text-2xs font-bold text-slate-400 uppercase tracking-wide mb-2">
-                  Connections ({connectedNodes.length})
-                </h4>
-                <div className="space-y-1 max-h-60 overflow-auto">
-                  {connectedNodes.map((cn) => {
-                    const edge = selectedNodeEdges.find((e) => e.source === cn.id || e.target === cn.id);
-                    return (
-                      <button
-                        key={cn.id}
-                        onClick={() => {
-                          const found = graphData?.nodes.find((n) => n.id === cn.id);
-                          if (found) handleNodeClick({ ...found, ...found.properties });
-                        }}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-left"
-                      >
-                        <div
-                          className={`w-2.5 h-2.5 shrink-0 ${cn.type === "topic" ? "rotate-45" : "rounded-full"}`}
-                          style={{ backgroundColor: NODE_TYPE_COLORS[cn.type] || NODE_FALLBACK_COLOR }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate block">{cn.label}</span>
-                          {edge && (
-                            <span className="text-2xs text-slate-400">
-                              {edge.type.replace(/_/g, " ").toLowerCase()}
-                              {edge.weight > 0 ? ` (${edge.weight.toFixed(1)})` : ""}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {selectedNode.type === "member" && (
-              <button
-                onClick={() => navigate(`/members/${selectedNode.id}`)}
-                className="mt-4 w-full px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
-              >
-                View Full Profile
-              </button>
-            )}
-          </div>
-        </div>
+        <NodeDetailPanel
+          selectedNode={selectedNode}
+          graphData={graphData}
+          selectedNodeEdges={selectedNodeEdges}
+          connectedNodes={connectedNodes}
+          onClose={() => { setSelectedNode(null); clearHighlight(); }}
+          onFocus={(nodeId) => { setFocusMode(true); setFocusNodeId(nodeId); }}
+          onNodeClick={handleNodeClick}
+        />
       )}
     </div>
   );

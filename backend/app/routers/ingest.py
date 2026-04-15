@@ -3,7 +3,13 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from sqlalchemy.orm import Session
 
-from app.schemas.requests import MarkdownIngestRequest, GitIngestRequest
+from app.schemas.requests import (
+    MarkdownIngestRequest,
+    GitIngestRequest,
+    NotionIngestRequest,
+    GoogleDocsIngestRequest,
+    ConfluenceIngestRequest,
+)
 from app.schemas.responses import IngestionResponse
 from app.models.artifact import ArtifactRecord
 from app.models.member import MemberRecord
@@ -575,3 +581,109 @@ async def ingest_documents(request: Request, files: list[UploadFile] = File(...)
             chunk_count=len(all_chunks),
             member_count=0,
         )
+
+
+# ── Phase 5: External integration ingest endpoints ────────────────────────────
+
+@router.post("/notion", response_model=IngestionResponse)
+async def ingest_notion(
+    body: NotionIngestRequest,
+    request: Request,
+    user=Depends(require_role("admin", "member")),
+):
+    """Ingest pages from a Notion database or page tree.
+
+    Requires CB_NOTION_TOKEN in .env.
+    Provide either database_id (all pages in a DB) or page_id (single page + children).
+    """
+    settings = request.app.state.settings
+    if not settings.notion_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Notion integration not configured. Set CB_NOTION_TOKEN in .env",
+        )
+    try:
+        source_input = body.to_source_input()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.ingestion.notion_connector import NotionConnector
+    connector = NotionConnector(
+        token=settings.notion_token,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+    source_path = f"notion:{body.database_id or body.page_id}"
+    return _run_ingestion(request, connector, source_input, source_path, room_id=body.room_id)
+
+
+@router.post("/google-docs", response_model=IngestionResponse)
+async def ingest_google_docs(
+    body: GoogleDocsIngestRequest,
+    request: Request,
+    user=Depends(require_role("admin", "member")),
+):
+    """Ingest Google Docs from a list of document IDs or a Drive folder.
+
+    Requires CB_GOOGLE_SERVICE_ACCOUNT_FILE or CB_GOOGLE_ACCESS_TOKEN in .env.
+    """
+    settings = request.app.state.settings
+    if not settings.google_service_account_file and not settings.google_access_token:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Google Docs integration not configured. "
+                "Set CB_GOOGLE_SERVICE_ACCOUNT_FILE or CB_GOOGLE_ACCESS_TOKEN in .env"
+            ),
+        )
+    try:
+        source_input = body.to_source_input()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.ingestion.google_docs_connector import GoogleDocsConnector
+    connector = GoogleDocsConnector(
+        service_account_file=settings.google_service_account_file or None,
+        access_token=settings.google_access_token or None,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+    source_path = f"google_docs:{body.folder_id or ','.join(body.document_ids or [])}"
+    return _run_ingestion(request, connector, source_input, source_path, room_id=body.room_id)
+
+
+@router.post("/confluence", response_model=IngestionResponse)
+async def ingest_confluence(
+    body: ConfluenceIngestRequest,
+    request: Request,
+    user=Depends(require_role("admin", "member")),
+):
+    """Ingest pages from a Confluence space or specific page IDs.
+
+    Requires CB_CONFLUENCE_URL, CB_CONFLUENCE_USER, CB_CONFLUENCE_TOKEN in .env.
+    """
+    settings = request.app.state.settings
+    if not settings.confluence_url or not settings.confluence_token:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Confluence integration not configured. "
+                "Set CB_CONFLUENCE_URL, CB_CONFLUENCE_USER, CB_CONFLUENCE_TOKEN in .env"
+            ),
+        )
+    try:
+        source_input = body.to_source_input()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.ingestion.confluence_connector import ConfluenceConnector
+    connector = ConfluenceConnector(
+        url=settings.confluence_url,
+        username=settings.confluence_user,
+        token=settings.confluence_token,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+        cloud=settings.confluence_cloud,
+    )
+    source_path = f"confluence:{body.space_key or ','.join(body.page_ids or [])}"
+    return _run_ingestion(request, connector, source_input, source_path, room_id=body.room_id)

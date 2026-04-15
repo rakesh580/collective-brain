@@ -31,7 +31,7 @@ export default function TeamProgressRing({
             fill="none"
             stroke="currentColor"
             strokeWidth={strokeWidth}
-            className="text-slate-100 dark:text-slate-700"
+            className="text-slate-100"
           />
           {/* Progress circle */}
           <circle
@@ -51,13 +51,13 @@ export default function TeamProgressRing({
         </svg>
         {/* Center text */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold text-slate-800 dark:text-white">
+          <span className="text-lg font-bold text-slate-800">
             {Math.round(value)}%
           </span>
         </div>
       </div>
       <div className="text-center">
-        <p className="text-xs font-medium text-slate-700 dark:text-slate-300">{label}</p>
+        <p className="text-xs font-medium text-slate-700">{label}</p>
         {sublabel && (
           <p className="text-2xs text-slate-400">{sublabel}</p>
         )}

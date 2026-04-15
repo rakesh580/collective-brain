@@ -91,30 +91,30 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
   };
 
   const inputClass =
-    "w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
+    "w-full border border-default   rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-labelledby="member-form-modal-title" className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="member-form-modal-title" className="relative border border-default rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 id="member-form-modal-title" className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+          <h3 id="member-form-modal-title" className="text-lg font-semibold ">
             {member ? "Edit Member" : "Add Member"}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Close member form">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors" aria-label="Close member form">
             <X size={18} />
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-sm rounded-lg p-3 mb-4">
+          <div className=" border text-red-500 text-sm rounded-lg p-3 mb-4">
             {error}
           </div>
         )}
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name *</label>
+            <label className="block text-sm font-medium mb-1">Name *</label>
             <input
               type="text"
               value={name}
@@ -125,7 +125,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
+            <label className="block text-sm font-medium mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -136,20 +136,20 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-sm font-medium mb-1">
               Expertise Tags
             </label>
-            <div className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex flex-wrap gap-1.5 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+            <div className="border border-default rounded-lg px-3 py-2 flex flex-wrap gap-1.5 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 text-xs bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full"
+                  className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-400 px-2 py-0.5 rounded-full"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => setTags(tags.filter((t) => t !== tag))}
-                    className="text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200"
+                    className="text-indigo-400 hover:text-indigo-700 "
                     aria-label={`Remove ${tag} tag`}
                   >
                     x
@@ -162,14 +162,14 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 onBlur={() => { if (tagInput) addTag(tagInput); }}
-                className="flex-1 min-w-[100px] text-sm outline-none bg-transparent text-slate-800 dark:text-slate-200 placeholder-slate-400"
+                className="flex-1 min-w-[100px] text-sm outline-none bg-transparent placeholder-slate-400"
                 placeholder={tags.length === 0 ? "Type and press Enter..." : ""}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-sm font-medium mb-1">
               Strengths <span className="text-slate-400 font-normal">(comma-separated)</span>
             </label>
             <textarea
@@ -182,7 +182,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-sm font-medium mb-1">
               Weaknesses <span className="text-slate-400 font-normal">(comma-separated)</span>
             </label>
             <textarea
@@ -198,7 +198,7 @@ export default function MemberFormModal({ member, onSave, onClose, isOpen }: Pro
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            className="px-4 py-2 text-sm hover:text-slate-800 transition-colors"
           >
             Cancel
           </button>

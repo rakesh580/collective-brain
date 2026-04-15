@@ -26,10 +26,9 @@ class Settings(BaseSettings):
     agent_max_iterations: int = 10
 
     # JWT Auth — no default; must be set via CB_JWT_SECRET env var.
-    # A random secret is generated at startup if unset (see main.py lifespan).
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 30  # 30 minutes
+    jwt_expire_minutes: int = 30
 
     # Google OAuth
     google_client_id: str = ""
@@ -38,18 +37,20 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
     embedding_dimension: int = 384
 
-    # ChromaDB
-    chroma_persist_dir: str = "./data/chroma_db"
-
-    # Database — PostgreSQL recommended for production, SQLite for local dev
-    # PostgreSQL: postgresql://user:pass@host:5432/dbname
-    # SQLite:     sqlite:///./data/collective_brain.db
+    # ── Supabase ─────────────────────────────────────────────────────────
+    # Transaction-mode pooler URL (port 6543) — used at runtime by the app
     database_url: str = ""
 
-    # Legacy SQLite fallback (used only when database_url is empty)
-    sqlite_url: str = "sqlite:///./data/collective_brain.db"
+    # Direct session URL (port 5432) — used ONLY by Alembic migrations
+    # Never used by the running FastAPI app (pooler handles that).
+    migration_database_url: str = ""
 
-    # Connection pool settings (PostgreSQL only, ignored for SQLite)
+    # Supabase project credentials (used by supabase-py client for auth helpers)
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_key: str = ""
+
+    # Connection pool settings (PostgreSQL)
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_pool_timeout: int = 30
@@ -67,30 +68,55 @@ class Settings(BaseSettings):
     context_max_tokens: int = 3000
 
     # Rate limiting
-    rate_limit_requests: int = 60  # per minute
-    rate_limit_ai_requests: int = 10  # AI queries per minute per user
+    rate_limit_requests: int = 60
+    rate_limit_ai_requests: int = 10
 
-    # Slack Bot Integration (set via CB_SLACK_CLIENT_ID, etc.)
+    # Slack Bot Integration
     slack_client_id: str = ""
     slack_client_secret: str = ""
     slack_signing_secret: str = ""
 
-    # GitHub Webhook Integration (set via CB_GITHUB_WEBHOOK_SECRET)
+    # GitHub Webhook Integration
     github_webhook_secret: str = ""
+
+    # ── Phase 5: External integrations ───────────────────────────────────
+    # Notion
+    notion_token: str = ""
+
+    # Google Docs / Drive (service account JSON file path OR OAuth access token)
+    google_service_account_file: str = ""
+    google_access_token: str = ""
+
+    # Confluence
+    confluence_url: str = ""       # e.g. https://yoursite.atlassian.net/wiki
+    confluence_user: str = ""      # email for Confluence Cloud
+    confluence_token: str = ""     # API token
+    confluence_cloud: bool = True
+
+    # Knowledge verification
+    knowledge_staleness_threshold_days: int = 30
 
     # Logging
     log_level: str = "INFO"
 
     @property
     def effective_database_url(self) -> str:
-        """Return database_url if explicitly set, else sqlite_url as fallback."""
-        if self.database_url:
-            return self.database_url
-        return self.sqlite_url
+        """Runtime DB URL — must be set via CB_DATABASE_URL."""
+        if not self.database_url:
+            raise RuntimeError(
+                "CB_DATABASE_URL is not set. "
+                "Copy .env.example to backend/.env and fill in your Supabase pooler URL."
+            )
+        return self.database_url
+
+    @property
+    def effective_migration_url(self) -> str:
+        """Direct URL for Alembic migrations — falls back to database_url if unset."""
+        return self.migration_database_url or self.database_url
 
     @property
     def is_postgres(self) -> bool:
-        return self.effective_database_url.startswith("postgresql")
+        return self.database_url.startswith("postgresql")
 
     model_config = {"env_file": ".env", "env_prefix": "CB_", "extra": "ignore"}
 

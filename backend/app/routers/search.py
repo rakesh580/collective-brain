@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, or_
 
 from app.models.member import MemberRecord
@@ -6,6 +6,7 @@ from app.models.artifact import ArtifactRecord
 from app.models.insight import InsightRecord
 from app.models.room import ChatRoom
 from app.db.database import create_session
+from app.dependencies import get_current_user
 
 router = APIRouter()
 
@@ -15,15 +16,12 @@ def _get_db():
 
 
 @router.get("")
-async def search(request: Request, q: str, room_id: str | None = None, limit: int = 20, semantic: bool = False):
+async def search(request: Request, q: str, room_id: str | None = None, limit: int = 20, semantic: bool = False, user=Depends(get_current_user)):
     """Cross-entity search across members, artifacts, insights, and rooms using SQL ILIKE.
 
     When semantic=true, also performs embedding-based vector search and includes
     the results under a ``"semantic"`` key.
     """
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     db = _get_db()
     try:
         # Escape ILIKE special characters to prevent false matches
@@ -151,11 +149,8 @@ def _perform_semantic_search(request: Request, query: str, n_results: int = 20, 
 
 
 @router.get("/semantic")
-async def search_semantic(request: Request, q: str, room_id: str | None = None, limit: int = 20):
+async def search_semantic(request: Request, q: str, room_id: str | None = None, limit: int = 20, user=Depends(get_current_user)):
     """Dedicated semantic search endpoint returning only vector search results with scores."""
-    from app.dependencies import get_current_user
-    get_current_user(request)
-
     results = _perform_semantic_search(request, q, n_results=limit, room_id=room_id)
     return {
         "query": q,

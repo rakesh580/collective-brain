@@ -7,7 +7,7 @@ interface Props {
   roomId?: string;
 }
 
-type SourceType = "git" | "markdown" | "documents" | "slack" | "discord" | "tasks";
+type SourceType = "git" | "markdown" | "documents" | "slack" | "discord" | "tasks" | "notion" | "google-docs" | "confluence";
 
 interface SourceConfig {
   label: string;
@@ -54,6 +54,21 @@ const sourceConfigs: Record<SourceType, SourceConfig> = {
     inputType: "file",
     accept: ".json,.csv",
     description: "Upload a JSON or CSV task list",
+  },
+  notion: {
+    label: "Notion",
+    inputType: "path",
+    description: "Enter a Notion database ID or page URL. Requires NOTION_API_KEY in backend .env",
+  },
+  "google-docs": {
+    label: "Google Docs",
+    inputType: "path",
+    description: "Enter a Google Drive folder ID. Requires Google service account credentials in backend",
+  },
+  confluence: {
+    label: "Confluence",
+    inputType: "path",
+    description: "Enter a Confluence space key. Requires CONFLUENCE_URL and CONFLUENCE_TOKEN in backend .env",
   },
 };
 

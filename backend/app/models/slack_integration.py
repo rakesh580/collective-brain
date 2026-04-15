@@ -8,6 +8,9 @@ class SlackWorkspace(Base):
     __tablename__ = "slack_workspaces"
 
     id = Column(String, primary_key=True)  # Slack team_id
+    organization_id = Column(
+        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     team_name = Column(String, nullable=False)
     bot_token = Column(Text, nullable=False)  # encrypted in production
     bot_user_id = Column(String)

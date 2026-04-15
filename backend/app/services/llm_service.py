@@ -1,3 +1,4 @@
+import time
 import httpx
 import logging
 from app.config import Settings
@@ -10,7 +11,6 @@ class LLMService:
     def __init__(self, settings: Settings):
         self.provider = settings.llm_provider
 
-        # Circuit breaker: open after 3 failures, recover after 30s
         self.breaker = CircuitBreaker(
             name=f"llm_{self.provider}",
             failure_threshold=3,
@@ -37,6 +37,49 @@ class LLMService:
         return await self.breaker.call(self._generate_impl, messages, max_tokens)
 
     async def _generate_impl(self, messages: list[dict], max_tokens: int = 2048) -> str:
+        from app.services.telemetry import get_tracer
+        from app.services.metrics import LLM_REQUESTS_TOTAL, LLM_LATENCY, LLM_TOKENS_ESTIMATED
+
+        tracer = get_tracer("collective_brain.llm")
+        t0 = time.perf_counter()
+        status = "success"
+
+        # Rough token estimate: count chars / 4 across all messages
+        total_chars = sum(len(m.get("content", "")) for m in messages)
+        estimated_tokens = total_chars // 4
+
+        with tracer.start_as_current_span(
+            f"llm.generate.{self.provider}",
+            attributes={
+                "llm.provider": self.provider,
+                "llm.model": self.model,
+                "llm.max_tokens": max_tokens,
+                "llm.estimated_input_tokens": estimated_tokens,
+            },
+        ) as span:
+            try:
+                result = await self._call_provider(messages, max_tokens)
+                span.set_attribute("llm.status", "success")
+                return result
+            except Exception as e:
+                status = "error"
+                span.record_exception(e)
+                span.set_attribute("llm.status", "error")
+                raise
+            finally:
+                elapsed = time.perf_counter() - t0
+                LLM_LATENCY.labels(provider=self.provider, model=self.model).observe(elapsed)
+                LLM_REQUESTS_TOTAL.labels(
+                    provider=self.provider, model=self.model, status=status
+                ).inc()
+                LLM_TOKENS_ESTIMATED.labels(provider=self.provider, org_id="-").inc(estimated_tokens)
+                logger.debug(
+                    "LLM generate: provider=%s model=%s elapsed=%.2fs status=%s",
+                    self.provider, self.model, elapsed, status,
+                )
+
+    async def _call_provider(self, messages: list[dict], max_tokens: int) -> str:
+        """Raw provider call — no metrics/tracing (handled by caller)."""
         if self.provider == "claude":
             system_msg = ""
             chat_messages = []
@@ -55,6 +98,7 @@ class LLMService:
             if not response.content:
                 raise ValueError("Claude returned empty response content")
             return response.content[0].text
+
         elif self.provider == "mistral":
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
@@ -76,7 +120,8 @@ class LLMService:
                 if not choices:
                     raise ValueError(f"Mistral returned no choices: {data}")
                 return choices[0]["message"]["content"]
-        else:
+
+        else:  # ollama
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
                     f"{self.ollama_url}/api/chat",
@@ -95,7 +140,11 @@ class LLMService:
 
     async def is_available(self) -> bool:
         """Check if LLM is available (respects circuit breaker)."""
-        if not self.breaker.is_available:
+        from app.services.metrics import CIRCUIT_BREAKER_STATE
+        is_open = not self.breaker.is_available
+        CIRCUIT_BREAKER_STATE.labels(service=f"llm_{self.provider}").set(1 if is_open else 0)
+
+        if is_open:
             return False
         try:
             if self.provider == "claude":
@@ -126,5 +175,4 @@ class LLMService:
             return False
 
     def get_circuit_status(self) -> dict:
-        """Return circuit breaker status for health checks."""
         return self.breaker.get_status()

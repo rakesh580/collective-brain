@@ -4,9 +4,9 @@ import type { FreshnessReport, FreshnessAlert } from "../../types";
 import { AlertTriangle, Clock, RefreshCw, Shield, FileText } from "lucide-react";
 
 const STATUS_CONFIG = {
-  fresh: { color: "#10b981", bg: "bg-emerald-50 dark:bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400", label: "Fresh" },
-  aging: { color: "#f59e0b", bg: "bg-amber-50 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", label: "Aging" },
-  stale: { color: "#ef4444", bg: "bg-red-50 dark:bg-red-500/10", text: "text-red-700 dark:text-red-400", label: "Stale" },
+  fresh: { color: "#10b981", bg: "", text: "text-emerald-700 ", label: "Fresh" },
+  aging: { color: "#f59e0b", bg: "", text: "text-amber-700 ", label: "Aging" },
+  stale: { color: "#ef4444", bg: "", text: "text-red-500", label: "Stale" },
 } as const;
 
 function getBarColor(score: number): string {
@@ -17,13 +17,13 @@ function getBarColor(score: number): string {
 
 function getSourceBadgeStyle(sourceType: string): string {
   const styles: Record<string, string> = {
-    git_content: "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    slack_content: "bg-sky-100 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300",
-    discord_content: "bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-    markdown_content: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-    document_content: "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    git_content: "bg-violet-100  text-violet-700 ",
+    slack_content: "bg-sky-100  text-sky-700 ",
+    discord_content: "bg-indigo-100  text-indigo-400",
+    markdown_content: "bg-emerald-100  text-emerald-700 ",
+    document_content: "bg-amber-100  text-amber-700 ",
   };
-  return styles[sourceType] || "bg-slate-100 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300";
+  return styles[sourceType] || "bg-slate-100  ";
 }
 
 export interface FreshnessAlertsProps {
@@ -51,10 +51,10 @@ export default function FreshnessAlerts(_props?: FreshnessAlertsProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+      <div className="border border-default rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Shield size={16} className="text-indigo-500" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <h3 className="text-sm font-semibold ">
             Knowledge Freshness
           </h3>
         </div>
@@ -68,28 +68,28 @@ export default function FreshnessAlerts(_props?: FreshnessAlertsProps) {
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+      <div className="border border-default rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Shield size={16} className="text-indigo-500" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <h3 className="text-sm font-semibold ">
             Knowledge Freshness
           </h3>
         </div>
-        <div className="text-sm text-red-500 dark:text-red-400">{error}</div>
+        <div className="text-sm text-red-500 ">{error}</div>
       </div>
     );
   }
 
   if (!report || report.summary.total === 0) {
     return (
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+      <div className="border border-default rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Shield size={16} className="text-indigo-500" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <h3 className="text-sm font-semibold ">
             Knowledge Freshness
           </h3>
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm ">
           No artifacts to analyze. Ingest some data to see freshness insights.
         </p>
       </div>
@@ -102,18 +102,18 @@ export default function FreshnessAlerts(_props?: FreshnessAlertsProps) {
   );
 
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+    <div className="border border-default rounded-xl p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Shield size={16} className="text-indigo-500" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <h3 className="text-sm font-semibold ">
             Knowledge Freshness
           </h3>
         </div>
         <button
           onClick={fetchData}
-          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          className="p-1.5 rounded-lg transition-colors"
           title="Refresh"
           aria-label="Refresh freshness data"
         >
@@ -141,7 +141,7 @@ export default function FreshnessAlerts(_props?: FreshnessAlertsProps) {
       ) : (
         <div className="flex items-center gap-2 py-4 justify-center">
           <Shield size={16} className="text-emerald-500" />
-          <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+          <span className="text-sm text-emerald-400 font-medium">
             All knowledge is up to date
           </span>
         </div>
@@ -172,11 +172,11 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
   const barColor = getBarColor(alert.staleness_score);
 
   return (
-    <div className="border border-slate-100 dark:border-slate-700 rounded-lg p-3.5 hover:border-slate-200 dark:hover:border-slate-600 transition-colors">
+    <div className="border border-subtle rounded-lg p-3.5 hover:border-slate-200 transition-colors">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <FileText size={14} className="text-slate-400 flex-shrink-0" />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
+          <span className="text-sm font-medium truncate">
             {alert.title}
           </span>
           <span
@@ -198,7 +198,7 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
       {/* Days old */}
       <div className="flex items-center gap-1 mb-2">
         <Clock size={11} className="text-slate-400" />
-        <span className="text-xs text-slate-500 dark:text-slate-400">
+        <span className="text-xs ">
           {alert.days_old} days old
         </span>
       </div>
@@ -207,11 +207,11 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
       <div className="mb-2">
         <div className="flex items-center justify-between mb-1">
           <span className="text-2xs text-slate-400">Staleness Score</span>
-          <span className="text-2xs font-medium text-slate-500 dark:text-slate-400">
+          <span className="text-2xs font-medium ">
             {alert.staleness_score}
           </span>
         </div>
-        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -224,7 +224,7 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
 
       {/* Related changes */}
       {alert.related_changes > 0 && (
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1.5">
+        <p className="text-xs mb-1.5">
           {alert.related_changes} PR{alert.related_changes !== 1 ? "s" : ""} since last update
         </p>
       )}
@@ -235,7 +235,7 @@ function AlertCard({ alert }: { alert: FreshnessAlert }) {
           {alert.responsible_members.map((name) => (
             <span
               key={name}
-              className="text-2xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded"
+              className="text-2xs px-1.5 py-0.5 rounded"
             >
               {name}
             </span>

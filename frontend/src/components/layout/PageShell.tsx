@@ -1,19 +1,28 @@
 import { Outlet } from "react-router-dom";
+import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
+import CommandPalette from "../ui/CommandPalette";
 
-export interface PageShellProps {
-  children?: React.ReactNode;
-}
-
-export default function PageShell(_props?: PageShellProps) {
+export default function PageShell() {
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div
+      className="flex min-h-screen transition-colors duration-300"
+      style={{ background: "var(--bg-base)" }}
+    >
       <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="animate-page-enter">
+      <main
+        className="flex-1 overflow-auto min-w-0"
+        style={{ background: "var(--bg-base)" }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        >
           <Outlet />
-        </div>
+        </motion.div>
       </main>
+      <CommandPalette />
     </div>
   );
 }

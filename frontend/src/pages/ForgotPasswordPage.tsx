@@ -66,11 +66,12 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
     try {
       const res = await api.authResetPassword(email, code, newPassword);
-      // Auto-login with the new token
+      // Auto-login with the new tokens
       localStorage.setItem("cb_token", res.token);
+      localStorage.setItem("cb_refresh_token", res.refresh_token);
       setStep("done");
-      // Navigate to home after a brief delay
-      setTimeout(() => navigate("/"), 1500);
+      // Full page reload to sync auth state with AuthProvider
+      setTimeout(() => { window.location.href = "/"; }, 1500);
     } catch (err) {
       setError(parseApiError(err));
     } finally {

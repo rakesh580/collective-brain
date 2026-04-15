@@ -31,7 +31,7 @@ export default function MemberSummaryCard({ member }: Props) {
   return (
     <Link
       to={`/members/${member.id}`}
-      className="block bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 card-hover"
+      className="block bg-elevated border border-default rounded-xl p-4 card-hover"
     >
       <div className="flex items-center gap-3">
         <div
@@ -40,10 +40,10 @@ export default function MemberSummaryCard({ member }: Props) {
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+          <h3 className="text-sm font-semibold text-slate-800 truncate">
             {member.name}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-500">
             {member.total_contributions} contributions
           </p>
         </div>
@@ -53,7 +53,7 @@ export default function MemberSummaryCard({ member }: Props) {
           {member.expertise_tags.slice(0, 4).map((tag) => (
             <span
               key={tag}
-              className="text-2xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full"
+              className="text-2xs bg-muted text-slate-600 px-2 py-0.5 rounded-full"
             >
               {tag}
             </span>

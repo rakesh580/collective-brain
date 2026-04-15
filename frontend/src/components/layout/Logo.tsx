@@ -97,7 +97,7 @@ export function LogoFull({ collapsed = false }: LogoFullProps) {
           <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent leading-tight">
             Collective Brain
           </h1>
-          <p className="text-2xs text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
+          <p className="text-2xs text-slate-500 font-medium tracking-wider uppercase">
             Group Intelligence
           </p>
         </div>

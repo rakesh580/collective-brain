@@ -64,25 +64,25 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
         }
       `}</style>
 
-      <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-slate-800 dark:via-slate-800 dark:to-indigo-900/20 border border-indigo-200 dark:border-indigo-500/20 rounded-2xl p-4 shadow-sm">
+      <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 border rounded-2xl p-4 shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-500/20">
-              <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+            <div className="flex items-center justify-center w-7 h-7 rounded-full ">
+              <Sparkles size={14} className="text-indigo-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              <p className="text-sm font-semibold ">
                 Want to talk to an expert?
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] ">
                 These team members may be able to help
               </p>
             </div>
           </div>
           <button
             onClick={onDismiss}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg "
             aria-label="Dismiss expert suggestions"
           >
             <X size={16} />
@@ -100,22 +100,22 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
               <div
                 key={expert.member_id}
                 className={`flex-shrink-0 w-56 rounded-xl border p-3 transition-all ${
-                  isRequested
-                    ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-500/20"
-                    : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/30 hover:shadow-md"
-                }`}
+ isRequested
+ ? "bg-green-50 border-green-200 "
+ : "/80 border-default hover:border-indigo-300 hover:shadow-md"
+ }`}
               >
                 {/* Name and availability */}
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex-shrink-0">
-                      <Users size={14} className="text-indigo-600 dark:text-indigo-400" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0">
+                      <Users size={14} className="text-indigo-400" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                      <p className="text-sm font-bold truncate">
                         {expert.name}
                       </p>
-                      <p className="text-2xs text-slate-500 dark:text-slate-400">
+                      <p className="text-2xs ">
                         {expert.availability_hint}
                       </p>
                     </div>
@@ -125,14 +125,14 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                 {/* Match score bar */}
                 <div className="mb-2">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-2xs font-medium text-slate-500 dark:text-slate-400">
+                    <span className="text-2xs font-medium ">
                       Match
                     </span>
-                    <span className="text-2xs font-semibold text-indigo-600 dark:text-indigo-400">
+                    <span className="text-2xs font-semibold text-indigo-400">
                       {scorePercent}%
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
                       style={{ width: `${scorePercent}%` }}
@@ -145,13 +145,13 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                   {expert.expertise_topics.slice(0, 3).map((topic) => (
                     <span
                       key={topic}
-                      className="text-2xs font-medium px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                      className="text-2xs font-medium px-1.5 py-0.5 rounded-full "
                     >
                       {topic}
                     </span>
                   ))}
                   {expert.expertise_topics.length > 3 && (
-                    <span className="text-2xs text-slate-400 dark:text-slate-500 self-center">
+                    <span className="text-2xs self-center">
                       +{expert.expertise_topics.length - 3}
                     </span>
                   )}
@@ -159,15 +159,15 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
 
                 {/* Last active */}
                 <div className="flex items-center gap-1 mb-3">
-                  <Clock size={10} className="text-slate-400 dark:text-slate-500" />
-                  <span className="text-2xs text-slate-500 dark:text-slate-400">
+                  <Clock size={10} className="" />
+                  <span className="text-2xs ">
                     Active {timeAgo(expert.last_active)}
                   </span>
                 </div>
 
                 {/* Action button */}
                 {isRequested ? (
-                  <div className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400 text-xs font-medium">
+                  <div className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-green-100 text-green-700 text-xs font-medium">
                     <CheckCircle2 size={14} />
                     Request Sent
                   </div>
@@ -175,7 +175,7 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
                   <button
                     onClick={() => handleRequestHelp(expert)}
                     disabled={isLoadingThis}
-                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <MessageCircle size={12} />
                     {isLoadingThis ? "Sending..." : "Request Help"}

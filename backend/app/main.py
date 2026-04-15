@@ -16,45 +16,57 @@ from app.services.llm_service import LLMService
 from app.services.redis_service import RedisService
 from app.services.task_queue import TaskQueue
 from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerError
+from app.services.telemetry import setup_telemetry, current_trace_id
+from app.services.metrics import APP_INFO
 import app.models  # noqa: F401 -- ensure all models registered with Base
 from app.routers import (
     health, ingest, query, members, insights, graph,
     conversations, artifacts, analytics, search, auth, discussions, rooms, slack,
     github_webhooks, expert_routing,
 )
+from app.routers.organizations import router as organizations_router
+from app.routers.saml import router as saml_router
+from app.routers.scim import router as scim_router
+from app.routers.offboarding import router as offboarding_router
+from app.routers.public_kb import manage_router as public_kb_manage_router, public_router as public_kb_router
 
 import logging
-
 from pythonjsonlogger import jsonlogger
 
-# Inject default request_id into all log records (compatible with Python 3.11)
+# ── OpenTelemetry must be set up before any instrumented code runs ──
+setup_telemetry(service_name="collective-brain", version="0.3.0")
+
+# ── Log record factory: inject request_id, trace_id, org_id ──────────────────
 _old_factory = logging.getLogRecordFactory()
 
 def _record_factory(*args, **kwargs):
     record = _old_factory(*args, **kwargs)
     if not hasattr(record, "request_id"):
         record.request_id = "-"
+    if not hasattr(record, "trace_id"):
+        record.trace_id = current_trace_id()
+    if not hasattr(record, "org_id"):
+        record.org_id = "-"
     return record
 
 logging.setLogRecordFactory(_record_factory)
 
-# Configure logging: JSON format for production, text for development
+# ── Logging format ────────────────────────────────────────────────────────────
 _log_level = os.environ.get("CB_LOG_LEVEL", "INFO").upper()
 _dev_mode = os.environ.get("CB_DEV_MODE", "") == "1"
 
 if _dev_mode:
     _formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s"
+        "%(asctime)s [%(levelname)s] %(name)s [req=%(request_id)s trace=%(trace_id)s]: %(message)s"
     )
 else:
     _formatter = jsonlogger.JsonFormatter(
-        fmt="%(asctime)s %(levelname)s %(name)s %(request_id)s %(message)s",
+        fmt="%(asctime)s %(levelname)s %(name)s %(request_id)s %(trace_id)s %(org_id)s %(message)s",
         rename_fields={"asctime": "timestamp", "levelname": "level"},
     )
 
 _handler = logging.StreamHandler()
 _handler.setFormatter(_formatter)
-
 logging.basicConfig(level=getattr(logging, _log_level, logging.INFO), handlers=[_handler])
 
 logger = logging.getLogger("collective_brain")
@@ -65,22 +77,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
 
-    # ── Check persistent storage on HuggingFace Spaces ──
-    _marker = Path("/data/.cb_persistence_marker")
-    if Path("/data").exists():
-        if _marker.exists():
-            logger.info("Persistent storage verified (/data survives restarts)")
-        else:
-            logger.warning(
-                "First boot with /data — if user data disappears after restart, "
-                "enable Persistent Storage in your HF Space Settings"
-            )
-            try:
-                _marker.write_text("ok")
-            except OSError:
-                pass
-
-    # ── Database (PostgreSQL or SQLite) ──
+    # ── Database (Supabase/PostgreSQL) + Alembic migrations ──
     init_db(settings=settings)
 
     # ── Redis (optional — graceful fallback to in-memory) ──
@@ -93,11 +90,12 @@ async def lifespan(app: FastAPI):
     app.state.task_queue = task_queue
 
     # ── Core Services ──
+    from app.db.database import get_session_factory
     app.state.embedding_service = EmbeddingService(settings.embedding_model)
-    app.state.vector_store = VectorStoreService(settings.chroma_persist_dir)
+    app.state.vector_store = VectorStoreService(get_session_factory())
     app.state.llm_service = LLMService(settings)
 
-    # ── Circuit Breakers for external services ──
+    # ── Circuit Breakers ──
     app.state.embedding_breaker = CircuitBreaker(
         "embedding_service", failure_threshold=5, recovery_timeout=60.0
     )
@@ -109,14 +107,18 @@ async def lifespan(app: FastAPI):
     discussions_init_redis(app)
 
     redis_ok = await redis.ping()
-    db_type = "PostgreSQL" if settings.is_postgres else "SQLite"
 
-    # Auto-generate a random JWT secret if none was provided.
-    # This is safe for single-worker or single-container deployments.
-    # For multi-worker/replica setups, set CB_JWT_SECRET explicitly.
+    # ── Publish app info to Prometheus ──
+    APP_INFO.info({
+        "version": "0.3.0",
+        "llm_provider": settings.llm_provider,
+        "agent_mode": settings.agent_mode,
+        "embedding_model": settings.embedding_model,
+    })
+
+    # JWT secret — generate if not set
     if not settings.jwt_secret:
         import secrets as _secrets
-        # Persist JWT secret to /data so tokens survive container restarts
         _jwt_path = Path("/data/.cb_jwt_secret")
         if _jwt_path.exists():
             settings.jwt_secret = _jwt_path.read_text().strip()
@@ -133,7 +135,10 @@ async def lifespan(app: FastAPI):
                     "JWTs will be invalidated on restart.", _jwt_path
                 )
 
-    # Eager-load the embedding model to avoid 5-10s latency on first query
+    if settings.jwt_secret and len(settings.jwt_secret) < 32:
+        logger.warning("CB_JWT_SECRET is shorter than 32 characters — use a stronger secret")
+
+    # Eager-load embedding model
     try:
         _ = app.state.embedding_service.model
         logger.info("Embedding model pre-loaded successfully")
@@ -141,8 +146,7 @@ async def lifespan(app: FastAPI):
         logger.warning("Failed to pre-load embedding model: %s", e)
 
     logger.info(
-        "Collective Brain started (DB: %s, Redis: %s, LLM: %s/%s, Agent: %s)",
-        db_type,
+        "Collective Brain started (DB: Supabase/PostgreSQL, Redis: %s, LLM: %s/%s, Agent: %s)",
         "connected" if redis_ok else "in-memory fallback",
         settings.llm_provider,
         settings.agent_mode,
@@ -152,17 +156,6 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Graceful Shutdown ──
-    # Flush SQLite WAL to main file before container dies
-    if not settings.is_postgres:
-        try:
-            from app.db.database import get_engine
-            eng = get_engine()
-            if eng:
-                with eng.raw_connection() as raw_conn:
-                    raw_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                logger.info("SQLite WAL flushed on shutdown")
-        except Exception as e:
-            logger.warning("WAL checkpoint on shutdown failed: %s", e)
     await task_queue.stop()
     await redis.close()
     logger.info("Collective Brain shut down gracefully")
@@ -170,34 +163,51 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Collective Brain", version="0.3.0", lifespan=lifespan)
 
+# ── Prometheus /metrics endpoint ─────────────────────────────────────────────
+from prometheus_fastapi_instrumentator import Instrumentator
+
+Instrumentator(
+    should_group_status_codes=True,
+    should_ignore_untemplated=True,
+    should_respect_env_var=False,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics", "/api/v1/health"],
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
+# ── CORS ─────────────────────────────────────────────────────────────────────
 _cors_origins = [
     "http://localhost:5173",
     "http://localhost:3000",
 ]
-# Allow Render deploy URL via env var
 _extra_origin = os.environ.get("CB_CORS_ORIGIN")
 if _extra_origin:
     _cors_origins.append(_extra_origin)
 
-# On HuggingFace Spaces the app is served inside an iframe from
-# huggingface.co.  SPACE_ID is auto-set by the HF runtime.
 _on_hf_spaces = bool(os.environ.get("SPACE_ID"))
 if _on_hf_spaces:
-    _cors_origins = ["*"]
+    _space_id = os.environ.get("SPACE_ID", "")
+    _cors_origins = [
+        f"https://{_space_id.replace('/', '-')}.hf.space",
+        "https://huggingface.co",
+        f"https://huggingface.co/spaces/{_space_id}",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_credentials=not _on_hf_spaces,  # credentials not allowed with wildcard origin
+    allow_credentials=not _on_hf_spaces,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
-
-# ── Security Headers Middleware ──
+# ── Middleware ────────────────────────────────────────────────────────────────
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
+import contextvars
+
+_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
+_org_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("org_id", default="-")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -207,23 +217,25 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        # On HuggingFace Spaces the app runs inside an iframe from huggingface.co
         if _on_hf_spaces:
             response.headers["X-Frame-Options"] = "ALLOWALL"
         else:
             response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' https://accounts.google.com https://apis.google.com; "
+            "style-src 'self' 'unsafe-inline' https://accounts.google.com; "
+            "frame-src https://accounts.google.com; "
+            "img-src 'self' data: https: blob:; "
+            "connect-src 'self' https://accounts.google.com https://www.googleapis.com wss:; "
+            "font-src 'self'"
+        )
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
 
-app.add_middleware(SecurityHeadersMiddleware)
-
-
-# ── Deprecation Header for non-versioned /api/* routes ──
 class DeprecationMiddleware(BaseHTTPMiddleware):
-    """Add Deprecation header to legacy /api/* routes (not /api/v1/*)."""
-
     async def dispatch(self, request: StarletteRequest, call_next):
         response: StarletteResponse = await call_next(request)
         path = request.url.path
@@ -234,43 +246,41 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(DeprecationMiddleware)
-
-
-# ── Request ID Tracing Middleware ──
-import contextvars
-
-_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
-
-
 class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Attach a unique request ID to every request for tracing."""
+    """Attach request_id + trace_id to every request; propagate org_id from JWT."""
 
     async def dispatch(self, request: StarletteRequest, call_next):
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
         _request_id_var.set(request_id)
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        # Expose trace ID so clients can correlate frontend errors with backend traces
+        trace_id = current_trace_id()
+        if trace_id != "-":
+            response.headers["X-Trace-ID"] = trace_id
         return response
 
 
-# Custom logging filter that injects request_id into log records
-class RequestIDFilter(logging.Filter):
+# Custom logging filter — injects context vars into every log record
+class RequestContextFilter(logging.Filter):
     def filter(self, record):
         record.request_id = _request_id_var.get("-")
+        record.trace_id = current_trace_id()
+        record.org_id = _org_id_var.get("-")
         return True
 
 
-# Add the filter to all handlers
-for handler in logging.root.handlers:
-    handler.addFilter(RequestIDFilter())
+for _h in logging.root.handlers:
+    _h.addFilter(RequestContextFilter())
 
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(DeprecationMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 
+# ── Exception handlers ────────────────────────────────────────────────────────
 @app.exception_handler(CircuitBreakerError)
 async def circuit_breaker_handler(request, exc: CircuitBreakerError):
-    """Return 503 when a circuit breaker is open."""
     from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=503,
@@ -292,8 +302,7 @@ async def global_exception_handler(request, exc):
     )
 
 
-# ── Versioned API (v1) ──
-# All routers are included under /api/v1 as the preferred prefix.
+# ── Versioned API (v1) ────────────────────────────────────────────────────────
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(health.router, prefix="/health", tags=["health"])
 api_v1.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
@@ -311,9 +320,19 @@ api_v1.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
 api_v1.include_router(slack.router, prefix="/slack", tags=["slack"])
 api_v1.include_router(github_webhooks.router, prefix="/github", tags=["github"])
 api_v1.include_router(expert_routing.router, prefix="/experts", tags=["experts"])
+# Phase 4 — Enterprise (organizations, SAML SSO, SCIM provisioning)
+api_v1.include_router(organizations_router, tags=["organizations"])
+api_v1.include_router(saml_router, tags=["sso"])
+api_v1.include_router(scim_router, tags=["scim"])
+# Phase 6 — Offboarding + Public Knowledge Base
+api_v1.include_router(offboarding_router, tags=["offboarding"])
+api_v1.include_router(public_kb_manage_router, tags=["public-kb"])
 app.include_router(api_v1)
 
-# ── Legacy /api/* routes (backward compatibility, deprecated) ──
+# Public Knowledge Base — no auth, under /api/v1/public
+app.include_router(public_kb_router, prefix="/api/v1/public", tags=["public-kb"])
+
+# ── Legacy /api/* routes (deprecated) ────────────────────────────────────────
 app.include_router(health.router, prefix="/api/health", tags=["health"], deprecated=True)
 app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"], deprecated=True)
 app.include_router(query.router, prefix="/api", tags=["query"], deprecated=True)
@@ -331,19 +350,15 @@ app.include_router(slack.router, prefix="/api/slack", tags=["slack"], deprecated
 app.include_router(github_webhooks.router, prefix="/api/github", tags=["github"], deprecated=True)
 app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"], deprecated=True)
 
-# ── Serve frontend static files in production ──
+# ── Frontend SPA fallback ─────────────────────────────────────────────────────
 _static_dir = Path(__file__).resolve().parent.parent / "static"
 if _static_dir.is_dir():
-    # Serve asset files (JS, CSS, images)
     app.mount("/assets", StaticFiles(directory=_static_dir / "assets"), name="assets")
-
     _static_dir_resolved = _static_dir.resolve()
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        """SPA fallback — serve index.html for all non-API routes."""
         file_path = (_static_dir / full_path).resolve()
-        # Prevent path traversal — only serve files within the static dir
         if file_path.is_relative_to(_static_dir_resolved) and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(_static_dir / "index.html")

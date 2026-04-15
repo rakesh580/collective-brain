@@ -52,3 +52,4 @@ service-account*.json
 
 # Claude Code
 .claude/
+collective_brain_dev.db

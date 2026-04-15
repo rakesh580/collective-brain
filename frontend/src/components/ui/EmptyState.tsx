@@ -20,13 +20,13 @@ export function EmptyState({
       className={`flex flex-col items-center justify-center gap-3 py-12 text-center ${className}`}
     >
       {icon && (
-        <div className="text-gray-400 dark:text-gray-500">{icon}</div>
+        <div className="text-gray-400">{icon}</div>
       )}
-      <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">
+      <h3 className="text-lg font-medium text-gray-700">
         {title}
       </h3>
       {description && (
-        <p className="max-w-sm text-sm text-gray-500 dark:text-gray-400">
+        <p className="max-w-sm text-sm text-gray-500">
           {description}
         </p>
       )}

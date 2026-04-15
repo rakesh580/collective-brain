@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    app: collective-brain
+
+scrape_configs:
+
+  # ── Collective Brain backend ──────────────────────────────────────────────
+  # When running in Docker (docker-compose.observability.yml):
+  #   use "backend:8000" (Docker internal network)
+  # When running locally (python uvicorn directly):
+  #   use "host.docker.internal:8000" (access host from Docker container)
+  - job_name: collective_brain
+    static_configs:
+      - targets:
+          - host.docker.internal:8000   # local dev: app runs on host
+          # - backend:8000              # uncomment when using docker-compose
+    metrics_path: /metrics
+    scrape_interval: 15s
+    # Relabel to add environment label
+    relabel_configs:
+      - target_label: environment
+        replacement: "local"
+
+  # ── Prometheus self-monitoring ────────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

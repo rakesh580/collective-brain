@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Float, JSON
+from sqlalchemy import Column, String, Text, DateTime, Float, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -8,7 +8,10 @@ class MemberRecord(Base):
     __tablename__ = "members"
 
     id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
+    organization_id = Column(
+        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    name = Column(String, nullable=False, index=True)
     aliases = Column(JSON, default=list)
     email = Column(String, nullable=True)
     expertise_tags = Column(JSON, default=list)
@@ -19,6 +22,10 @@ class MemberRecord(Base):
     last_active = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     total_contributions = Column(Float, default=0)
     metadata_json = Column(JSON, default=dict)
+
+    # ── Phase 6: lifecycle status ─────────────────────────────────────────────
+    # "active" | "offboarding" | "offboarded"
+    status = Column(String(20), nullable=True, default="active", index=True)
 
     contributions = relationship(
         "ContributionRecord",
