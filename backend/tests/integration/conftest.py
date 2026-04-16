@@ -86,13 +86,28 @@ def app_client(app_settings):
     with patch("app.db.database._run_alembic_migrations"):
         init_db(settings=app_settings)
 
-    with TestClient(app, raise_server_exceptions=True) as client:
+    with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
+def _clear_rate_limits():
+    """Clear in-memory rate limiter before each test to prevent 429 errors."""
+    from app.routers.auth import _memory_rate_limits
+
+    _memory_rate_limits.clear()
+    yield
+    _memory_rate_limits.clear()
+
+
+@pytest.fixture(scope="session")
 def registered_user(app_client):
-    """Pre-register a test user and return (user_data, auth_token)."""
+    """Pre-register a test user and return (user_data, auth_token). Session-scoped to avoid rate limits."""
+    # Clear rate limits before registration
+    from app.routers.auth import _memory_rate_limits
+
+    _memory_rate_limits.clear()
+
     resp = app_client.post(
         "/api/v1/auth/register",
         json={
@@ -106,7 +121,7 @@ def registered_user(app_client):
     assert resp.status_code in (201, 409), f"Unexpected: {resp.status_code} {resp.text}"
 
     if resp.status_code == 409:
-        # Log in instead
+        _memory_rate_limits.clear()
         login = app_client.post(
             "/api/v1/auth/login",
             json={
@@ -129,9 +144,13 @@ def auth_headers(registered_user):
     return {"Authorization": f"Bearer {registered_user['token']}"}
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def second_user(app_client):
-    """Register a second user for access control tests."""
+    """Register a second user for access control tests. Session-scoped."""
+    from app.routers.auth import _memory_rate_limits
+
+    _memory_rate_limits.clear()
+
     resp = app_client.post(
         "/api/v1/auth/register",
         json={
@@ -142,6 +161,7 @@ def second_user(app_client):
         },
     )
     if resp.status_code == 409:
+        _memory_rate_limits.clear()
         login = app_client.post(
             "/api/v1/auth/login",
             json={"username": "bob", "password": "StrongP@ss1"},

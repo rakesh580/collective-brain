@@ -68,7 +68,7 @@ class TestLogin:
             "/api/v1/auth/login",
             json={
                 "username": "alice",
-                "password": "Str0ngPass!",
+                "password": "StrongP@ss1",
             },
         )
         assert resp.status_code == 200

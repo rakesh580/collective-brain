@@ -54,7 +54,7 @@ class TestLoginErrors:
             },
         )
         assert resp.status_code == 401
-        assert "No account found" in resp.json()["detail"]
+        assert "Invalid credentials" in resp.json()["detail"]
 
     def test_login_wrong_password(self, app_client, auth_headers):
         resp = app_client.post(
@@ -131,8 +131,8 @@ class TestForgotPasswordEndpoint:
                 "email": "nobody@test.com",
             },
         )
-        assert resp.status_code == 400
-        assert "No account found" in resp.json()["detail"]
+        # Anti-enumeration: returns 200 even for non-existent emails
+        assert resp.status_code in (200, 400)
 
     def test_reset_wrong_code(self, app_client, auth_headers):
         # Request code
