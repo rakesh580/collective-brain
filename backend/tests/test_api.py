@@ -30,6 +30,7 @@ def client(_test_db_dir):
         """Force SQLite in the temp directory instead of the default dev.db path."""
         if settings is None:
             from app.config import get_settings
+
             settings = get_settings()
 
         from sqlalchemy import create_engine
@@ -46,9 +47,7 @@ def client(_test_db_dir):
             poolclass=StaticPool,
             echo=False,
         )
-        db_mod._SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=db_mod._engine
-        )
+        db_mod._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=db_mod._engine)
         db_mod.Base.metadata.create_all(bind=db_mod._engine)
 
     # Monkey-patch init_db before the app lifespan runs
