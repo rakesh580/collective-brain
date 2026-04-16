@@ -11,7 +11,7 @@ class TestResponseTimes:
     def test_auth_login_under_500ms(self, app_client, registered_user):
         start = time.perf_counter()
         resp = app_client.post(
-            "/auth/login",
+            "/api/v1/auth/login",
             json={
                 "username": "alice",
                 "password": "Str0ngPass!",
@@ -23,14 +23,14 @@ class TestResponseTimes:
 
     def test_member_list_under_200ms(self, app_client, auth_headers):
         start = time.perf_counter()
-        resp = app_client.get("/members", headers=auth_headers)
+        resp = app_client.get("/api/v1/members", headers=auth_headers)
         elapsed = time.perf_counter() - start
         assert resp.status_code == 200
         assert elapsed < 0.2, f"Member list took {elapsed:.2f}s (expected < 0.2s)"
 
     def test_conversation_list_under_200ms(self, app_client, auth_headers):
         start = time.perf_counter()
-        resp = app_client.get("/conversations", headers=auth_headers)
+        resp = app_client.get("/api/v1/conversations", headers=auth_headers)
         elapsed = time.perf_counter() - start
         assert resp.status_code == 200
         assert elapsed < 0.2, f"Conversation list took {elapsed:.2f}s (expected < 0.2s)"
@@ -39,7 +39,7 @@ class TestResponseTimes:
         """AI query with mocked LLM should complete quickly."""
         start = time.perf_counter()
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Who is the best developer?",
@@ -58,7 +58,7 @@ class TestConcurrentQueries:
 
         def register(i):
             return app_client.post(
-                "/auth/register",
+                "/api/v1/auth/register",
                 json={
                     "username": f"concurrent_{i}",
                     "email": f"conc{i}@test.com",
@@ -79,7 +79,7 @@ class TestConcurrentQueries:
 
         def query(q):
             return app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": q,
@@ -102,7 +102,7 @@ class TestConcurrentQueries:
         """Concurrent read operations should not conflict."""
 
         def read_members():
-            return app_client.get("/members", headers=auth_headers)
+            return app_client.get("/api/v1/members", headers=auth_headers)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
             futures = [pool.submit(read_members) for _ in range(10)]
@@ -138,7 +138,7 @@ class TestBulkIngestion:
             content = f"# Document {i}\n\nThis is the content of document number {i}. " * 50
             files.append(("files", (f"doc_{i}.md", io.BytesIO(content.encode()), "text/markdown")))
 
-        resp = app_client.post("/ingest/markdown-upload", headers=auth_headers, files=files)
+        resp = app_client.post("/api/v1/ingest/markdown-upload", headers=auth_headers, files=files)
         assert resp.status_code == 200
         assert resp.json()["chunks_created"] >= 10
 
@@ -147,12 +147,12 @@ class TestBulkIngestion:
         content = b"# Idempotency Test\n\nThis content should be handled gracefully on re-ingest."
         files = [("files", ("idem.md", io.BytesIO(content), "text/markdown"))]
 
-        resp1 = app_client.post("/ingest/markdown-upload", headers=auth_headers, files=files)
+        resp1 = app_client.post("/api/v1/ingest/markdown-upload", headers=auth_headers, files=files)
         assert resp1.status_code == 200
         chunks1 = resp1.json()["chunks_created"]
 
         files2 = [("files", ("idem.md", io.BytesIO(content), "text/markdown"))]
-        resp2 = app_client.post("/ingest/markdown-upload", headers=auth_headers, files=files2)
+        resp2 = app_client.post("/api/v1/ingest/markdown-upload", headers=auth_headers, files=files2)
         assert resp2.status_code == 200
 
 
@@ -169,7 +169,7 @@ class TestRateLimiting:
         results = []
         for i in range(15):
             resp = app_client.post(
-                "/auth/login",
+                "/api/v1/auth/login",
                 json={
                     "username": "nobody",
                     "password": "wrongpass",
@@ -188,7 +188,7 @@ class TestRateLimiting:
         results = []
         for i in range(15):
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": f"Question {i}",

@@ -60,7 +60,7 @@ class TestThousandUserScale:
     def _register_user(self, i: int) -> dict:
         """Register user i and return {token, user_id, headers} or {error}."""
         resp = self.client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": f"scale_user_{i}",
                 "email": f"scale_{i}@test.com",
@@ -85,7 +85,7 @@ class TestThousandUserScale:
         # 1. List members
         t0 = time.perf_counter()
         try:
-            resp = self.client.get("/members", headers=headers)
+            resp = self.client.get("/api/v1/members", headers=headers)
             result.members_ok = resp.status_code == 200
             if not result.members_ok:
                 result.errors.append(f"members: HTTP {resp.status_code}")
@@ -97,7 +97,7 @@ class TestThousandUserScale:
         t0 = time.perf_counter()
         try:
             resp = self.client.post(
-                "/query",
+                "/api/v1/query",
                 headers=headers,
                 json={
                     "question": f"What is the team working on? (user {i})",
@@ -114,7 +114,7 @@ class TestThousandUserScale:
         t0 = time.perf_counter()
         try:
             resp = self.client.post(
-                "/rooms",
+                "/api/v1/rooms",
                 headers=headers,
                 json={
                     "name": f"Room by user {i}",
@@ -126,7 +126,7 @@ class TestThousandUserScale:
                 # Send a message to the room
                 if room_id:
                     msg_resp = self.client.post(
-                        f"/rooms/{room_id}/messages",
+                        f"/api/v1/rooms/{room_id}/messages",
                         headers=headers,
                         json={"content": f"Hello from user {i}!"},
                     )
@@ -143,7 +143,7 @@ class TestThousandUserScale:
         t0 = time.perf_counter()
         try:
             resp = self.client.post(
-                "/discussions",
+                "/api/v1/discussions",
                 headers=headers,
                 json={
                     "title": f"Discussion by user {i}",
@@ -161,7 +161,7 @@ class TestThousandUserScale:
         # 5. List conversations
         t0 = time.perf_counter()
         try:
-            resp = self.client.get("/conversations", headers=headers)
+            resp = self.client.get("/api/v1/conversations", headers=headers)
             result.conversations_ok = resp.status_code == 200
             if not result.conversations_ok:
                 result.errors.append(f"conversations: HTTP {resp.status_code}")
@@ -325,7 +325,7 @@ class TestThousandUserScale:
         login_errors = []
         for i in sample_indices:
             resp = self.client.post(
-                "/auth/login",
+                "/api/v1/auth/login",
                 json={
                     "username": f"scale_user_{i}",
                     "password": "Str0ngPass!",
@@ -342,7 +342,7 @@ class TestThousandUserScale:
         # Verify each user can see their own profile
         profile_ok = 0
         for i in sample_indices:
-            resp = self.client.get("/auth/me", headers=users[i]["headers"])
+            resp = self.client.get("/api/v1/auth/me", headers=users[i]["headers"])
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("username") == f"scale_user_{i}":
@@ -361,7 +361,7 @@ class TestThousandUserScale:
         errors = []
 
         def read_members(idx):
-            resp = self.client.get("/members", headers=headers)
+            resp = self.client.get("/api/v1/members", headers=headers)
             if resp.status_code != 200:
                 return f"Request {idx}: HTTP {resp.status_code}"
             return None
@@ -397,7 +397,7 @@ class TestThousandUserScale:
         conversation_ids = {}
         for i, info in users.items():
             resp = self.client.post(
-                "/query",
+                "/api/v1/query",
                 headers=info["headers"],
                 json={
                     "question": f"Private question from user {i}",
@@ -411,7 +411,7 @@ class TestThousandUserScale:
         # Verify each user only sees their own conversations
         isolation_errors = []
         for i, info in list(users.items())[:20]:  # Sample 20
-            resp = self.client.get("/conversations", headers=info["headers"])
+            resp = self.client.get("/api/v1/conversations", headers=info["headers"])
             if resp.status_code == 200:
                 data = resp.json()
                 convs = data.get("conversations", data.get("items", []))

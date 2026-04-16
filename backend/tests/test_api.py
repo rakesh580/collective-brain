@@ -42,7 +42,7 @@ class TestHealthEndpoint:
 class TestIngestEndpoint:
     def test_ingest_markdown(self, client):
         resp = client.post(
-            "/ingest/markdown",
+            "/api/v1/ingest/markdown",
             json={"directory_path": str(FIXTURES_DIR)},
         )
         assert resp.status_code == 200
@@ -56,10 +56,10 @@ class TestMembersEndpoint:
     def test_list_members(self, client):
         # Ingest first to populate members
         client.post(
-            "/ingest/markdown",
+            "/api/v1/ingest/markdown",
             json={"directory_path": str(FIXTURES_DIR)},
         )
-        resp = client.get("/members")
+        resp = client.get("/api/v1/members")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -67,7 +67,7 @@ class TestMembersEndpoint:
 
 class TestGraphEndpoint:
     def test_full_graph(self, client):
-        resp = client.get("/graph/full")
+        resp = client.get("/api/v1/graph/full")
         assert resp.status_code == 200
         data = resp.json()
         assert "nodes" in data
@@ -76,7 +76,7 @@ class TestGraphEndpoint:
 
 class TestDashboardEndpoint:
     def test_dashboard(self, client):
-        resp = client.get("/insights/dashboard")
+        resp = client.get("/api/v1/insights/dashboard")
         assert resp.status_code == 200
         data = resp.json()
         assert "total_members" in data

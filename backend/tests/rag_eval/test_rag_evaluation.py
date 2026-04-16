@@ -141,7 +141,7 @@ class TestHallucinationDetection:
     def test_answer_uses_context_only(self, app_client, auth_headers):
         """The LLM should be called with context — response should be grounded."""
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Who is the Python expert?",
@@ -156,7 +156,7 @@ class TestHallucinationDetection:
     def test_empty_knowledge_base_still_responds(self, app_client, auth_headers):
         """When no data is ingested, pipeline should still return a response."""
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "What obscure topic does nobody know about?",
@@ -175,7 +175,7 @@ class TestGroundedResponse:
     def test_sources_in_response(self, app_client, auth_headers):
         """Query response should include a sources list."""
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "What has the team been working on?",
@@ -188,7 +188,7 @@ class TestGroundedResponse:
     def test_conversation_persists_messages(self, app_client, auth_headers):
         """Each query should persist the conversation with messages."""
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Tell me about recent activity",
@@ -197,6 +197,6 @@ class TestGroundedResponse:
         conv_id = resp.json()["conversation_id"]
 
         # Fetch the conversation — should have messages
-        conv_resp = app_client.get(f"/conversations/{conv_id}", headers=auth_headers)
+        conv_resp = app_client.get(f"/api/v1/conversations/{conv_id}", headers=auth_headers)
         assert conv_resp.status_code == 200
         assert len(conv_resp.json().get("messages", [])) >= 1

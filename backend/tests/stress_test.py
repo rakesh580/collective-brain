@@ -124,19 +124,19 @@ async def phase1_rest_api(concurrent_users: int, duration_s: int = 30) -> PhaseR
     endpoints = [
         ("GET", "/health", None),
         ("GET", "/health/detailed", None),
-        ("GET", "/members", None),
-        ("GET", "/conversations?limit=20", None),
-        ("GET", "/rooms?limit=50", None),
-        ("GET", "/insights/dashboard", None),
-        ("GET", "/graph/full", None),
-        ("GET", "/graph/expertise-matrix", None),
-        ("GET", "/analytics/activity-timeline?days=30", None),
-        ("GET", "/analytics/source-breakdown", None),
-        ("GET", "/search?q=python&limit=10", None),
-        ("GET", "/discussions?limit=20", None),
+        ("GET", "/api/v1/members", None),
+        ("GET", "/api/v1/conversations?limit=20", None),
+        ("GET", "/api/v1/rooms?limit=50", None),
+        ("GET", "/api/v1/insights/dashboard", None),
+        ("GET", "/api/v1/graph/full", None),
+        ("GET", "/api/v1/graph/expertise-matrix", None),
+        ("GET", "/api/v1/analytics/activity-timeline?days=30", None),
+        ("GET", "/api/v1/analytics/source-breakdown", None),
+        ("GET", "/api/v1/search?q=python&limit=10", None),
+        ("GET", "/api/v1/discussions?limit=20", None),
         ("GET", "/artifacts?limit=50", None),
-        ("GET", "/auth/me", None),
-        ("GET", "/auth/users", None),
+        ("GET", "/api/v1/auth/me", None),
+        ("GET", "/api/v1/auth/users", None),
     ]
 
     # Pre-register users
@@ -446,12 +446,12 @@ async def phase4_saturation(burst_size: int = 500) -> PhaseResult:
     async def burst_request(idx: int):
         endpoints = [
             "/health",
-            "/members",
-            "/graph/full",
-            "/conversations?limit=5",
-            "/rooms?limit=5",
-            "/auth/me",
-            "/search?q=test",
+            "/api/v1/members",
+            "/api/v1/graph/full",
+            "/api/v1/conversations?limit=5",
+            "/api/v1/rooms?limit=5",
+            "/api/v1/auth/me",
+            "/api/v1/search?q=test",
         ]
         path = endpoints[idx % len(endpoints)]
         async with httpx.AsyncClient(timeout=60.0) as client:

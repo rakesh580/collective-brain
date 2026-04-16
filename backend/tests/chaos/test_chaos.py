@@ -18,7 +18,7 @@ class TestVectorDBFailure:
         app.state.vector_store = broken_vs
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "This should handle vector DB failure",
@@ -42,7 +42,7 @@ class TestVectorDBFailure:
         app.state.vector_store = broken_vs
         try:
             files = [("files", ("test.md", io.BytesIO(b"# Test\nContent"), "text/markdown"))]
-            resp = app_client.post("/ingest/markdown-upload", headers=auth_headers, files=files)
+            resp = app_client.post("/api/v1/ingest/markdown-upload", headers=auth_headers, files=files)
             # Should not crash the server
             assert resp.status_code in (200, 500, 503)
         finally:
@@ -68,10 +68,10 @@ class TestRedisOutage:
         app.state.redis = broken_redis
         try:
             # Basic operations should still work
-            resp = app_client.get("/members", headers=auth_headers)
+            resp = app_client.get("/api/v1/members", headers=auth_headers)
             assert resp.status_code == 200
 
-            resp = app_client.get("/conversations", headers=auth_headers)
+            resp = app_client.get("/api/v1/conversations", headers=auth_headers)
             assert resp.status_code == 200
         finally:
             app.state.redis = original_redis
@@ -85,7 +85,7 @@ class TestRedisOutage:
 
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "Works without rate limiting?",
@@ -111,7 +111,7 @@ class TestLLMFailure:
         app.state.llm_service = timeout_llm
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "This should timeout",
@@ -133,7 +133,7 @@ class TestLLMFailure:
         app.state.llm_service = broken_llm
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "This should fail gracefully",
@@ -154,7 +154,7 @@ class TestLLMFailure:
         app.state.llm_service = empty_llm
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "Empty response test",
@@ -177,7 +177,7 @@ class TestDatabaseFailure:
         # Since mocking get_session at the right import path is fragile,
         # we simply verify the endpoint doesn't crash on duplicate registration.
         app_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "failuser",
                 "email": "fail@test.com",
@@ -186,7 +186,7 @@ class TestDatabaseFailure:
         )
         # Duplicate should return 409 (conflict), not 500
         resp = app_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "failuser",
                 "email": "fail@test.com",
@@ -204,7 +204,7 @@ class TestDatabaseFailure:
             mock_get.return_value = broken_db
 
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "Database is down",
@@ -230,7 +230,7 @@ class TestEmbeddingFailure:
         app.state.embedding_service = broken_emb
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "This needs embeddings",
@@ -253,7 +253,7 @@ class TestEmbeddingFailure:
         app.state.embedding_service = broken_emb
         try:
             files = [("files", ("test.md", io.BytesIO(b"# Test\nContent"), "text/markdown"))]
-            resp = app_client.post("/ingest/markdown-upload", headers=auth_headers, files=files)
+            resp = app_client.post("/api/v1/ingest/markdown-upload", headers=auth_headers, files=files)
             assert resp.status_code in (200, 500, 503)
         finally:
             app.state.embedding_service = original_emb
@@ -279,7 +279,7 @@ class TestConcurrentFailures:
         app.state.vector_store = broken_vs
         try:
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "Everything is on fire",
@@ -289,7 +289,7 @@ class TestConcurrentFailures:
             assert resp.status_code in (200, 500, 503)
 
             # Non-AI endpoints should still work
-            resp = app_client.get("/members", headers=auth_headers)
+            resp = app_client.get("/api/v1/members", headers=auth_headers)
             assert resp.status_code == 200
         finally:
             app.state.llm_service = original_llm

@@ -8,7 +8,7 @@ from starlette.websockets import WebSocketDisconnect
 class TestDiscussionCRUD:
     def test_create_thread(self, app_client, auth_headers):
         resp = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Architecture Discussion",
@@ -21,7 +21,7 @@ class TestDiscussionCRUD:
 
     def test_list_threads(self, app_client, auth_headers):
         app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Thread 1",
@@ -30,7 +30,7 @@ class TestDiscussionCRUD:
             },
         )
         app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Thread 2",
@@ -38,13 +38,13 @@ class TestDiscussionCRUD:
                 "context_id": "test-member",
             },
         )
-        resp = app_client.get("/discussions", headers=auth_headers)
+        resp = app_client.get("/api/v1/discussions", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()["total"] >= 2
 
     def test_get_thread_detail(self, app_client, auth_headers):
         create = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Detail Thread",
@@ -53,7 +53,7 @@ class TestDiscussionCRUD:
             },
         )
         thread_id = create.json()["id"]
-        resp = app_client.get(f"/discussions/{thread_id}", headers=auth_headers)
+        resp = app_client.get(f"/api/v1/discussions/{thread_id}", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()["title"] == "Detail Thread"
 
@@ -61,7 +61,7 @@ class TestDiscussionCRUD:
 class TestDiscussionMessages:
     def test_post_message(self, app_client, auth_headers):
         thread = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Msg Thread",
@@ -71,7 +71,7 @@ class TestDiscussionMessages:
         )
         thread_id = thread.json()["id"]
         resp = app_client.post(
-            f"/discussions/{thread_id}/messages",
+            f"/api/v1/discussions/{thread_id}/messages",
             headers=auth_headers,
             json={"content": "This is my take on the architecture."},
         )
@@ -79,7 +79,7 @@ class TestDiscussionMessages:
 
     def test_edit_own_message(self, app_client, auth_headers):
         thread = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Edit Thread",
@@ -89,14 +89,14 @@ class TestDiscussionMessages:
         )
         thread_id = thread.json()["id"]
         msg = app_client.post(
-            f"/discussions/{thread_id}/messages",
+            f"/api/v1/discussions/{thread_id}/messages",
             headers=auth_headers,
             json={"content": "Original content"},
         )
         msg_id = msg.json()["id"]
 
         resp = app_client.put(
-            f"/discussions/{thread_id}/messages/{msg_id}",
+            f"/api/v1/discussions/{thread_id}/messages/{msg_id}",
             headers=auth_headers,
             json={"content": "Updated content"},
         )
@@ -104,7 +104,7 @@ class TestDiscussionMessages:
 
     def test_delete_own_message(self, app_client, auth_headers):
         thread = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Del Thread",
@@ -114,14 +114,14 @@ class TestDiscussionMessages:
         )
         thread_id = thread.json()["id"]
         msg = app_client.post(
-            f"/discussions/{thread_id}/messages",
+            f"/api/v1/discussions/{thread_id}/messages",
             headers=auth_headers,
             json={"content": "To be deleted"},
         )
         msg_id = msg.json()["id"]
 
         resp = app_client.delete(
-            f"/discussions/{thread_id}/messages/{msg_id}",
+            f"/api/v1/discussions/{thread_id}/messages/{msg_id}",
             headers=auth_headers,
         )
         assert resp.status_code == 200
@@ -129,7 +129,7 @@ class TestDiscussionMessages:
     def test_cannot_edit_others_message(self, app_client, auth_headers):
         """Another user should not be able to edit someone else's message."""
         thread = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Access Thread",
@@ -139,7 +139,7 @@ class TestDiscussionMessages:
         )
         thread_id = thread.json()["id"]
         msg = app_client.post(
-            f"/discussions/{thread_id}/messages",
+            f"/api/v1/discussions/{thread_id}/messages",
             headers=auth_headers,
             json={"content": "Alice's message"},
         )
@@ -147,7 +147,7 @@ class TestDiscussionMessages:
 
         # Register another user
         bob = app_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "disc_bob",
                 "email": "disc_bob@test.com",
@@ -157,7 +157,7 @@ class TestDiscussionMessages:
         bob_headers = {"Authorization": f"Bearer {bob.json()['token']}"}
 
         resp = app_client.put(
-            f"/discussions/{thread_id}/messages/{msg_id}",
+            f"/api/v1/discussions/{thread_id}/messages/{msg_id}",
             headers=bob_headers,
             json={"content": "Hijacked!"},
         )
@@ -166,7 +166,7 @@ class TestDiscussionMessages:
     def test_threaded_reply(self, app_client, auth_headers):
         """Messages can reply to parent messages."""
         thread = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=auth_headers,
             json={
                 "title": "Reply Thread",
@@ -176,14 +176,14 @@ class TestDiscussionMessages:
         )
         thread_id = thread.json()["id"]
         parent = app_client.post(
-            f"/discussions/{thread_id}/messages",
+            f"/api/v1/discussions/{thread_id}/messages",
             headers=auth_headers,
             json={"content": "Parent message"},
         )
         parent_id = parent.json()["id"]
 
         reply = app_client.post(
-            f"/discussions/{thread_id}/messages",
+            f"/api/v1/discussions/{thread_id}/messages",
             headers=auth_headers,
             json={"content": "Reply to parent", "parent_message_id": parent_id},
         )
@@ -194,7 +194,7 @@ class TestDiscussionWebSocket:
     def test_ws_auth_and_disconnect(self, app_client):
         """WebSocket requires valid token."""
         reg = app_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "dws_user",
                 "email": "dws@test.com",
@@ -205,7 +205,7 @@ class TestDiscussionWebSocket:
         headers = {"Authorization": f"Bearer {token}"}
 
         thread = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             headers=headers,
             json={
                 "title": "WS Thread",
@@ -215,7 +215,7 @@ class TestDiscussionWebSocket:
         )
         thread_id = thread.json()["id"]
 
-        with app_client.websocket_connect(f"/discussions/ws/{thread_id}") as ws:
+        with app_client.websocket_connect(f"/api/v1/discussions/ws/{thread_id}") as ws:
             ws.send_text(json.dumps({"token": "invalid-token"}))
             try:
                 data = json.loads(ws.receive_text())
@@ -226,12 +226,12 @@ class TestDiscussionWebSocket:
 
 class TestDiscussionAuth:
     def test_discussions_require_auth(self, app_client):
-        resp = app_client.get("/discussions")
+        resp = app_client.get("/api/v1/discussions")
         assert resp.status_code == 401
 
     def test_create_thread_requires_auth(self, app_client):
         resp = app_client.post(
-            "/discussions",
+            "/api/v1/discussions",
             json={
                 "title": "No Auth",
                 "context_type": "member",

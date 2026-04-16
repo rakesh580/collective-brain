@@ -22,7 +22,7 @@ class CollectiveBrainUser(HttpUser):
         """Register a unique user and store the token."""
         suffix = random.randint(100000, 999999)
         resp = self.client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": f"loaduser_{suffix}",
                 "email": f"load{suffix}@test.com",
@@ -37,7 +37,7 @@ class CollectiveBrainUser(HttpUser):
         else:
             # Fallback: login
             resp = self.client.post(
-                "/auth/login",
+                "/api/v1/auth/login",
                 json={
                     "username": f"loaduser_{suffix}",
                     "password": "LoadT3st!Pass",
@@ -65,10 +65,10 @@ class CollectiveBrainUser(HttpUser):
             "What are the team's knowledge gaps?",
         ]
         resp = self.client.post(
-            "/query",
+            "/api/v1/query",
             headers=self.headers,
             json={"question": random.choice(questions)},
-            name="/query",
+            name="/api/v1/query",
         )
         if resp.status_code == 200:
             conv_id = resp.json().get("conversation_id")
@@ -77,30 +77,30 @@ class CollectiveBrainUser(HttpUser):
 
     @task(3)
     def list_conversations(self):
-        self.client.get("/conversations", headers=self.headers, name="/conversations")
+        self.client.get("/api/v1/conversations", headers=self.headers, name="/api/v1/conversations")
 
     @task(2)
     def get_conversation(self):
         if self._conv_ids:
             conv_id = random.choice(self._conv_ids)
             self.client.get(
-                f"/conversations/{conv_id}",
+                f"/api/v1/conversations/{conv_id}",
                 headers=self.headers,
-                name="/conversations/[id]",
+                name="/api/v1/conversations/[id]",
             )
 
     @task(3)
     def list_members(self):
-        self.client.get("/members", headers=self.headers, name="/members")
+        self.client.get("/api/v1/members", headers=self.headers, name="/api/v1/members")
 
     @task(2)
     def create_room(self):
         suffix = random.randint(1, 99999)
         resp = self.client.post(
-            "/rooms",
+            "/api/v1/rooms",
             headers=self.headers,
             json={"name": f"loadroom-{suffix}"},
-            name="/rooms",
+            name="/api/v1/rooms",
         )
         if resp.status_code == 201:
             self._room_ids.append(resp.json()["id"])
@@ -110,20 +110,20 @@ class CollectiveBrainUser(HttpUser):
         if self._room_ids:
             room_id = random.choice(self._room_ids)
             self.client.post(
-                f"/rooms/{room_id}/messages",
+                f"/api/v1/rooms/{room_id}/messages",
                 headers=self.headers,
                 json={"content": f"Load test message {random.randint(1, 9999)}"},
-                name="/rooms/[id]/messages",
+                name="/api/v1/rooms/[id]/messages",
             )
 
     @task(1)
     def list_rooms(self):
-        self.client.get("/rooms", headers=self.headers, name="/rooms")
+        self.client.get("/api/v1/rooms", headers=self.headers, name="/api/v1/rooms")
 
     @task(1)
     def get_profile(self):
-        self.client.get("/auth/me", headers=self.headers, name="/auth/me")
+        self.client.get("/api/v1/auth/me", headers=self.headers, name="/api/v1/auth/me")
 
     @task(1)
     def list_discussions(self):
-        self.client.get("/discussions", headers=self.headers, name="/discussions")
+        self.client.get("/api/v1/discussions", headers=self.headers, name="/api/v1/discussions")

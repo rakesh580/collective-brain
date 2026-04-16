@@ -11,11 +11,11 @@ class TestStatelessAPI:
     def test_requests_independent_of_order(self, app_client, auth_headers):
         """API responses should not depend on previous request ordering."""
         # Create a member
-        resp1 = app_client.post("/members", headers=auth_headers, json={"name": "Order1"})
+        resp1 = app_client.post("/api/v1/members", headers=auth_headers, json={"name": "Order1"})
         assert resp1.status_code == 201
 
         # List members — should include the new one regardless of any prior state
-        resp2 = app_client.get("/members", headers=auth_headers)
+        resp2 = app_client.get("/api/v1/members", headers=auth_headers)
         assert resp2.status_code == 200
         names = [m["name"] for m in resp2.json()]
         assert "Order1" in names
@@ -24,7 +24,7 @@ class TestStatelessAPI:
         """Two different users should not share session state."""
         # Register user A
         a = app_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "stateless_a",
                 "email": "sla@test.com",
@@ -35,7 +35,7 @@ class TestStatelessAPI:
 
         # Register user B
         b = app_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "stateless_b",
                 "email": "slb@test.com",
@@ -45,11 +45,11 @@ class TestStatelessAPI:
         b_headers = {"Authorization": f"Bearer {b.json()['token']}"}
 
         # A creates data
-        app_client.post("/members", headers=a_headers, json={"name": "A-Member"})
+        app_client.post("/api/v1/members", headers=a_headers, json={"name": "A-Member"})
 
         # B should see the same members (shared resource) but different profile
-        a_profile = app_client.get("/auth/me", headers=a_headers).json()
-        b_profile = app_client.get("/auth/me", headers=b_headers).json()
+        a_profile = app_client.get("/api/v1/auth/me", headers=a_headers).json()
+        b_profile = app_client.get("/api/v1/auth/me", headers=b_headers).json()
         assert a_profile["username"] != b_profile["username"]
 
     def test_token_is_self_contained(self, app_client, registered_user):
@@ -57,7 +57,7 @@ class TestStatelessAPI:
         _, token = registered_user
         # Make multiple requests with the same token — all should work
         for _ in range(5):
-            resp = app_client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+            resp = app_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
             assert resp.status_code == 200
 
 
@@ -68,7 +68,7 @@ class TestIdempotency:
     def test_get_endpoints_idempotent(self, app_client, auth_headers):
         """GET requests should return the same result when called multiple times."""
         for _ in range(3):
-            resp = app_client.get("/members", headers=auth_headers)
+            resp = app_client.get("/api/v1/members", headers=auth_headers)
             assert resp.status_code == 200
             # Results should be consistent
             data = resp.json()
@@ -79,7 +79,7 @@ class TestIdempotency:
         results = []
         for _ in range(3):
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "Who is the top contributor?",
@@ -101,7 +101,7 @@ class TestIdempotency:
         ids = set()
         for _ in range(3):
             resp = app_client.post(
-                "/members",
+                "/api/v1/members",
                 headers=auth_headers,
                 json={
                     "name": "Duplicate Name",
@@ -113,13 +113,13 @@ class TestIdempotency:
 
     def test_delete_twice_returns_404(self, app_client, auth_headers):
         """Deleting the same resource twice: first succeeds, second 404."""
-        create = app_client.post("/members", headers=auth_headers, json={"name": "ToDelete"})
+        create = app_client.post("/api/v1/members", headers=auth_headers, json={"name": "ToDelete"})
         member_id = create.json()["id"]
 
-        resp1 = app_client.delete(f"/members/{member_id}", headers=auth_headers)
+        resp1 = app_client.delete(f"/api/v1/members/{member_id}", headers=auth_headers)
         assert resp1.status_code == 200
 
-        resp2 = app_client.delete(f"/members/{member_id}", headers=auth_headers)
+        resp2 = app_client.delete(f"/api/v1/members/{member_id}", headers=auth_headers)
         assert resp2.status_code == 404
 
 
@@ -132,7 +132,7 @@ class TestConcurrency:
 
         def create(i):
             return app_client.post(
-                "/members",
+                "/api/v1/members",
                 headers=auth_headers,
                 json={
                     "name": f"Concurrent_{i}",
@@ -147,7 +147,7 @@ class TestConcurrency:
         assert len(successes) == 5
 
         # Verify all are present
-        resp = app_client.get("/members", headers=auth_headers)
+        resp = app_client.get("/api/v1/members", headers=auth_headers)
         names = [m["name"] for m in resp.json()]
         for i in range(5):
             assert f"Concurrent_{i}" in names
@@ -157,7 +157,7 @@ class TestConcurrency:
         start = time.perf_counter()
 
         def read():
-            return app_client.get("/members", headers=auth_headers)
+            return app_client.get("/api/v1/members", headers=auth_headers)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
             futures = [pool.submit(read) for _ in range(10)]
@@ -172,12 +172,12 @@ class TestConcurrency:
 
     def test_concurrent_room_messages(self, app_client, auth_headers):
         """Sending messages concurrently to the same room should work."""
-        room = app_client.post("/rooms", headers=auth_headers, json={"name": "conc-msg-room"})
+        room = app_client.post("/api/v1/rooms", headers=auth_headers, json={"name": "conc-msg-room"})
         room_id = room.json()["id"]
 
         def send(i):
             return app_client.post(
-                f"/rooms/{room_id}/messages",
+                f"/api/v1/rooms/{room_id}/messages",
                 headers=auth_headers,
                 json={"content": f"Concurrent message {i}"},
             )
@@ -201,12 +201,12 @@ class TestScalabilityIndicators:
         quickly — a proxy for no leaked state.
         """
         for i in range(20):
-            app_client.get("/members", headers=auth_headers)
-            app_client.get("/conversations", headers=auth_headers)
+            app_client.get("/api/v1/members", headers=auth_headers)
+            app_client.get("/api/v1/conversations", headers=auth_headers)
 
         # Final request should still be fast
         start = time.perf_counter()
-        resp = app_client.get("/members", headers=auth_headers)
+        resp = app_client.get("/api/v1/members", headers=auth_headers)
         elapsed = time.perf_counter() - start
         assert resp.status_code == 200
         assert elapsed < 0.5
@@ -215,14 +215,14 @@ class TestScalabilityIndicators:
         """Create many members and verify listing still works."""
         for i in range(20):
             app_client.post(
-                "/members",
+                "/api/v1/members",
                 headers=auth_headers,
                 json={
                     "name": f"Scale_{i}",
                 },
             )
 
-        resp = app_client.get("/members", headers=auth_headers)
+        resp = app_client.get("/api/v1/members", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()) >= 20
 
@@ -235,7 +235,7 @@ class TestRetrySafety:
         """Retrying a login should give the same result."""
         for _ in range(3):
             resp = app_client.post(
-                "/auth/login",
+                "/api/v1/auth/login",
                 json={
                     "username": "alice",
                     "password": "Str0ngPass!",
@@ -248,7 +248,7 @@ class TestRetrySafety:
         """Retrying GET requests is always safe."""
         results = []
         for _ in range(5):
-            resp = app_client.get("/conversations", headers=auth_headers)
+            resp = app_client.get("/api/v1/conversations", headers=auth_headers)
             assert resp.status_code == 200
             results.append(resp.json()["total"])
 
@@ -260,7 +260,7 @@ class TestRetrySafety:
         conv_ids = set()
         for _ in range(3):
             resp = app_client.post(
-                "/query",
+                "/api/v1/query",
                 headers=auth_headers,
                 json={
                     "question": "Retry test question",
@@ -280,7 +280,7 @@ class TestDataIntegrity:
         """Full CRUD cycle should maintain data integrity."""
         # Create
         create = app_client.post(
-            "/members",
+            "/api/v1/members",
             headers=auth_headers,
             json={
                 "name": "Integrity User",
@@ -291,13 +291,13 @@ class TestDataIntegrity:
         member_id = create.json()["id"]
 
         # Read
-        read = app_client.get(f"/members/{member_id}", headers=auth_headers)
+        read = app_client.get(f"/api/v1/members/{member_id}", headers=auth_headers)
         assert read.status_code == 200
         assert read.json()["name"] == "Integrity User"
 
         # Update
         update = app_client.put(
-            f"/members/{member_id}",
+            f"/api/v1/members/{member_id}",
             headers=auth_headers,
             json={
                 "name": "Updated Integrity User",
@@ -307,18 +307,18 @@ class TestDataIntegrity:
         assert update.json()["name"] == "Updated Integrity User"
 
         # Delete
-        delete = app_client.delete(f"/members/{member_id}", headers=auth_headers)
+        delete = app_client.delete(f"/api/v1/members/{member_id}", headers=auth_headers)
         assert delete.status_code == 200
 
         # Verify deleted
-        gone = app_client.get(f"/members/{member_id}", headers=auth_headers)
+        gone = app_client.get(f"/api/v1/members/{member_id}", headers=auth_headers)
         assert gone.status_code == 404
 
     def test_conversation_message_ordering(self, app_client, auth_headers):
         """Messages in a conversation should maintain chronological order."""
         # Create conversation with first message
         resp1 = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "First question",
@@ -328,7 +328,7 @@ class TestDataIntegrity:
 
         # Continue conversation
         resp2 = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Second question",
@@ -337,7 +337,7 @@ class TestDataIntegrity:
         )
 
         # Fetch conversation
-        conv = app_client.get(f"/conversations/{conv_id}", headers=auth_headers)
+        conv = app_client.get(f"/api/v1/conversations/{conv_id}", headers=auth_headers)
         assert conv.status_code == 200
         messages = conv.json().get("messages", [])
         # Should have at least 4 messages (2 user + 2 assistant)

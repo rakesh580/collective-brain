@@ -35,14 +35,14 @@ class CollectiveBrainUser(HttpUser):
         self.username = uname
         try:
             resp = self.client.post(
-                "/auth/register",
+                "/api/v1/auth/register",
                 json={
                     "username": uname,
                     "email": f"{uname}@test.com",
                     "password": "TestPass123!",
                     "display_name": f"Load Tester {_rand(4)}",
                 },
-                name="/auth/register",
+                name="/api/v1/auth/register",
             )
             if resp.status_code == 201:
                 data = resp.json()
@@ -55,9 +55,9 @@ class CollectiveBrainUser(HttpUser):
             # Try login if register failed (user exists)
             try:
                 resp = self.client.post(
-                    "/auth/login",
+                    "/api/v1/auth/login",
                     json={"username": uname, "password": "TestPass123!"},
-                    name="/auth/login",
+                    name="/api/v1/auth/login",
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -87,69 +87,69 @@ class CollectiveBrainUser(HttpUser):
     @tag("read")
     @task(8)
     def list_members(self):
-        self.client.get("/members", headers=self._headers(), name="/members")
+        self.client.get("/api/v1/members", headers=self._headers(), name="/api/v1/members")
 
     @tag("read")
     @task(5)
     def list_conversations(self):
         self.client.get(
-            "/conversations?limit=20&offset=0",
+            "/api/v1/conversations?limit=20&offset=0",
             headers=self._headers(),
-            name="/conversations",
+            name="/api/v1/conversations",
         )
 
     @tag("read")
     @task(4)
     def list_rooms(self):
         self.client.get(
-            "/rooms?limit=50&offset=0",
+            "/api/v1/rooms?limit=50&offset=0",
             headers=self._headers(),
-            name="/rooms",
+            name="/api/v1/rooms",
         )
 
     @tag("read")
     @task(3)
     def dashboard(self):
         self.client.get(
-            "/insights/dashboard",
+            "/api/v1/insights/dashboard",
             headers=self._headers(),
-            name="/insights/dashboard",
+            name="/api/v1/insights/dashboard",
         )
 
     @tag("read")
     @task(3)
     def graph_full(self):
         self.client.get(
-            "/graph/full",
+            "/api/v1/graph/full",
             headers=self._headers(),
-            name="/graph/full",
+            name="/api/v1/graph/full",
         )
 
     @tag("read")
     @task(2)
     def expertise_matrix(self):
         self.client.get(
-            "/graph/expertise-matrix",
+            "/api/v1/graph/expertise-matrix",
             headers=self._headers(),
-            name="/graph/expertise-matrix",
+            name="/api/v1/graph/expertise-matrix",
         )
 
     @tag("read")
     @task(3)
     def analytics_timeline(self):
         self.client.get(
-            "/analytics/activity-timeline?days=30",
+            "/api/v1/analytics/activity-timeline?days=30",
             headers=self._headers(),
-            name="/analytics/activity-timeline",
+            name="/api/v1/analytics/activity-timeline",
         )
 
     @tag("read")
     @task(2)
     def analytics_sources(self):
         self.client.get(
-            "/analytics/source-breakdown",
+            "/api/v1/analytics/source-breakdown",
             headers=self._headers(),
-            name="/analytics/source-breakdown",
+            name="/api/v1/analytics/source-breakdown",
         )
 
     @tag("read")
@@ -158,18 +158,18 @@ class CollectiveBrainUser(HttpUser):
         terms = ["python", "react", "api", "database", "auth", "team", "project"]
         q = random.choice(terms)
         self.client.get(
-            f"/search?q={q}&limit=10",
+            f"/api/v1/search?q={q}&limit=10",
             headers=self._headers(),
-            name="/search",
+            name="/api/v1/search",
         )
 
     @tag("read")
     @task(2)
     def list_discussions(self):
         self.client.get(
-            "/discussions?limit=20",
+            "/api/v1/discussions?limit=20",
             headers=self._headers(),
-            name="/discussions",
+            name="/api/v1/discussions",
         )
 
     @tag("read")
@@ -187,10 +187,10 @@ class CollectiveBrainUser(HttpUser):
     @task(2)
     def create_room(self):
         resp = self.client.post(
-            "/rooms",
+            "/api/v1/rooms",
             json={"name": f"LoadTest Room {_rand(6)}", "description": "stress test"},
             headers=self._headers(),
-            name="/rooms [POST]",
+            name="/api/v1/rooms [POST]",
         )
         if resp.status_code == 201:
             self.room_id = resp.json().get("id")
@@ -201,20 +201,20 @@ class CollectiveBrainUser(HttpUser):
         if not self.room_id:
             return
         self.client.post(
-            f"/rooms/{self.room_id}/messages",
+            f"/api/v1/rooms/{self.room_id}/messages",
             json={"content": f"Load test message {_rand(20)}"},
             headers=self._headers(),
-            name="/rooms/{id}/messages [POST]",
+            name="/api/v1/rooms/{id}/messages [POST]",
         )
 
     @tag("write")
     @task(1)
     def create_discussion(self):
         self.client.post(
-            "/discussions",
+            "/api/v1/discussions",
             json={"title": f"Discussion {_rand(8)}"},
             headers=self._headers(),
-            name="/discussions [POST]",
+            name="/api/v1/discussions [POST]",
         )
 
     # ── Auth Endpoint Stress ──────────────────────────────
@@ -224,9 +224,9 @@ class CollectiveBrainUser(HttpUser):
     def auth_profile(self):
         if self.token:
             self.client.get(
-                "/auth/me",
+                "/api/v1/auth/me",
                 headers=self._headers(),
-                name="/auth/me",
+                name="/api/v1/auth/me",
             )
 
     @tag("auth")
@@ -234,7 +234,7 @@ class CollectiveBrainUser(HttpUser):
     def auth_users_list(self):
         if self.token:
             self.client.get(
-                "/auth/users",
+                "/api/v1/auth/users",
                 headers=self._headers(),
-                name="/auth/users",
+                name="/api/v1/auth/users",
             )
