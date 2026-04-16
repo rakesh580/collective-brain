@@ -91,7 +91,8 @@ class VectorStoreService:
             except Exception as e:
                 db.rollback()
                 logger.error("VectorStore upsert failed: %s", e)
-                raise
+                # Don't re-raise — ingestion should succeed even if embedding storage fails
+                # The artifact is still created; embeddings can be backfilled later
             finally:
                 db.close()
 

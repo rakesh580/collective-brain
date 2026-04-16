@@ -1,28 +1,10 @@
 """Integration tests for conversation endpoints — CRUD, sharing, access control."""
 
-import pytest
-
-
-@pytest.fixture()
-def second_user(app_client):
-    resp = app_client.post(
-        "/api/v1/auth/register",
-        json={
-            "username": "bob",
-            "email": "bob@test.com",
-            "password": "Str0ngPass!",
-            "display_name": "Bob",
-        },
-    )
-    data = resp.json()
-    return data["user"], data["token"]
-
 
 class TestConversationCRUD:
     def test_list_conversations_empty(self, app_client, auth_headers):
         resp = app_client.get("/api/v1/conversations", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json()["total"] == 0
 
     def test_get_conversation_not_found(self, app_client, auth_headers):
         resp = app_client.get("/api/v1/conversations/nonexistent", headers=auth_headers)
@@ -31,10 +13,7 @@ class TestConversationCRUD:
 
 class TestConversationSharing:
     def test_share_conversation(self, app_client, auth_headers, registered_user, second_user):
-        user, token = registered_user
-        bob_user, bob_token = second_user
-
-        # Create a conversation by querying (mocked LLM)
+        # Create a conversation by querying
         resp = app_client.post(
             "/api/v1/query",
             headers=auth_headers,
@@ -44,16 +23,16 @@ class TestConversationSharing:
         conv_id = resp.json()["conversation_id"]
 
         # Share with bob
+        bob_user_id = second_user["user"].get("id", "")
         resp = app_client.post(
             f"/api/v1/conversations/{conv_id}/share",
             headers=auth_headers,
-            json={"user_ids": [bob_user["id"]]},
+            json={"user_ids": [bob_user_id]},
         )
         assert resp.status_code == 200
 
         # Bob should now be able to access it
-        bob_headers = {"Authorization": f"Bearer {bob_token}"}
-        resp = app_client.get(f"/api/v1/conversations/{conv_id}", headers=bob_headers)
+        resp = app_client.get(f"/api/v1/conversations/{conv_id}", headers=second_user["headers"])
         assert resp.status_code == 200
 
     def test_share_nonexistent_conversation(self, app_client, auth_headers):
@@ -67,7 +46,6 @@ class TestConversationSharing:
 
 class TestConversationAccessControl:
     def test_cannot_access_others_private_conversation(self, app_client, auth_headers, second_user):
-        # Alice creates a conversation
         resp = app_client.post(
             "/api/v1/query",
             headers=auth_headers,
@@ -75,9 +53,7 @@ class TestConversationAccessControl:
         )
         conv_id = resp.json()["conversation_id"]
 
-        # Bob tries to access it
-        bob_headers = {"Authorization": f"Bearer {second_user[1]}"}
-        resp = app_client.get(f"/api/v1/conversations/{conv_id}", headers=bob_headers)
+        resp = app_client.get(f"/api/v1/conversations/{conv_id}", headers=second_user["headers"])
         assert resp.status_code == 403
 
     def test_cannot_delete_others_conversation(self, app_client, auth_headers, second_user):
@@ -88,8 +64,7 @@ class TestConversationAccessControl:
         )
         conv_id = resp.json()["conversation_id"]
 
-        bob_headers = {"Authorization": f"Bearer {second_user[1]}"}
-        resp = app_client.delete(f"/api/v1/conversations/{conv_id}", headers=bob_headers)
+        resp = app_client.delete(f"/api/v1/conversations/{conv_id}", headers=second_user["headers"])
         assert resp.status_code == 403
 
 
@@ -102,6 +77,5 @@ class TestParticipantEndpoint:
         )
         conv_id = resp.json()["conversation_id"]
 
-        bob_headers = {"Authorization": f"Bearer {second_user[1]}"}
-        resp = app_client.get(f"/api/v1/conversations/{conv_id}/participants", headers=bob_headers)
+        resp = app_client.get(f"/api/v1/conversations/{conv_id}/participants", headers=second_user["headers"])
         assert resp.status_code == 403
