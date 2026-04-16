@@ -32,10 +32,11 @@ def client(_test_db_dir):
             from app.config import get_settings
             settings = get_settings()
 
-        import app.models  # noqa: F401
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy.pool import StaticPool
+
+        import app.models  # noqa: F401
 
         sqlite_path = os.path.join(_test_db_dir, "test_brain.db")
         sqlite_url = f"sqlite:///{sqlite_path}"
