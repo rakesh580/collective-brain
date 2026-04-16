@@ -79,6 +79,28 @@ jobs:
           python -m alembic upgrade head
           echo "Migration complete."
 
+  # ── Deploy to Hugging Face Spaces ──────────────────────────────────────────
+  deploy-hf-spaces:
+    name: Deploy to HF Spaces
+    runs-on: ubuntu-latest
+    needs: migrate
+    environment:
+      name: production
+      url: https://huggingface.co/spaces/${{ vars.HF_SPACE_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for git push
+
+      - name: Push to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+        run: |
+          git remote add hf "https://HF_USER:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_NAME}" 2>/dev/null || \
+            git remote set-url hf "https://HF_USER:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_NAME}"
+          git push hf main --force
+
   # ── Deploy backend ─────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend
