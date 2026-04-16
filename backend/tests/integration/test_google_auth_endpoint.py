@@ -17,8 +17,8 @@ class TestGoogleAuthEndpoint:
             "/api/v1/auth/google",
             json={"credential": "fake-token"},
         )
-        # May fail if google_client_id not set — accept 200 or 400/500
-        assert resp.status_code in (200, 400, 500)
+        # May fail if google_client_id not set — accept 200, 400/500, or 501 (not configured)
+        assert resp.status_code in (200, 400, 500, 501)
 
 
 class TestLoginErrors:
