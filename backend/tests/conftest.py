@@ -10,6 +10,8 @@ from app.config import Settings
 collect_ignore = [
     os.path.join(os.path.dirname(__file__), "load_test.py"),
     os.path.join(os.path.dirname(__file__), "stress_test.py"),
+    os.path.join(os.path.dirname(__file__), "collaboration_test.py"),
+    os.path.join(os.path.dirname(__file__), "ws_db_test.py"),
 ]
 
 
