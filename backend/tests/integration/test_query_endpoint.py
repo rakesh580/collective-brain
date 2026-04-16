@@ -4,7 +4,7 @@
 class TestQueryEndpoint:
     def test_query_creates_conversation(self, app_client, auth_headers):
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Who is the best Python developer?",
@@ -19,7 +19,7 @@ class TestQueryEndpoint:
     def test_query_continues_conversation(self, app_client, auth_headers):
         # First query creates a conversation
         resp1 = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Tell me about the team",
@@ -29,7 +29,7 @@ class TestQueryEndpoint:
 
         # Second query in same conversation
         resp2 = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "Who contributes the most?",
@@ -40,16 +40,16 @@ class TestQueryEndpoint:
         assert resp2.json()["conversation_id"] == conv_id
 
     def test_query_requires_auth(self, app_client):
-        resp = app_client.post("/query", json={"question": "test"})
+        resp = app_client.post("/api/v1/query", json={"question": "test"})
         assert resp.status_code == 401
 
     def test_query_empty_question(self, app_client, auth_headers):
-        resp = app_client.post("/query", headers=auth_headers, json={"question": ""})
+        resp = app_client.post("/api/v1/query", headers=auth_headers, json={"question": ""})
         assert resp.status_code == 422
 
     def test_query_with_filters(self, app_client, auth_headers):
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "What has Alice done?",
@@ -61,7 +61,7 @@ class TestQueryEndpoint:
 
     def test_query_returns_sources(self, app_client, auth_headers):
         resp = app_client.post(
-            "/query",
+            "/api/v1/query",
             headers=auth_headers,
             json={
                 "question": "What projects are active?",

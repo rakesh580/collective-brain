@@ -121,3 +121,40 @@ def registered_user(app_client):
 
     token = data.get("token") or data.get("access_token", "")
     return {"token": token, "user": data.get("user", {})}
+
+
+@pytest.fixture
+def auth_headers(registered_user):
+    """Authorization headers for authenticated requests."""
+    return {"Authorization": f"Bearer {registered_user['token']}"}
+
+
+@pytest.fixture
+def second_user(app_client):
+    """Register a second user for access control tests."""
+    resp = app_client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "bob",
+            "email": "bob@test.example",
+            "password": "StrongP@ss1",
+            "display_name": "Bob Test",
+        },
+    )
+    if resp.status_code == 409:
+        login = app_client.post(
+            "/api/v1/auth/login",
+            json={"username": "bob", "password": "StrongP@ss1"},
+        )
+        assert login.status_code == 200
+        data = login.json()
+    else:
+        assert resp.status_code == 201
+        data = resp.json()
+
+    token = data.get("token") or data.get("access_token", "")
+    return {
+        "token": token,
+        "headers": {"Authorization": f"Bearer {token}"},
+        "user": data.get("user", {}),
+    }

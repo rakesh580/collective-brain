@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 class TestGoogleAuthEndpoint:
     def test_google_not_configured_returns_501(self, app_client):
-        resp = app_client.post("/auth/google", json={"credential": "fake-token"})
+        resp = app_client.post("/api/v1/auth/google", json={"credential": "fake-token"})
         assert resp.status_code == 501
         assert "not configured" in resp.json()["detail"]
 
@@ -16,7 +16,7 @@ class TestGoogleAuthEndpoint:
         try:
             with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
                 mock_verify.side_effect = ValueError("bad token")
-                resp = app_client.post("/auth/google", json={"credential": "bad"})
+                resp = app_client.post("/api/v1/auth/google", json={"credential": "bad"})
                 assert resp.status_code == 401
         finally:
             app.state.settings.google_client_id = ""
@@ -34,7 +34,7 @@ class TestGoogleAuthEndpoint:
                     "name": "New User",
                     "picture": None,
                 }
-                resp = app_client.post("/auth/google", json={"credential": "good-token"})
+                resp = app_client.post("/api/v1/auth/google", json={"credential": "good-token"})
                 assert resp.status_code == 200
                 data = resp.json()
                 assert "token" in data
@@ -47,7 +47,7 @@ class TestGoogleAuthEndpoint:
 class TestLoginErrors:
     def test_login_no_account(self, app_client):
         resp = app_client.post(
-            "/auth/login",
+            "/api/v1/auth/login",
             json={
                 "username": "nonexistent",
                 "password": "anything",
@@ -58,7 +58,7 @@ class TestLoginErrors:
 
     def test_login_wrong_password(self, app_client, auth_headers):
         resp = app_client.post(
-            "/auth/login",
+            "/api/v1/auth/login",
             json={
                 "username": "alice",
                 "password": "WrongPassword!",
@@ -69,7 +69,7 @@ class TestLoginErrors:
 
     def test_login_correct_password(self, app_client, auth_headers):
         resp = app_client.post(
-            "/auth/login",
+            "/api/v1/auth/login",
             json={
                 "username": "alice",
                 "password": "Str0ngPass!",
@@ -83,7 +83,7 @@ class TestForgotPasswordEndpoint:
     def test_forgot_password_flow(self, app_client, auth_headers):
         # Step 1: Request reset code
         resp = app_client.post(
-            "/auth/forgot-password",
+            "/api/v1/auth/forgot-password",
             json={
                 "email": "alice@test.com",
             },
@@ -94,7 +94,7 @@ class TestForgotPasswordEndpoint:
 
         # Step 2: Reset password with code
         resp = app_client.post(
-            "/auth/reset-password",
+            "/api/v1/auth/reset-password",
             json={
                 "email": "alice@test.com",
                 "code": code,
@@ -106,7 +106,7 @@ class TestForgotPasswordEndpoint:
 
         # Step 3: Login with new password works
         resp = app_client.post(
-            "/auth/login",
+            "/api/v1/auth/login",
             json={
                 "username": "alice",
                 "password": "NewSecure123!",
@@ -116,7 +116,7 @@ class TestForgotPasswordEndpoint:
 
         # Step 4: Old password fails
         resp = app_client.post(
-            "/auth/login",
+            "/api/v1/auth/login",
             json={
                 "username": "alice",
                 "password": "Str0ngPass!",
@@ -126,7 +126,7 @@ class TestForgotPasswordEndpoint:
 
     def test_forgot_password_no_account(self, app_client):
         resp = app_client.post(
-            "/auth/forgot-password",
+            "/api/v1/auth/forgot-password",
             json={
                 "email": "nobody@test.com",
             },
@@ -136,10 +136,10 @@ class TestForgotPasswordEndpoint:
 
     def test_reset_wrong_code(self, app_client, auth_headers):
         # Request code
-        app_client.post("/auth/forgot-password", json={"email": "alice@test.com"})
+        app_client.post("/api/v1/auth/forgot-password", json={"email": "alice@test.com"})
         # Use wrong code
         resp = app_client.post(
-            "/auth/reset-password",
+            "/api/v1/auth/reset-password",
             json={
                 "email": "alice@test.com",
                 "code": "000000",
