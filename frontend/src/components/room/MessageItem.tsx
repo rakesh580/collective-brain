@@ -16,7 +16,7 @@ const MessageItem = React.memo(function MessageItem({
   if (message.message_type === "system") {
     return (
       <div className="flex justify-center py-2">
-        <span className="text-xs text-slate-400 bg-elevated px-3 py-1 rounded-full">
+        <span className="text-xs px-3 py-1 rounded-full" style={{ color: "var(--text-tertiary)", background: "var(--bg-elevated)" }}>
           {message.content}
         </span>
       </div>
@@ -57,17 +57,14 @@ const MessageItem = React.memo(function MessageItem({
             }`}
           >
             <span
-              className={`text-xs font-semibold ${
-                isAI
-                  ? "text-violet-600"
-                  : isOwn
-                    ? "text-indigo-600"
-                    : "text-slate-700"
-              }`}
+              className="text-xs font-semibold"
+              style={{
+                color: isAI ? "#a78bfa" : "var(--text-secondary)",
+              }}
             >
               {message.sender_name}
             </span>
-            <span className="text-2xs text-slate-400">
+            <span className="text-2xs" style={{ color: "var(--text-tertiary)" }}>
               {formatTime(message.created_at)}
             </span>
           </div>
@@ -76,11 +73,25 @@ const MessageItem = React.memo(function MessageItem({
         <div
           className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
             isAI
-              ? "bg-violet-50 border border-violet-200 text-slate-800 rounded-tl-md"
+              ? "rounded-tl-md"
               : isOwn
                 ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-tr-md"
-                : "bg-muted/50 text-slate-800 rounded-tl-md"
+                : "rounded-tl-md"
           }`}
+          style={
+            isAI
+              ? {
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
+                }
+              : !isOwn
+                ? {
+                    background: "var(--bg-muted)",
+                    color: "var(--text-primary)",
+                  }
+                : undefined
+          }
         >
           {isAI ? (
             <MarkdownContent content={message.content} className="break-words" />
@@ -95,7 +106,8 @@ const MessageItem = React.memo(function MessageItem({
             {message.sources.slice(0, 3).map((s, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 text-2xs text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full"
+                className="inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded-full"
+                style={{ color: "#a78bfa", background: "rgba(139,92,246,0.1)" }}
               >
                 <FileText size={8} />
                 {s.source_ref?.split("/").pop() || "source"}
@@ -112,7 +124,8 @@ const MessageItem = React.memo(function MessageItem({
               {message.related_members.map((m) => (
                 <span
                   key={m.id}
-                  className="inline-flex items-center gap-1 text-2xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full"
+                  className="inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded-full"
+                style={{ color: "#818cf8", background: "rgba(99,102,241,0.1)" }}
                 >
                   <UserCircle size={8} />
                   {m.name}
