@@ -67,8 +67,15 @@ jobs:
 
       - name: Force IPv4 for Supabase connectivity
         run: |
-          # GitHub Actions runners sometimes resolve Supabase to IPv6 which is unreachable
-          sudo sh -c 'echo "precedence ::ffff:0:0/96 100" >> /etc/gai.conf'
+          # GitHub Actions runners resolve Supabase to IPv6 which is unreachable
+          # Force IPv4 by resolving and pinning in /etc/hosts
+          IPV4=$(dig +short A db.jfcvntwtkqhrfakykdog.supabase.co | head -1)
+          if [ -n "$IPV4" ]; then
+            echo "$IPV4 db.jfcvntwtkqhrfakykdog.supabase.co" | sudo tee -a /etc/hosts
+            echo "Pinned db.jfcvntwtkqhrfakykdog.supabase.co -> $IPV4"
+          else
+            echo "::warning::Could not resolve IPv4 for Supabase"
+          fi
 
       - name: Run Alembic migrations (dry-run check first)
         working-directory: backend
