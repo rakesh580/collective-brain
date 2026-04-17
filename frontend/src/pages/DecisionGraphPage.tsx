@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { DecisionGraphNode, DecisionGraphEdge } from "../types";
 import {
   GitMerge, X, Filter, RotateCcw, ZoomIn, ZoomOut,
-  Calendar, Tag, Users, Loader2,
+  Calendar, Tag, Loader2,
 } from "lucide-react";
 
 let ForceGraph2D: any = null;
@@ -23,10 +23,6 @@ const LINK_COLORS: Record<string, string> = {
   contradicts: "#ef4444",
 };
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
-};
 const item = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },

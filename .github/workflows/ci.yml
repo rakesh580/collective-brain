@@ -125,7 +125,15 @@ jobs:
           # Start server in background
           uvicorn app.main:app --host 127.0.0.1 --port 8000 &
           SERVER_PID=$!
-          sleep 5
+
+          # Wait for server to be ready (up to 30s)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
 
           # Register test user and get token
           TOKEN=$(curl -sf http://127.0.0.1:8000/api/v1/auth/register \
