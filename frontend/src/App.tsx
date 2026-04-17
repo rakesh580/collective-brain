@@ -21,6 +21,13 @@ const RoomChatPage = lazy(() => import("./pages/RoomChatPage"));
 const TeamHealthPage = lazy(() => import("./pages/TeamHealthPage"));
 const PublicKBPage = lazy(() => import("./pages/PublicKBPage"));
 const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage"));
+const DecisionsPage = lazy(() => import("./pages/DecisionsPage"));
+const RiskRadarPage = lazy(() => import("./pages/RiskRadarPage"));
+const ContinuityPage = lazy(() => import("./pages/ContinuityPage"));
+const DecisionGraphPage = lazy(() => import("./pages/DecisionGraphPage"));
+const WhoShouldDecidePage = lazy(() => import("./pages/WhoShouldDecidePage"));
+const OnboardingBriefingPage = lazy(() => import("./pages/OnboardingBriefingPage"));
+const OrgXrayPage = lazy(() => import("./pages/OrgXrayPage"));
 
 function PageFallback() {
   return (
@@ -62,6 +69,13 @@ export default function App() {
         <Route path="/graph" element={guarded(<GraphPage />, "Knowledge Graph")} />
         <Route path="/analytics" element={guarded(<AnalyticsPage />, "Analytics")} />
         <Route path="/health" element={guarded(<TeamHealthPage />, "Team Health")} />
+        <Route path="/decisions" element={guarded(<DecisionsPage />, "Decisions")} />
+        <Route path="/risk-radar" element={guarded(<RiskRadarPage />, "Risk Radar")} />
+        <Route path="/continuity" element={guarded(<ContinuityPage />, "Continuity")} />
+        <Route path="/decision-graph" element={guarded(<DecisionGraphPage />, "Decision Graph")} />
+        <Route path="/who-decides" element={guarded(<WhoShouldDecidePage />, "Who Decides")} />
+        <Route path="/onboarding" element={guarded(<OnboardingBriefingPage />, "Onboarding")} />
+        <Route path="/org-xray" element={guarded(<OrgXrayPage />, "Org X-Ray")} />
         <Route path="/rooms" element={guarded(<RoomsPage />, "Rooms")} />
         <Route path="/rooms/:roomId" element={guarded(<RoomChatPage />, "Room Chat")} />
         <Route path="/discussions" element={guarded(<DiscussionsPage />, "Discussions")} />

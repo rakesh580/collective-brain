@@ -55,6 +55,19 @@ import type {
   HealthSnapshot,
   HealthSnapshotRecord,
   HealthPrediction,
+  Decision,
+  DecisionSearchResult,
+  RiskAlert,
+  RiskSummary,
+  ContinuityDashboard,
+  MemberContinuity,
+  DecisionGraphNode,
+  DecisionGraphEdge,
+  DecisionOutcome,
+  DecisionRecommendation,
+  DecisionInfluenceMap,
+  OnboardingBriefing,
+  OrgXrayReport,
 } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
@@ -600,4 +613,100 @@ export const api = {
     request<{ success: boolean }>(`/organizations/${orgId}/members/${userId}`, { method: "DELETE" }),
   getAuditLog: (orgId: string) =>
     request<{ entries: AuditLogEntry[] }>(`/organizations/${orgId}/audit-log`),
+
+  // ── Decision Intelligence ──
+  getDecisions: (params?: { type?: string; status?: string; limit?: number; offset?: number }) => {
+    const p = new URLSearchParams();
+    if (params?.type) p.set("type", params.type);
+    if (params?.status) p.set("status", params.status);
+    if (params?.limit) p.set("limit", String(params.limit));
+    if (params?.offset) p.set("offset", String(params.offset));
+    return request<{ decisions: Decision[]; total: number }>(`/decisions?${p}`);
+  },
+  getDecision: (id: string) =>
+    request<Decision>(`/decisions/${id}`),
+  searchDecisions: (q: string) =>
+    request<{ decisions: Decision[]; total: number }>(`/decisions/search?q=${encodeURIComponent(q)}`),
+  whyDidWe: (question: string) =>
+    request<DecisionSearchResult>("/decisions/why", {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
+  extractDecisions: (artifactIds: string[]) =>
+    request<{ extracted_count: number; decisions: Decision[] }>("/decisions/extract", {
+      method: "POST",
+      body: JSON.stringify({ artifact_ids: artifactIds }),
+    }),
+  getDecisionTimeline: (topic: string) =>
+    request<{ timeline: { date: string; decisions: Decision[] }[] }>(`/decisions/timeline?topic=${encodeURIComponent(topic)}`),
+
+  // ── Risk Radar ──
+  scanRisks: () =>
+    request<{ alerts: RiskAlert[]; summary: RiskSummary }>("/risk-radar/scan", { method: "POST" }),
+  getAlerts: (params?: { severity?: string; type?: string }) => {
+    const p = new URLSearchParams();
+    if (params?.severity) p.set("severity", params.severity);
+    if (params?.type) p.set("type", params.type);
+    return request<{ alerts: RiskAlert[]; total: number }>(`/risk-radar/alerts?${p}`);
+  },
+  acknowledgeAlert: (id: string) =>
+    request<{ status: string }>(`/risk-radar/alerts/${id}/acknowledge`, { method: "POST" }),
+  resolveAlert: (id: string) =>
+    request<{ status: string }>(`/risk-radar/alerts/${id}/resolve`, { method: "POST" }),
+  getRiskSummary: () =>
+    request<RiskSummary>("/risk-radar/summary"),
+
+  // ── Knowledge Continuity ──
+  getContinuityDashboard: () =>
+    request<ContinuityDashboard>("/continuity/dashboard"),
+  getMemberContinuity: (memberId: string) =>
+    request<MemberContinuity>(`/continuity/member/${memberId}`),
+  getTeamContinuity: () =>
+    request<ContinuityDashboard>("/continuity/team"),
+  calculateContinuity: () =>
+    request<{ status: string }>("/continuity/calculate", { method: "POST" }),
+
+  // ── Decision Graph ──
+  getDecisionGraph: () => request<{ nodes: DecisionGraphNode[]; edges: DecisionGraphEdge[] }>("/decisions/graph/data"),
+
+  // ── Decision Outcomes ──
+  recordOutcome: (decisionId: string, data: { outcome_description: string; outcome_status: string; lessons_learned: string[] }) =>
+    request<{ status: string; outcome_id: string }>(`/decisions/${decisionId}/outcome`, { method: "POST", body: JSON.stringify(data) }),
+  getOutcomes: (decisionId: string) =>
+    request<{ decision_id: string; outcomes: DecisionOutcome[] }>(`/decisions/${decisionId}/outcomes`),
+
+  // ── Who Should Decide ──
+  recommendDecisionMakers: (topic: string, decisionType?: string, topK?: number) =>
+    request<DecisionRecommendation>("/decision-recommender/recommend", {
+      method: "POST",
+      body: JSON.stringify({ topic, decision_type: decisionType || "technical", top_k: topK || 5 }),
+    }),
+  getDecisionInfluenceMap: () =>
+    request<DecisionInfluenceMap>("/decision-recommender/influence-map"),
+
+  // ── Onboarding ──
+  generateBriefing: (memberId?: string, topics?: string[]) =>
+    request<OnboardingBriefing>("/onboarding/briefing", {
+      method: "POST",
+      body: JSON.stringify({ member_id: memberId, topics }),
+    }),
+  generateTopicBriefing: (topic: string) =>
+    request<OnboardingBriefing>("/onboarding/topic-briefing", {
+      method: "POST",
+      body: JSON.stringify({ topic }),
+    }),
+
+  // ── Org X-Ray ──
+  getOrgXray: () => request<OrgXrayReport>("/org-xray/report"),
+  compareTeams: (teamA: string[], teamB: string[]) =>
+    request<any>("/org-xray/compare-teams", {
+      method: "POST",
+      body: JSON.stringify({ team_a_member_ids: teamA, team_b_member_ids: teamB }),
+    }),
+
+  // ── Notifications ──
+  registerWebhook: (url: string, eventTypes: string[]) =>
+    request<{ id: string }>("/notifications/webhooks", { method: "POST", body: JSON.stringify({ url, event_types: eventTypes }) }),
+  getWebhooks: () => request<{ webhooks: any[] }>("/notifications/webhooks"),
+  deleteWebhook: (id: string) => request<{ status: string }>(`/notifications/webhooks/${id}`, { method: "DELETE" }),
 };

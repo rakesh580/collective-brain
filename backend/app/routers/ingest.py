@@ -147,6 +147,25 @@ def _run_ingestion(request: Request, connector, source_input, source_path: str, 
 
         db.commit()
 
+        # ── Auto-extract decisions from newly ingested artifact ──
+        try:
+            settings = request.app.state.settings
+            if getattr(settings, 'decision_extraction_enabled', True):
+                from app.services.decision_extraction import DecisionExtractionService
+                extraction_svc = DecisionExtractionService(request.app.state.llm_service)
+                import asyncio
+                # Fire-and-forget: don't block ingestion on extraction
+                asyncio.create_task(extraction_svc.extract_decisions_from_artifact(artifact_id))
+                import logging
+                logging.getLogger("collective_brain.ingest").info(
+                    "Decision extraction triggered for artifact %s", artifact_id
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger("collective_brain.ingest").warning(
+                "Failed to trigger decision extraction for artifact %s: %s", artifact_id, e
+            )
+
         # Invalidate cached graph so new data is reflected
         from app.services.memory_graph import invalidate_graph_cache
 

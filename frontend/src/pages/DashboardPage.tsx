@@ -17,7 +17,7 @@ import FreshnessAlerts from "../components/insights/FreshnessAlerts";
 import {
   Users, Database, Boxes, ArrowRight, MessageSquare,
   Upload, TrendingUp, Sparkles, Brain, Target,
-  Zap, Command,
+  Zap, Command, GitBranch, ShieldAlert, Shield,
 } from "lucide-react";
 
 /* ── Count-up hook ── */
@@ -422,6 +422,60 @@ export default function DashboardPage() {
           </div>
         </motion.div>
       )}
+
+      {/* ── Decision Intelligence ── */}
+      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        {/* Decision count card */}
+        <Link to="/decisions" className="rounded-2xl p-5" style={{ background: "var(--bg-muted)", border: "1px solid var(--border-default)" }}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
+              <GitBranch size={15} style={{ color: "#a78bfa" }} />
+            </div>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Decisions Tracked</h3>
+          </div>
+          <p className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>{(data as any).decision_count || 0}</p>
+          {(data as any).recent_decisions?.length > 0 && (
+            <p className="text-xs mt-2 truncate" style={{ color: "var(--text-tertiary)" }}>
+              Latest: {(data as any).recent_decisions[0].title}
+            </p>
+          )}
+        </Link>
+
+        {/* Active risks card */}
+        <Link to="/risk-radar" className="rounded-2xl p-5" style={{ background: "var(--bg-muted)", border: "1px solid var(--border-default)" }}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: (data as any).active_risk_count > 0 ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.15)" }}>
+              <ShieldAlert size={15} style={{ color: (data as any).active_risk_count > 0 ? "#ef4444" : "#22c55e" }} />
+            </div>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Active Risks</h3>
+          </div>
+          <p className="text-3xl font-bold" style={{ color: (data as any).active_risk_count > 0 ? "#ef4444" : "#22c55e" }}>
+            {(data as any).active_risk_count || 0}
+          </p>
+          <p className="text-xs mt-2" style={{ color: "var(--text-tertiary)" }}>
+            {(data as any).active_risk_count > 0 ? "Needs attention" : "All clear"}
+          </p>
+        </Link>
+
+        {/* Quick actions card */}
+        <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: "var(--bg-muted)", border: "1px solid var(--border-default)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(99,102,241,0.15)" }}>
+              <Sparkles size={15} style={{ color: "var(--brand-400)" }} />
+            </div>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Intelligence</h3>
+          </div>
+          <Link to="/decisions" className="text-xs flex items-center gap-1.5 py-1" style={{ color: "var(--brand-400)" }}>
+            <GitBranch size={12} /> Why did we...? <ArrowRight size={10} />
+          </Link>
+          <Link to="/continuity" className="text-xs flex items-center gap-1.5 py-1" style={{ color: "var(--brand-400)" }}>
+            <Shield size={12} /> Knowledge Continuity <ArrowRight size={10} />
+          </Link>
+          <Link to="/org-xray" className="text-xs flex items-center gap-1.5 py-1" style={{ color: "var(--brand-400)" }}>
+            <Zap size={12} /> Org X-Ray <ArrowRight size={10} />
+          </Link>
+        </div>
+      </motion.div>
 
       {/* ── Freshness alerts ── */}
       <motion.div variants={item} className="mb-6">

@@ -96,6 +96,15 @@ class Settings(BaseSettings):
     # Knowledge verification
     knowledge_staleness_threshold_days: int = 30
 
+    # Decision Intelligence
+    decision_extraction_enabled: bool = True
+    decision_extraction_min_confidence: float = 0.6
+    risk_radar_scan_interval_hours: int = 24
+
+    # Notifications
+    notification_webhook_timeout: int = 10
+    notification_retry_count: int = 3
+
     # Logging
     log_level: str = "INFO"
 

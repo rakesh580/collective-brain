@@ -5,7 +5,8 @@ import {
   LayoutDashboard, MessageSquare, MessagesSquare, Upload,
   Users, Network, BarChart3, Settings, LogOut, Sun, Moon,
   PanelLeftClose, PanelLeftOpen, Hash, Heart, Brain,
-  ChevronRight, Globe, Building2,
+  ChevronRight, Globe, Building2, GitBranch, ShieldAlert, Shield,
+  GitMerge, UserCheck, BookOpen, Scan,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
@@ -28,6 +29,13 @@ const links: NavItem[] = [
   { to: "/graph",      label: "Graph",      icon: Network },
   { to: "/analytics",  label: "Analytics",  icon: BarChart3 },
   { to: "/health",     label: "Team Health",icon: Heart },
+  { to: "/decisions",  label: "Decisions",  icon: GitBranch },
+  { to: "/risk-radar", label: "Risk Radar", icon: ShieldAlert },
+  { to: "/continuity", label: "Continuity", icon: Shield },
+  { to: "/decision-graph", label: "Decision Map", icon: GitMerge },
+  { to: "/who-decides",    label: "Who Decides",  icon: UserCheck },
+  { to: "/onboarding",     label: "Onboarding",   icon: BookOpen },
+  { to: "/org-xray",       label: "Org X-Ray",    icon: Scan },
   { to: "/public-kb",  label: "Public KB",  icon: Globe },
   { to: "/organizations", label: "Organizations", icon: Building2 },
   { to: "/settings",   label: "Settings",   icon: Settings },

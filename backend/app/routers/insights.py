@@ -46,7 +46,7 @@ def _get_db():
     return create_session()
 
 
-@router.get("/dashboard", response_model=DashboardResponse)
+@router.get("/dashboard")
 async def get_dashboard(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
     db = _get_db()
     try:
@@ -65,7 +65,16 @@ async def get_dashboard(request: Request, room_id: str | None = None, user=Depen
         insights = ins_query.limit(5).all()
         vs = request.app.state.vector_store
 
-        return DashboardResponse(
+        # ── Decision Intelligence summary ──
+        from app.models.decision import DecisionRecord, RiskAlert
+
+        decision_count = db.query(DecisionRecord).count()
+        active_risk_count = db.query(RiskAlert).filter(RiskAlert.is_resolved == False).count()  # noqa: E712
+        recent_decisions = (
+            db.query(DecisionRecord).order_by(DecisionRecord.created_at.desc()).limit(5).all()
+        )
+
+        dashboard = DashboardResponse(
             total_members=total_members,
             total_artifacts=total_artifacts,
             total_chunks=vs.count(),
@@ -97,6 +106,16 @@ async def get_dashboard(request: Request, room_id: str | None = None, user=Depen
                 for m in members
             ],
         )
+
+        # Attach decision intelligence fields as extra data
+        result = dashboard.model_dump()
+        result["decision_count"] = decision_count
+        result["active_risk_count"] = active_risk_count
+        result["recent_decisions"] = [
+            {"id": d.id, "title": d.title, "type": d.decision_type, "status": d.status}
+            for d in recent_decisions
+        ]
+        return result
     finally:
         db.close()
 

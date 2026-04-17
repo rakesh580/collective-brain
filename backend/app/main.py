@@ -31,6 +31,13 @@ from app.routers import (
     search,
     slack,
 )
+from app.routers import continuity as continuity_router_mod
+from app.routers import decision_recommender as decision_recommender_mod
+from app.routers import decisions as decisions_router_mod
+from app.routers import notifications as notifications_mod
+from app.routers import onboarding as onboarding_mod
+from app.routers import org_xray as org_xray_mod
+from app.routers import risk_radar as risk_radar_router_mod
 from app.routers.offboarding import router as offboarding_router
 from app.routers.organizations import router as organizations_router
 from app.routers.public_kb import manage_router as public_kb_manage_router
@@ -47,7 +54,7 @@ from app.services.telemetry import current_trace_id, setup_telemetry
 from app.services.vector_store import VectorStoreService
 
 # ── OpenTelemetry must be set up before any instrumented code runs ──
-setup_telemetry(service_name="collective-brain", version="0.3.0")
+setup_telemetry(service_name="collective-brain", version="0.5.0")
 
 # ── Log record factory: inject request_id, trace_id, org_id ──────────────────
 _old_factory = logging.getLogRecordFactory()
@@ -126,7 +133,7 @@ async def lifespan(app: FastAPI):
     # ── Publish app info to Prometheus ──
     APP_INFO.info(
         {
-            "version": "0.3.0",
+            "version": "0.5.0",
             "llm_provider": settings.llm_provider,
             "agent_mode": settings.agent_mode,
             "embedding_model": settings.embedding_model,
@@ -179,7 +186,7 @@ async def lifespan(app: FastAPI):
     logger.info("Collective Brain shut down gracefully")
 
 
-app = FastAPI(title="Collective Brain", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="Collective Brain", version="0.5.0", lifespan=lifespan)
 
 # ── Prometheus /metrics endpoint ─────────────────────────────────────────────
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -341,6 +348,15 @@ api_v1.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
 api_v1.include_router(slack.router, prefix="/slack", tags=["slack"])
 api_v1.include_router(github_webhooks.router, prefix="/github", tags=["github"])
 api_v1.include_router(expert_routing.router, prefix="/experts", tags=["experts"])
+# Phase 7 — Decision Intelligence
+api_v1.include_router(decisions_router_mod.router, prefix="/decisions", tags=["decisions"])
+api_v1.include_router(risk_radar_router_mod.router, prefix="/risk-radar", tags=["risk-radar"])
+api_v1.include_router(continuity_router_mod.router, prefix="/continuity", tags=["continuity"])
+# Phase 8 — Decision Recommender, Onboarding, Notifications, Org X-Ray
+api_v1.include_router(decision_recommender_mod.router, prefix="/decision-recommender", tags=["decision-recommender"])
+api_v1.include_router(onboarding_mod.router, prefix="/onboarding", tags=["onboarding"])
+api_v1.include_router(notifications_mod.router, prefix="/notifications", tags=["notifications"])
+api_v1.include_router(org_xray_mod.router, prefix="/org-xray", tags=["org-xray"])
 # Phase 4 — Enterprise (organizations, SAML SSO, SCIM provisioning)
 api_v1.include_router(organizations_router, tags=["organizations"])
 api_v1.include_router(saml_router, tags=["sso"])
@@ -370,6 +386,13 @@ app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], deprecated
 app.include_router(slack.router, prefix="/api/slack", tags=["slack"], deprecated=True)
 app.include_router(github_webhooks.router, prefix="/api/github", tags=["github"], deprecated=True)
 app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"], deprecated=True)
+app.include_router(decisions_router_mod.router, prefix="/api/decisions", tags=["decisions"], deprecated=True)
+app.include_router(risk_radar_router_mod.router, prefix="/api/risk-radar", tags=["risk-radar"], deprecated=True)
+app.include_router(continuity_router_mod.router, prefix="/api/continuity", tags=["continuity"], deprecated=True)
+app.include_router(decision_recommender_mod.router, prefix="/api/decision-recommender", tags=["decision-recommender"], deprecated=True)
+app.include_router(onboarding_mod.router, prefix="/api/onboarding", tags=["onboarding"], deprecated=True)
+app.include_router(notifications_mod.router, prefix="/api/notifications", tags=["notifications"], deprecated=True)
+app.include_router(org_xray_mod.router, prefix="/api/org-xray", tags=["org-xray"], deprecated=True)
 
 # ── Frontend SPA fallback ─────────────────────────────────────────────────────
 _static_dir = Path(__file__).resolve().parent.parent / "static"

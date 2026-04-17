@@ -587,3 +587,140 @@ export interface AuditLogEntry {
   details: string;
   timestamp: string;
 }
+
+// Decision Intelligence
+export interface Decision {
+  id: string;
+  title: string;
+  description: string | null;
+  decision_type: string;
+  status: string;
+  confidence_score: number;
+  context_summary: string | null;
+  alternatives_considered: string[];
+  outcome_summary: string | null;
+  source_artifact_ids: string[];
+  involved_member_ids: string[];
+  tags: string[];
+  decided_at: string | null;
+  extracted_at: string;
+  links?: DecisionLink[];
+}
+
+export interface DecisionLink {
+  id: string;
+  from_decision_id: string;
+  to_decision_id: string;
+  link_type: string;
+}
+
+export interface DecisionSearchResult {
+  answer: string;
+  decisions: Decision[];
+  sources: { chunk_id: string; text: string; source_type: string; score: number }[];
+  confidence: number;
+}
+
+export interface DecisionTimeline {
+  timeline: { date: string; decisions: Decision[] }[];
+}
+
+// Risk Radar
+export interface RiskAlert {
+  id: string;
+  alert_type: string;
+  severity: string;
+  title: string;
+  description: string | null;
+  affected_entity_type: string | null;
+  affected_entity_id: string | null;
+  metrics: Record<string, unknown>;
+  is_acknowledged: boolean;
+  is_resolved: boolean;
+  detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface RiskSummary {
+  total_alerts: number;
+  by_severity: Record<string, number>;
+  by_type: Record<string, number>;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+}
+
+// Knowledge Continuity
+export interface MemberContinuity {
+  member_id: string;
+  member_name: string;
+  score: number;
+  risk_level: string;
+  knowledge_areas_at_risk: string[];
+  artifacts_at_risk: number;
+  backup_members: Record<string, string[]>;
+  recommendations: string[];
+}
+
+export interface ContinuityDashboard {
+  overall_score: number;
+  risk_level: string;
+  members_at_risk: MemberContinuity[];
+  knowledge_gaps: { tag: string; member_count: number; members: string[] }[];
+  total_members: number;
+  backed_up_areas: number;
+  recommendations: string[];
+}
+
+// Decision Graph
+export interface DecisionGraphNode {
+  id: string; title: string; type: string; status: string;
+  confidence: number; tags: string[]; decided_at: string | null;
+}
+export interface DecisionGraphEdge {
+  source: string; target: string; type: string;
+}
+
+// Decision Outcome
+export interface DecisionOutcome {
+  id: string; outcome_description: string; outcome_status: string;
+  lessons_learned: string[]; recorded_by: string; recorded_at: string;
+}
+
+// Who Should Decide
+export interface DecisionMakerRecommendation {
+  member_id: string; member_name: string; score: number;
+  reasons: string[]; relevant_decisions: { id: string; title: string }[];
+  expertise_overlap: string[];
+}
+export interface DecisionRecommendation {
+  topic: string; decision_type: string;
+  recommended_members: DecisionMakerRecommendation[];
+  suggested_reviewers: DecisionMakerRecommendation[];
+  knowledge_gaps: string[];
+}
+export interface DecisionInfluenceMap {
+  influencers: { member_id: string; member_name: string; decision_count: number; topics: string[] }[];
+  concentration_score: number;
+}
+
+// Onboarding Briefing
+export interface OnboardingBriefing {
+  title: string; generated_at: string;
+  sections: { title: string; content: string; key_facts?: string[]; decisions?: any[]; risks?: any[]; action_items?: string[] }[];
+  key_contacts: { name: string; expertise: string[]; role_description: string }[];
+  recommended_reading: { artifact_id: string; title: string; reason: string }[];
+}
+
+// Org X-Ray
+export interface OrgXrayReport {
+  generated_at: string;
+  summary: { total_members: number; total_artifacts: number; total_decisions: number; total_knowledge_chunks: number };
+  knowledge_map: { topics: { name: string; artifact_count: number; member_count: number; decision_count: number }[]; coverage_score: number };
+  team_dynamics: { collaboration_density: number; key_connectors: { member_id: string; name: string; connection_count: number }[]; isolated_members: { member_id: string; name: string }[] };
+  decision_patterns: { total_decisions: number; by_type: Record<string, number>; avg_decision_makers: number; most_active_decision_makers: { member_id: string; name: string; count: number }[] };
+  risk_profile: { bus_factor_members: string[]; knowledge_silos: string[]; single_point_failures: number; overall_resilience_score: number };
+  recommendations: string[];
+}
