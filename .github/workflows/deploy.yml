@@ -36,70 +36,29 @@ jobs:
       - name: CI passed — proceeding to deploy
         run: echo "CI OK, deploying."
 
-  # ── Migrate: run Alembic before new code goes live ─────────────────────────
-  # NOTE: Supabase free tier only exposes IPv6 for direct connections.
-  # GitHub Actions runners cannot reach IPv6 — migrations may fail.
-  # The app also runs migrations at startup (database.py), so this is a
-  # best-effort pre-deploy step, not a hard blocker.
+  # ── Migrate ────────────────────────────────────────────────────────────────
+  # Supabase Nano (free tier) only exposes IPv6 for direct DB connections.
+  # GitHub Actions runners cannot route to IPv6 — so CI migrations always fail.
+  #
+  # Migrations run automatically at app startup via database.py:_run_alembic_migrations()
+  # This is actually safer — migrations execute alongside the code that needs them.
+  #
+  # For manual migrations, use the separate "Database Migrations" workflow
+  # (migrate.yml) which can be triggered manually with a confirmation prompt.
   migrate:
-    name: Run Migrations
+    name: Run Migrations (skipped — runs at app startup)
     runs-on: ubuntu-latest
     needs: check-ci
-    continue-on-error: true
     if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.run_migrations == 'true' ||
-      github.event_name == 'workflow_run'
+      github.event_name == 'workflow_dispatch' && github.event.inputs.run_migrations == 'true'
     environment: production
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install system dependencies
+      - name: Migration info
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends libpq-dev
-
-      - name: Install Alembic + psycopg2
-        working-directory: backend
-        run: |
-          pip install --upgrade pip
-          pip install alembic psycopg2-binary sqlalchemy pgvector
-
-      - name: Force IPv4 for Supabase connectivity
-        run: |
-          # GitHub Actions runners resolve Supabase to IPv6 which is unreachable
-          # Force IPv4 by resolving and pinning in /etc/hosts
-          IPV4=$(dig +short A db.jfcvntwtkqhrfakykdog.supabase.co | head -1)
-          if [ -n "$IPV4" ]; then
-            echo "$IPV4 db.jfcvntwtkqhrfakykdog.supabase.co" | sudo tee -a /etc/hosts
-            echo "Pinned db.jfcvntwtkqhrfakykdog.supabase.co -> $IPV4"
-          else
-            echo "::warning::Could not resolve IPv4 for Supabase"
-          fi
-
-      - name: Run Alembic migrations (dry-run check first)
-        working-directory: backend
-        env:
-          CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
-          CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
-        run: |
-          if [ -z "$CB_MIGRATION_DATABASE_URL" ] && [ -z "$CB_DATABASE_URL" ]; then
-            echo "::warning::Neither CB_MIGRATION_DATABASE_URL nor CB_DATABASE_URL secrets are set."
-            echo "Skipping migrations. Set secrets in GitHub repo → Settings → Environments → production."
-            exit 0
-          fi
-          echo "Current revision:"
-          python -m alembic current
-          echo "Pending migrations:"
-          python -m alembic history --indicate-current
-          echo "Running upgrade..."
-          python -m alembic upgrade head
-          echo "Migration complete."
+          echo "Migrations run automatically when the app starts (database.py)."
+          echo "For manual migration control, use the 'Database Migrations' workflow."
+          echo "This step only runs on manual workflow_dispatch with run_migrations=true."
 
   # ── Deploy to Hugging Face Spaces ──────────────────────────────────────────
   deploy-hf-spaces:
@@ -138,8 +97,7 @@ jobs:
   deploy-backend:
     name: Deploy Backend
     runs-on: ubuntu-latest
-    needs: [check-ci, migrate]
-    if: always() && needs.check-ci.result == 'success'
+    needs: check-ci
     environment:
       name: production
       url: ${{ vars.BACKEND_URL }}
