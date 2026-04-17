@@ -211,11 +211,7 @@ class DecisionExtractionService:
             query_embedding = embedding_service.embed(text_to_embed)
 
             # Find all other decisions
-            all_decisions = (
-                db.query(DecisionRecord)
-                .filter(DecisionRecord.id != decision_id)
-                .all()
-            )
+            all_decisions = db.query(DecisionRecord).filter(DecisionRecord.id != decision_id).all()
 
             if not all_decisions:
                 return []

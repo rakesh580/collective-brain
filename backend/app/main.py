@@ -389,7 +389,9 @@ app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"
 app.include_router(decisions_router_mod.router, prefix="/api/decisions", tags=["decisions"], deprecated=True)
 app.include_router(risk_radar_router_mod.router, prefix="/api/risk-radar", tags=["risk-radar"], deprecated=True)
 app.include_router(continuity_router_mod.router, prefix="/api/continuity", tags=["continuity"], deprecated=True)
-app.include_router(decision_recommender_mod.router, prefix="/api/decision-recommender", tags=["decision-recommender"], deprecated=True)
+app.include_router(
+    decision_recommender_mod.router, prefix="/api/decision-recommender", tags=["decision-recommender"], deprecated=True
+)
 app.include_router(onboarding_mod.router, prefix="/api/onboarding", tags=["onboarding"], deprecated=True)
 app.include_router(notifications_mod.router, prefix="/api/notifications", tags=["notifications"], deprecated=True)
 app.include_router(org_xray_mod.router, prefix="/api/org-xray", tags=["org-xray"], deprecated=True)

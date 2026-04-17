@@ -96,10 +96,7 @@ class OnboardingService:
         )
         if topics:
             # Filter decisions by topic if specified
-            decisions = [
-                d for d in decisions_query.limit(50).all()
-                if self._matches_topics(d, topics)
-            ][:15]
+            decisions = [d for d in decisions_query.limit(50).all() if self._matches_topics(d, topics)][:15]
         else:
             decisions = decisions_query.limit(15).all()
 
@@ -186,26 +183,17 @@ class OnboardingService:
             {
                 "title": "Key Decisions",
                 "content": parsed.get("key_decisions", {}).get("content", "No decisions recorded yet."),
-                "decisions": [
-                    {"id": d.id, "title": d.title, "type": d.decision_type}
-                    for d in decisions[:10]
-                ],
+                "decisions": [{"id": d.id, "title": d.title, "type": d.decision_type} for d in decisions[:10]],
             },
             {
                 "title": "Knowledge Architecture",
                 "content": parsed.get("knowledge_architecture", {}).get("content", ""),
-                "sources": [
-                    {"type": row.source_type, "count": row.cnt}
-                    for row in source_type_counts
-                ],
+                "sources": [{"type": row.source_type, "count": row.cnt} for row in source_type_counts],
             },
             {
                 "title": "Active Risks",
                 "content": parsed.get("active_risks", {}).get("content", "No active risks."),
-                "risks": [
-                    {"id": r.id, "title": r.title, "severity": r.severity}
-                    for r in active_risks[:5]
-                ],
+                "risks": [{"id": r.id, "title": r.title, "severity": r.severity} for r in active_risks[:5]],
             },
             {
                 "title": "Getting Started",
@@ -255,17 +243,10 @@ class OnboardingService:
 
         # Find related decisions
         all_decisions = db.query(DecisionRecord).all()
-        related_decisions = [
-            d for d in all_decisions
-            if self._matches_topics(d, [topic])
-        ]
+        related_decisions = [d for d in all_decisions if self._matches_topics(d, [topic])]
 
         # Find members with relevant expertise
-        all_members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.status == "active")
-            .all()
-        )
+        all_members = db.query(MemberRecord).filter(MemberRecord.status == "active").all()
         relevant_members = []
         for m in all_members:
             tags = m.expertise_tags if isinstance(m.expertise_tags, list) else []
@@ -285,17 +266,11 @@ class OnboardingService:
 
         related_artifacts = []
         if related_artifact_ids:
-            related_artifacts = (
-                db.query(ArtifactRecord)
-                .filter(ArtifactRecord.id.in_(list(related_artifact_ids)))
-                .all()
-            )
+            related_artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.id.in_(list(related_artifact_ids))).all()
 
         # Find knowledge chunks mentioning the topic
         chunk_count = (
-            db.query(func.count(KnowledgeEmbedding.id))
-            .filter(KnowledgeEmbedding.content.ilike(f"%{topic}%"))
-            .scalar()
+            db.query(func.count(KnowledgeEmbedding.id)).filter(KnowledgeEmbedding.content.ilike(f"%{topic}%")).scalar()
             or 0
         )
 
@@ -426,7 +401,7 @@ class OnboardingService:
             end = text.rfind("}")
             if start != -1 and end != -1 and end > start:
                 try:
-                    return json.loads(text[start: end + 1])
+                    return json.loads(text[start : end + 1])
                 except json.JSONDecodeError:
                     pass
 

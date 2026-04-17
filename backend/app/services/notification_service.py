@@ -54,11 +54,7 @@ class NotificationService:
 
     def unregister_webhook(self, db: Session, webhook_id: str) -> bool:
         """Remove a webhook registration."""
-        registration = (
-            db.query(WebhookRegistration)
-            .filter(WebhookRegistration.id == webhook_id)
-            .first()
-        )
+        registration = db.query(WebhookRegistration).filter(WebhookRegistration.id == webhook_id).first()
         if not registration:
             return False
 
@@ -126,12 +122,7 @@ class NotificationService:
 
     def get_notification_history(self, db: Session, limit: int = 50) -> list[dict]:
         """Get recent notification delivery history."""
-        logs = (
-            db.query(NotificationLog)
-            .order_by(NotificationLog.sent_at.desc())
-            .limit(limit)
-            .all()
-        )
+        logs = db.query(NotificationLog).order_by(NotificationLog.sent_at.desc()).limit(limit).all()
 
         return [
             {
@@ -205,12 +196,14 @@ class NotificationService:
             else:
                 failures += 1
 
-            details.append({
-                "webhook_id": wh.id,
-                "url": wh.url,
-                "success": success,
-                "error_message": error_msg,
-            })
+            details.append(
+                {
+                    "webhook_id": wh.id,
+                    "url": wh.url,
+                    "success": success,
+                    "error_message": error_msg,
+                }
+            )
 
         try:
             db.commit()
@@ -239,12 +232,15 @@ class NotificationService:
         import aiohttp
 
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                url,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-                headers={"Content-Type": "application/json"},
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    url,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                    headers={"Content-Type": "application/json"},
+                ) as resp,
+            ):
                 success = resp.status < 400
                 if not success:
                     self.logger.warning(

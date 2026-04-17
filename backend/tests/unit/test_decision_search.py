@@ -1,6 +1,5 @@
 """Unit tests for DecisionSearchService."""
 
-import json
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 

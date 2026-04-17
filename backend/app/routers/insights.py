@@ -70,9 +70,7 @@ async def get_dashboard(request: Request, room_id: str | None = None, user=Depen
 
         decision_count = db.query(DecisionRecord).count()
         active_risk_count = db.query(RiskAlert).filter(RiskAlert.is_resolved == False).count()  # noqa: E712
-        recent_decisions = (
-            db.query(DecisionRecord).order_by(DecisionRecord.created_at.desc()).limit(5).all()
-        )
+        recent_decisions = db.query(DecisionRecord).order_by(DecisionRecord.created_at.desc()).limit(5).all()
 
         dashboard = DashboardResponse(
             total_members=total_members,
@@ -112,8 +110,7 @@ async def get_dashboard(request: Request, room_id: str | None = None, user=Depen
         result["decision_count"] = decision_count
         result["active_risk_count"] = active_risk_count
         result["recent_decisions"] = [
-            {"id": d.id, "title": d.title, "type": d.decision_type, "status": d.status}
-            for d in recent_decisions
+            {"id": d.id, "title": d.title, "type": d.decision_type, "status": d.status} for d in recent_decisions
         ]
         return result
     finally:

@@ -17,7 +17,7 @@ vi.mock("../../api/client", () => ({
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: any) => {
-      const { variants, initial, animate, exit, layout, whileHover, transition, ...rest } = props;
+      const { variants: _v, initial: _i, animate: _a, exit: _e, layout: _l, whileHover: _wh, transition: _t, ...rest } = props;
       return <div {...rest}>{children}</div>;
     },
   },

@@ -20,13 +20,6 @@ const item = {
 };
 
 const TYPE_OPTIONS = ["technical", "architectural", "process", "strategic"];
-const TYPE_COLORS: Record<string, string> = {
-  technical: "#6366f1",
-  architectural: "#8b5cf6",
-  process: "#f59e0b",
-  strategic: "#10b981",
-};
-
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (

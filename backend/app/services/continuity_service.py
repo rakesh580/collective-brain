@@ -118,11 +118,7 @@ class ContinuityScoreService:
                 "recommendations": ["No artifacts specified."],
             }
 
-        artifacts = (
-            db.query(ArtifactRecord)
-            .filter(ArtifactRecord.id.in_(artifact_ids))
-            .all()
-        )
+        artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.id.in_(artifact_ids)).all()
         if not artifacts:
             return {
                 "score": 0,
@@ -142,11 +138,13 @@ class ContinuityScoreService:
             member_ids = a.member_ids if isinstance(a.member_ids, list) else []
             all_contributor_ids.update(member_ids)
             if len(member_ids) <= 1:
-                single_contributor_artifacts.append({
-                    "artifact_id": a.id,
-                    "title": a.title or a.id,
-                    "contributor_count": len(member_ids),
-                })
+                single_contributor_artifacts.append(
+                    {
+                        "artifact_id": a.id,
+                        "title": a.title or a.id,
+                        "contributor_count": len(member_ids),
+                    }
+                )
 
         # Check if contributors are still active
         active_contributors = (
@@ -188,9 +186,7 @@ class ContinuityScoreService:
                 "Ensure their knowledge is documented and handed off."
             )
         if contributor_count <= 1:
-            recommendations.append(
-                "This project has only one contributor. Assign a backup contributor."
-            )
+            recommendations.append("This project has only one contributor. Assign a backup contributor.")
         if not recommendations:
             recommendations.append("Project continuity looks healthy. Keep up the collaborative work.")
 
@@ -201,10 +197,7 @@ class ContinuityScoreService:
             "contributor_count": contributor_count,
             "active_contributor_count": len(active_ids),
             "inactive_contributor_count": inactive_count,
-            "contributors": [
-                {"id": m.id, "name": m.name, "status": m.status}
-                for m in active_contributors
-            ],
+            "contributors": [{"id": m.id, "name": m.name, "status": m.status} for m in active_contributors],
             "single_contributor_artifacts": single_contributor_artifacts,
             "recommendations": recommendations,
         }
@@ -245,11 +238,13 @@ class ContinuityScoreService:
         for tag in all_tags:
             members_with_tag = [m.name for m in all_members if tag in (m.expertise_tags or [])]
             if len(members_with_tag) < 2:
-                structured_gaps.append({
-                    "tag": tag,
-                    "member_count": len(members_with_tag),
-                    "members": members_with_tag,
-                })
+                structured_gaps.append(
+                    {
+                        "tag": tag,
+                        "member_count": len(members_with_tag),
+                        "members": members_with_tag,
+                    }
+                )
             else:
                 backed_up_count += 1
 
@@ -335,11 +330,7 @@ class ContinuityScoreService:
 
         Higher score = more impact = lower continuity if they leave.
         """
-        all_active_members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.status == "active")
-            .all()
-        )
+        all_active_members = db.query(MemberRecord).filter(MemberRecord.status == "active").all()
         total_active = len(all_active_members)
 
         # --- Factor 1: Unique expertise tags (heavy weight, up to 35 pts) ---
@@ -382,9 +373,7 @@ class ContinuityScoreService:
         # --- Factor 3: Contribution volume relative to team (moderate, up to 15 pts) ---
         total_contributions = member.total_contributions or 0
         if total_active > 1:
-            avg_contributions = sum(
-                (m.total_contributions or 0) for m in all_active_members
-            ) / total_active
+            avg_contributions = sum((m.total_contributions or 0) for m in all_active_members) / total_active
             if avg_contributions > 0:
                 volume_ratio = total_contributions / avg_contributions
                 volume_score = min(15.0, max(0.0, (volume_ratio - 1.0) * 10.0))
@@ -416,10 +405,9 @@ class ContinuityScoreService:
         backup_members: dict[str, list[str]] = {}
         for tag in member_tags:
             others = [
-                m.name for m in all_active_members
-                if m.id != member.id
-                and isinstance(m.expertise_tags, list)
-                and tag in m.expertise_tags
+                m.name
+                for m in all_active_members
+                if m.id != member.id and isinstance(m.expertise_tags, list) and tag in m.expertise_tags
             ]
             backup_members[tag] = others
 
@@ -476,26 +464,14 @@ class ContinuityScoreService:
 
         uncovered = [tag for tag, others in backup.items() if not others]
         if uncovered and uncovered != unique_tags:
-            recs.append(
-                f"No backup exists for: {', '.join(uncovered)}. "
-                "Schedule knowledge-sharing sessions."
-            )
+            recs.append(f"No backup exists for: {', '.join(uncovered)}. Schedule knowledge-sharing sessions.")
 
-        partially_covered = [
-            tag for tag, others in backup.items()
-            if len(others) == 1
-        ]
+        partially_covered = [tag for tag, others in backup.items() if len(others) == 1]
         if partially_covered:
-            recs.append(
-                f"Only one backup for: {', '.join(partially_covered)}. "
-                "Consider training a second backup."
-            )
+            recs.append(f"Only one backup for: {', '.join(partially_covered)}. Consider training a second backup.")
 
         if not recs:
-            recs.append(
-                f"{member.name}'s knowledge is well-distributed. "
-                "Continue current collaboration practices."
-            )
+            recs.append(f"{member.name}'s knowledge is well-distributed. Continue current collaboration practices.")
 
         return recs
 
@@ -539,10 +515,7 @@ class ContinuityScoreService:
             )
 
         if not recs:
-            recs.append(
-                "Team knowledge continuity is healthy. "
-                "Maintain current collaboration and review practices."
-            )
+            recs.append("Team knowledge continuity is healthy. Maintain current collaboration and review practices.")
 
         return recs
 

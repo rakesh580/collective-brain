@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.decision_extraction import DecisionExtractionService, EXTRACTION_PROMPT_TEMPLATE
+from app.services.decision_extraction import EXTRACTION_PROMPT_TEMPLATE, DecisionExtractionService
 
 
 def _make_artifact(artifact_id="art-1", org_id="org-1", title="Test Artifact"):
@@ -26,19 +26,21 @@ def _make_chunk(chunk_id="chunk-1", artifact_id="art-1", content="Some text", cr
     return c
 
 
-VALID_LLM_JSON = json.dumps([
-    {
-        "title": "Chose PostgreSQL over MongoDB",
-        "description": "Team decided to use PostgreSQL for the billing service.",
-        "context_summary": "Need ACID compliance for financial data.",
-        "alternatives_considered": ["MongoDB", "DynamoDB"],
-        "involved_people": ["Alice", "Bob"],
-        "tags": ["database", "billing"],
-        "approximate_date": "2025-01-15",
-        "decision_type": "technical",
-        "confidence": 0.9,
-    }
-])
+VALID_LLM_JSON = json.dumps(
+    [
+        {
+            "title": "Chose PostgreSQL over MongoDB",
+            "description": "Team decided to use PostgreSQL for the billing service.",
+            "context_summary": "Need ACID compliance for financial data.",
+            "alternatives_considered": ["MongoDB", "DynamoDB"],
+            "involved_people": ["Alice", "Bob"],
+            "tags": ["database", "billing"],
+            "approximate_date": "2025-01-15",
+            "decision_type": "technical",
+            "confidence": 0.9,
+        }
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -155,19 +157,21 @@ class TestExtractDecisionsFromArtifact:
 
     @pytest.mark.asyncio
     async def test_confidence_score_set_correctly(self, mock_llm):
-        decisions_json = json.dumps([
-            {
-                "title": "Use Redis for caching",
-                "description": "Redis selected for session caching.",
-                "context_summary": "Need fast reads.",
-                "alternatives_considered": ["Memcached"],
-                "involved_people": [],
-                "tags": ["caching"],
-                "approximate_date": None,
-                "decision_type": "technical",
-                "confidence": 0.72,
-            }
-        ])
+        decisions_json = json.dumps(
+            [
+                {
+                    "title": "Use Redis for caching",
+                    "description": "Redis selected for session caching.",
+                    "context_summary": "Need fast reads.",
+                    "alternatives_considered": ["Memcached"],
+                    "involved_people": [],
+                    "tags": ["caching"],
+                    "approximate_date": None,
+                    "decision_type": "technical",
+                    "confidence": 0.72,
+                }
+            ]
+        )
         mock_llm.generate = AsyncMock(return_value=decisions_json)
         service = DecisionExtractionService(mock_llm)
         artifact = _make_artifact()
@@ -276,7 +280,7 @@ class TestLinkRelatedDecisions:
             mock_create.return_value = db
             db.query.return_value.filter.return_value.first.side_effect = [
                 decision,  # finding the decision
-                None,      # no existing link
+                None,  # no existing link
             ]
             db.query.return_value.filter.return_value.all.return_value = [other_decision]
 
@@ -319,9 +323,7 @@ class TestLinkRelatedDecisions:
             db.query.return_value.filter.return_value.first.return_value = decision
             db.query.return_value.filter.return_value.all.return_value = [other_decision]
 
-            result = await service.link_related_decisions(
-                "d1", embedding_service=embedder, vector_store=MagicMock()
-            )
+            result = await service.link_related_decisions("d1", embedding_service=embedder, vector_store=MagicMock())
 
         assert len(result) == 0
 
@@ -334,7 +336,9 @@ class TestLinkRelatedDecisions:
             mock_create.return_value = db
             db.query.return_value.filter.return_value.first.return_value = None
 
-            result = await service.link_related_decisions("missing", embedding_service=MagicMock(), vector_store=MagicMock())
+            result = await service.link_related_decisions(
+                "missing", embedding_service=MagicMock(), vector_store=MagicMock()
+            )
 
         assert result == []
 

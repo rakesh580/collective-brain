@@ -33,9 +33,7 @@ class OrgXrayService:
         total_decisions = db.query(func.count(DecisionRecord.id)).scalar() or 0
         total_chunks = db.query(func.count(KnowledgeEmbedding.id)).scalar() or 0
 
-        earliest_artifact = (
-            db.query(func.min(ArtifactRecord.ingested_at)).scalar()
-        )
+        earliest_artifact = db.query(func.min(ArtifactRecord.ingested_at)).scalar()
         active_since = earliest_artifact.isoformat() if earliest_artifact else now.isoformat()
 
         summary = {
@@ -85,16 +83,10 @@ class OrgXrayService:
         potential synergies, and integration risks.
         """
         team_a_members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.id.in_(team_a_member_ids))
-            .all()
-            if team_a_member_ids else []
+            db.query(MemberRecord).filter(MemberRecord.id.in_(team_a_member_ids)).all() if team_a_member_ids else []
         )
         team_b_members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.id.in_(team_b_member_ids))
-            .all()
-            if team_b_member_ids else []
+            db.query(MemberRecord).filter(MemberRecord.id.in_(team_b_member_ids)).all() if team_b_member_ids else []
         )
 
         # Gather expertise tags for each team
@@ -120,16 +112,26 @@ class OrgXrayService:
 
         # Contribution stats for each team
         a_contribution_count = (
-            db.query(func.count(ContributionRecord.id))
-            .filter(ContributionRecord.member_id.in_(team_a_member_ids))
-            .scalar() or 0
-        ) if team_a_member_ids else 0
+            (
+                db.query(func.count(ContributionRecord.id))
+                .filter(ContributionRecord.member_id.in_(team_a_member_ids))
+                .scalar()
+                or 0
+            )
+            if team_a_member_ids
+            else 0
+        )
 
         b_contribution_count = (
-            db.query(func.count(ContributionRecord.id))
-            .filter(ContributionRecord.member_id.in_(team_b_member_ids))
-            .scalar() or 0
-        ) if team_b_member_ids else 0
+            (
+                db.query(func.count(ContributionRecord.id))
+                .filter(ContributionRecord.member_id.in_(team_b_member_ids))
+                .scalar()
+                or 0
+            )
+            if team_b_member_ids
+            else 0
+        )
 
         # Decisions involvement
         all_decisions = db.query(DecisionRecord).all()
@@ -153,13 +155,9 @@ class OrgXrayService:
         # Synergies: areas where combining teams creates better coverage
         synergies = []
         for tag in unique_a:
-            synergies.append(
-                f"Team A brings unique expertise in '{tag}' ({', '.join(team_a_tag_members[tag])})"
-            )
+            synergies.append(f"Team A brings unique expertise in '{tag}' ({', '.join(team_a_tag_members[tag])})")
         for tag in unique_b:
-            synergies.append(
-                f"Team B brings unique expertise in '{tag}' ({', '.join(team_b_tag_members[tag])})"
-            )
+            synergies.append(f"Team B brings unique expertise in '{tag}' ({', '.join(team_b_tag_members[tag])})")
 
         # Integration risks
         integration_risks = []
@@ -169,16 +167,12 @@ class OrgXrayService:
                 f"({', '.join(sorted(overlap_tags)[:5])}) may lead to role ambiguity."
             )
         if not overlap_tags:
-            integration_risks.append(
-                "No overlapping expertise — teams may struggle to find common ground."
-            )
+            integration_risks.append("No overlapping expertise — teams may struggle to find common ground.")
         combined_members = len(team_a_member_ids) + len(team_b_member_ids)
         if combined_members > 0:
             size_ratio = max(len(team_a_member_ids), len(team_b_member_ids)) / combined_members
             if size_ratio > 0.8:
-                integration_risks.append(
-                    "Significant size imbalance between teams may cause cultural friction."
-                )
+                integration_risks.append("Significant size imbalance between teams may cause cultural friction.")
 
         return {
             "generated_at": datetime.now(UTC).isoformat(),
@@ -248,18 +242,17 @@ class OrgXrayService:
 
         topic_list = []
         for topic in sorted(all_topics):
-            topic_list.append({
-                "name": topic,
-                "artifact_count": len(topic_artifacts.get(topic, set())),
-                "member_count": len(topic_members.get(topic, set())),
-                "decision_count": topic_decisions.get(topic, 0),
-            })
+            topic_list.append(
+                {
+                    "name": topic,
+                    "artifact_count": len(topic_artifacts.get(topic, set())),
+                    "member_count": len(topic_members.get(topic, set())),
+                    "decision_count": topic_decisions.get(topic, 0),
+                }
+            )
 
         # Coverage score: percentage of topics that have at least 2 members and 1 artifact
-        well_covered = sum(
-            1 for t in topic_list
-            if t["member_count"] >= 2 and t["artifact_count"] >= 1
-        )
+        well_covered = sum(1 for t in topic_list if t["member_count"] >= 2 and t["artifact_count"] >= 1)
         coverage_score = (well_covered / len(topic_list) * 100) if topic_list else 0.0
 
         return {
@@ -286,11 +279,7 @@ class OrgXrayService:
         # Collaboration density: how many members share artifacts
         # Build a co-contribution graph
         artifact_contributors: dict[str, set[str]] = defaultdict(set)
-        contributions = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.artifact_id.isnot(None))
-            .all()
-        )
+        contributions = db.query(ContributionRecord).filter(ContributionRecord.artifact_id.isnot(None)).all()
         for c in contributions:
             artifact_contributors[c.artifact_id].add(c.member_id)
 
@@ -326,19 +315,17 @@ class OrgXrayService:
         key_connectors = []
         for mid in sorted(connections.keys(), key=lambda x: len(connections[x] & member_ids), reverse=True)[:5]:
             if mid in member_ids:
-                key_connectors.append({
-                    "member_id": mid,
-                    "name": name_map.get(mid, "Unknown"),
-                    "connection_count": len(connections[mid] & member_ids),
-                })
+                key_connectors.append(
+                    {
+                        "member_id": mid,
+                        "name": name_map.get(mid, "Unknown"),
+                        "connection_count": len(connections[mid] & member_ids),
+                    }
+                )
 
         # Isolated members: active members with zero connections
         connected_ids = {mid for mid in connections if connections[mid] & member_ids}
-        isolated = [
-            {"member_id": m.id, "name": m.name}
-            for m in members
-            if m.id not in connected_ids
-        ]
+        isolated = [{"member_id": m.id, "name": m.name} for m in members if m.id not in connected_ids]
 
         return {
             "collaboration_density": round(collaboration_density, 3),
@@ -387,18 +374,9 @@ class OrgXrayService:
         eight_weeks_ago = now - timedelta(weeks=8)
         four_weeks_ago = now - timedelta(weeks=4)
 
-        recent_decisions = [
-            d for d in decisions
-            if d.created_at and d.created_at >= eight_weeks_ago
-        ]
-        last_4_weeks = [
-            d for d in decisions
-            if d.created_at and d.created_at >= four_weeks_ago
-        ]
-        prev_4_weeks = [
-            d for d in decisions
-            if d.created_at and eight_weeks_ago <= d.created_at < four_weeks_ago
-        ]
+        recent_decisions = [d for d in decisions if d.created_at and d.created_at >= eight_weeks_ago]
+        last_4_weeks = [d for d in decisions if d.created_at and d.created_at >= four_weeks_ago]
+        prev_4_weeks = [d for d in decisions if d.created_at and eight_weeks_ago <= d.created_at < four_weeks_ago]
 
         velocity = len(recent_decisions) / 8.0 if recent_decisions else 0.0
 
@@ -411,10 +389,9 @@ class OrgXrayService:
 
         # Most active decision makers
         members_in_decisions = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.id.in_(list(member_counter.keys())))
-            .all()
-            if member_counter else []
+            db.query(MemberRecord).filter(MemberRecord.id.in_(list(member_counter.keys()))).all()
+            if member_counter
+            else []
         )
         name_map = {m.id: m.name for m in members_in_decisions}
 
@@ -470,19 +447,12 @@ class OrgXrayService:
             bus_factor_names.update(tag_members[tag])
 
         # Single point of failure: artifacts with only one contributor
-        contributions = (
-            db.query(ContributionRecord)
-            .filter(ContributionRecord.artifact_id.isnot(None))
-            .all()
-        )
+        contributions = db.query(ContributionRecord).filter(ContributionRecord.artifact_id.isnot(None)).all()
         artifact_contributors: dict[str, set[str]] = defaultdict(set)
         for c in contributions:
             artifact_contributors[c.artifact_id].add(c.member_id)
 
-        single_point_artifacts = sum(
-            1 for contributors in artifact_contributors.values()
-            if len(contributors) == 1
-        )
+        single_point_artifacts = sum(1 for contributors in artifact_contributors.values() if len(contributors) == 1)
 
         # Overall resilience score (0-100)
         # Penalize for silos, bus factor members, and single-point artifacts
@@ -494,7 +464,7 @@ class OrgXrayService:
 
         resilience = 100.0
         resilience -= silo_ratio * 40  # Up to -40 for all-silo tags
-        resilience -= spf_ratio * 30   # Up to -30 for all single-contributor artifacts
+        resilience -= spf_ratio * 30  # Up to -30 for all single-contributor artifacts
         resilience -= min(20.0, len(bus_factor_names) * 5.0)  # Up to -20 for bus factor people
         if len(members) <= 2:
             resilience -= 10  # Small team penalty
@@ -581,10 +551,7 @@ class OrgXrayService:
 
         spf = risk_profile.get("single_point_failures", 0)
         if spf > 0:
-            recs.append(
-                f"{spf} artifact(s) have only a single contributor. "
-                "Assign backup contributors or reviewers."
-            )
+            recs.append(f"{spf} artifact(s) have only a single contributor. Assign backup contributors or reviewers.")
 
         resilience = risk_profile.get("overall_resilience_score", 100)
         if resilience < 50:

@@ -163,22 +163,14 @@ class DecisionSearchService:
                     linked_ids.add(link.to_decision_id)
 
             if linked_ids:
-                extra_decisions = (
-                    db.query(DecisionRecord)
-                    .filter(DecisionRecord.id.in_(linked_ids))
-                    .all()
-                )
+                extra_decisions = db.query(DecisionRecord).filter(DecisionRecord.id.in_(linked_ids)).all()
                 for d in extra_decisions:
                     linked_decisions.append(self._decision_to_dict(d))
 
             # Get source artifacts
             source_artifacts = []
             if all_source_artifact_ids:
-                artifacts = (
-                    db.query(ArtifactRecord)
-                    .filter(ArtifactRecord.id.in_(list(all_source_artifact_ids)))
-                    .all()
-                )
+                artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.id.in_(list(all_source_artifact_ids))).all()
                 for a in artifacts:
                     source_artifacts.append(
                         {
@@ -193,11 +185,7 @@ class DecisionSearchService:
             # Get involved members
             related_members = []
             if all_member_ids:
-                members = (
-                    db.query(MemberRecord)
-                    .filter(MemberRecord.id.in_(list(all_member_ids)))
-                    .all()
-                )
+                members = db.query(MemberRecord).filter(MemberRecord.id.in_(list(all_member_ids))).all()
                 for m in members:
                     related_members.append(
                         {
@@ -292,9 +280,7 @@ class DecisionSearchService:
             for d in decisions:
                 entry = self._decision_to_dict(d)
                 entry["effective_date"] = (
-                    d.decided_at.isoformat()
-                    if d.decided_at
-                    else (d.created_at.isoformat() if d.created_at else None)
+                    d.decided_at.isoformat() if d.decided_at else (d.created_at.isoformat() if d.created_at else None)
                 )
                 timeline.append(entry)
 

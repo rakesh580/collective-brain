@@ -2,9 +2,7 @@
 
 from collections import namedtuple
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, PropertyMock, call
-
-import pytest
+from unittest.mock import MagicMock
 
 from app.services.risk_radar import RiskRadarService
 
@@ -75,8 +73,8 @@ class TestDetectProjectStalls:
         # Previous week: 10 contributions to artifact a1
         # Current week: 2 contributions -> 80% drop
         mock_db.query.return_value.filter.return_value.group_by.return_value.all.side_effect = [
-            [ContribRow(artifact_id="a1", cnt=2)],   # recent
-            [ContribRow(artifact_id="a1", cnt=10)],   # previous
+            [ContribRow(artifact_id="a1", cnt=2)],  # recent
+            [ContribRow(artifact_id="a1", cnt=10)],  # previous
         ]
         artifact = _make_artifact("a1", title="Backend API")
         mock_db.query.return_value.filter.return_value.first.return_value = artifact
@@ -205,7 +203,9 @@ class TestDetectKeyPersonRisks:
         mock_db.query.side_effect = None
         mock_db.query.return_value.filter.return_value.all.return_value = members
         mock_db.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
-            ("a1",), ("a2",), ("a3",),
+            ("a1",),
+            ("a2",),
+            ("a3",),
         ]
         mock_db.query.return_value.filter.return_value.scalar.return_value = 0
 
@@ -246,13 +246,11 @@ class TestDetectCollaborationDrops:
 
         # Recent: 4 artifacts, 0 multi-contributor = 0%
         recent_artifacts = [
-            _make_artifact(f"ra{i}", member_ids=["m1"], ingested_at=now - timedelta(days=3))
-            for i in range(4)
+            _make_artifact(f"ra{i}", member_ids=["m1"], ingested_at=now - timedelta(days=3)) for i in range(4)
         ]
         # Older: 4 artifacts, 4 multi-contributor = 100%
         older_artifacts = [
-            _make_artifact(f"oa{i}", member_ids=["m1", "m2"], ingested_at=now - timedelta(days=20))
-            for i in range(4)
+            _make_artifact(f"oa{i}", member_ids=["m1", "m2"], ingested_at=now - timedelta(days=20)) for i in range(4)
         ]
 
         call_count = [0]
@@ -280,8 +278,7 @@ class TestDetectCollaborationDrops:
         now = datetime.now(UTC)
 
         artifacts = [
-            _make_artifact(f"a{i}", member_ids=["m1", "m2"], ingested_at=now - timedelta(days=3))
-            for i in range(4)
+            _make_artifact(f"a{i}", member_ids=["m1", "m2"], ingested_at=now - timedelta(days=3)) for i in range(4)
         ]
 
         mock_db.query.return_value.filter.side_effect = None
@@ -343,13 +340,19 @@ class TestScanAllRisks:
         service = RiskRadarService()
 
         # Patch all detection methods to return known alerts
-        service._detect_project_stalls = MagicMock(return_value=[
-            {
-                "alert_type": "project_stall", "severity": "high", "title": "Stall",
-                "description": "desc", "affected_entity_type": "artifact",
-                "affected_entity_id": "a1", "metrics": {},
-            }
-        ])
+        service._detect_project_stalls = MagicMock(
+            return_value=[
+                {
+                    "alert_type": "project_stall",
+                    "severity": "high",
+                    "title": "Stall",
+                    "description": "desc",
+                    "affected_entity_type": "artifact",
+                    "affected_entity_id": "a1",
+                    "metrics": {},
+                }
+            ]
+        )
         service._detect_knowledge_silos = MagicMock(return_value=[])
         service._detect_key_person_risks = MagicMock(return_value=[])
         service._detect_collaboration_drops = MagicMock(return_value=[])
@@ -374,14 +377,19 @@ class TestScanAllRisks:
         service = RiskRadarService()
 
         service._detect_project_stalls = MagicMock(return_value=[])
-        service._detect_knowledge_silos = MagicMock(return_value=[
-            {
-                "alert_type": "knowledge_silo", "severity": "high",
-                "title": "Silo: k8s", "description": "Only Alice",
-                "affected_entity_type": "expertise_tag",
-                "affected_entity_id": "kubernetes", "metrics": {},
-            }
-        ])
+        service._detect_knowledge_silos = MagicMock(
+            return_value=[
+                {
+                    "alert_type": "knowledge_silo",
+                    "severity": "high",
+                    "title": "Silo: k8s",
+                    "description": "Only Alice",
+                    "affected_entity_type": "expertise_tag",
+                    "affected_entity_id": "kubernetes",
+                    "metrics": {},
+                }
+            ]
+        )
         service._detect_key_person_risks = MagicMock(return_value=[])
         service._detect_collaboration_drops = MagicMock(return_value=[])
         service._detect_expertise_concentration = MagicMock(return_value=[])

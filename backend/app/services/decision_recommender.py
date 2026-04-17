@@ -39,11 +39,7 @@ class DecisionRecommenderService:
         topic_lower = topic.lower()
         topic_tokens = set(topic_lower.split())
 
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.status == "active")
-            .all()
-        )
+        members = db.query(MemberRecord).filter(MemberRecord.status == "active").all()
 
         if not members:
             return {
@@ -107,9 +103,7 @@ class DecisionRecommenderService:
             member_related = member_decisions.get(member.id, [])
             decision_score = min(30.0, len(member_related) * 10.0)
             if member_related:
-                reasons.append(
-                    f"Involved in {len(member_related)} related decision(s)"
-                )
+                reasons.append(f"Involved in {len(member_related)} related decision(s)")
 
             # --- Factor 3: Contribution recency (0-15) ---
             recency_score = 0.0
@@ -138,23 +132,23 @@ class DecisionRecommenderService:
             total_score = expertise_score + decision_score + recency_score + breadth_score
 
             if total_score > 0:
-                relevant_decs = [
-                    {"id": d.id, "title": d.title} for d in member_related[:5]
-                ]
-                scored_members.append({
-                    "member_id": member.id,
-                    "member_name": member.name,
-                    "score": round(total_score, 2),
-                    "reasons": reasons,
-                    "relevant_decisions": relevant_decs,
-                    "expertise_overlap": overlap,
-                })
+                relevant_decs = [{"id": d.id, "title": d.title} for d in member_related[:5]]
+                scored_members.append(
+                    {
+                        "member_id": member.id,
+                        "member_name": member.name,
+                        "score": round(total_score, 2),
+                        "reasons": reasons,
+                        "relevant_decisions": relevant_decs,
+                        "expertise_overlap": overlap,
+                    }
+                )
 
         # Sort by score descending
         scored_members.sort(key=lambda m: m["score"], reverse=True)
 
         recommended = scored_members[:top_k]
-        reviewers = scored_members[top_k: top_k + 3]
+        reviewers = scored_members[top_k : top_k + 3]
 
         # Knowledge gaps: topic tokens that no member has expertise in
         knowledge_gaps = self._find_knowledge_gaps(topic_tokens, all_expertise_tags)
@@ -200,21 +194,19 @@ class DecisionRecommenderService:
 
         # Resolve member names
         member_ids = list(member_decision_count.keys())
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.id.in_(member_ids))
-            .all()
-        )
+        members = db.query(MemberRecord).filter(MemberRecord.id.in_(member_ids)).all()
         name_map = {m.id: m.name for m in members}
 
         influencers = []
         for mid, count in member_decision_count.most_common():
-            influencers.append({
-                "member_id": mid,
-                "member_name": name_map.get(mid, "Unknown"),
-                "decision_count": count,
-                "topics": sorted(member_topics.get(mid, set())),
-            })
+            influencers.append(
+                {
+                    "member_id": mid,
+                    "member_name": name_map.get(mid, "Unknown"),
+                    "decision_count": count,
+                    "topics": sorted(member_topics.get(mid, set())),
+                }
+            )
 
         distribution = {mid: count for mid, count in member_decision_count.items()}
 
@@ -273,7 +265,12 @@ class DecisionRecommenderService:
         for tag in member_tags:
             tag_lower = tag.lower()
             # Direct token match
-            if tag_lower in topic_tokens or tag_lower in topic_lower or topic_lower in tag_lower or any(token in tag_lower for token in topic_tokens if len(token) > 2):
+            if (
+                tag_lower in topic_tokens
+                or tag_lower in topic_lower
+                or topic_lower in tag_lower
+                or any(token in tag_lower for token in topic_tokens if len(token) > 2)
+            ):
                 overlap.append(tag)
         return overlap
 
@@ -285,10 +282,7 @@ class DecisionRecommenderService:
         for token in topic_tokens:
             if len(token) <= 2:
                 continue  # Skip short words like "in", "to", etc.
-            found = any(
-                token in tag or tag in token
-                for tag in all_tags_lower
-            )
+            found = any(token in tag or tag in token for tag in all_tags_lower)
             if not found:
                 gaps.append(token)
         return gaps

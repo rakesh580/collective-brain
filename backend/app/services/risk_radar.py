@@ -144,12 +144,7 @@ class RiskRadarService:
         recent_cutoff = now - timedelta(days=7)
         older_cutoff = now - timedelta(days=14)
 
-        recent_count = (
-            db.query(func.count(RiskAlert.id))
-            .filter(RiskAlert.detected_at >= recent_cutoff)
-            .scalar()
-            or 0
-        )
+        recent_count = db.query(func.count(RiskAlert.id)).filter(RiskAlert.detected_at >= recent_cutoff).scalar() or 0
         older_count = (
             db.query(func.count(RiskAlert.id))
             .filter(RiskAlert.detected_at >= older_cutoff, RiskAlert.detected_at < recent_cutoff)
@@ -257,11 +252,7 @@ class RiskRadarService:
     def _detect_knowledge_silos(self, db: Session) -> list[dict]:
         """Find expertise areas covered by fewer than 2 active members."""
         alerts: list[dict] = []
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.status == "active")
-            .all()
-        )
+        members = db.query(MemberRecord).filter(MemberRecord.status == "active").all()
         if not members:
             return alerts
 
@@ -298,11 +289,7 @@ class RiskRadarService:
     def _detect_key_person_risks(self, db: Session) -> list[dict]:
         """Find members who are single points of failure."""
         alerts: list[dict] = []
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.status == "active")
-            .all()
-        )
+        members = db.query(MemberRecord).filter(MemberRecord.status == "active").all()
         if not members:
             return alerts
 
@@ -434,11 +421,7 @@ class RiskRadarService:
     def _detect_expertise_concentration(self, db: Session) -> list[dict]:
         """Flag expertise areas where active-expert ratio is below threshold."""
         alerts: list[dict] = []
-        members = (
-            db.query(MemberRecord)
-            .filter(MemberRecord.status == "active")
-            .all()
-        )
+        members = db.query(MemberRecord).filter(MemberRecord.status == "active").all()
         if len(members) < 3:
             return alerts  # Too few members to assess concentration
 

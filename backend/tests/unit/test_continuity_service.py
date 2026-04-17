@@ -1,9 +1,7 @@
 """Unit tests for ContinuityScoreService."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
-
-import pytest
 
 from app.services.continuity_service import ContinuityScoreService
 
@@ -80,7 +78,8 @@ class TestMemberContinuity:
         service = ContinuityScoreService()
 
         target = _make_member(
-            "m1", "Alice",
+            "m1",
+            "Alice",
             expertise_tags=["kubernetes", "terraform", "helm"],
             total_contributions=50,
             last_active=datetime.now(UTC),
@@ -96,7 +95,10 @@ class TestMemberContinuity:
 
         # 4 sole-contributor artifacts
         mock_db.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
-            ("a1",), ("a2",), ("a3",), ("a4",),
+            ("a1",),
+            ("a2",),
+            ("a3",),
+            ("a4",),
         ]
         # No other contributors
         mock_db.query.return_value.filter.return_value.scalar.return_value = 0
@@ -242,7 +244,7 @@ class TestProjectContinuity:
         ]
 
         mock_db.query.return_value.filter.return_value.all.side_effect = [
-            artifacts,       # artifacts query
+            artifacts,  # artifacts query
             active_members,  # active contributors query
         ]
 
@@ -306,8 +308,12 @@ class TestContinuityDashboard:
         result = service.get_continuity_dashboard(mock_db)
 
         required_keys = [
-            "overall_score", "risk_level", "members_at_risk",
-            "knowledge_gaps", "backed_up_areas", "total_members",
+            "overall_score",
+            "risk_level",
+            "members_at_risk",
+            "knowledge_gaps",
+            "backed_up_areas",
+            "total_members",
             "recommendations",
         ]
         for key in required_keys:
@@ -349,7 +355,8 @@ class TestScoring:
 
         # Test with extreme case: very high impact member
         member = _make_member(
-            "m1", "Alice",
+            "m1",
+            "Alice",
             expertise_tags=["a", "b", "c", "d", "e"],
             total_contributions=100,
             last_active=datetime.now(UTC),
@@ -359,7 +366,11 @@ class TestScoring:
         mock_db.query.return_value.filter.return_value.first.return_value = member
         mock_db.query.return_value.filter.return_value.all.return_value = all_members
         mock_db.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
-            ("a1",), ("a2",), ("a3",), ("a4",), ("a5",),
+            ("a1",),
+            ("a2",),
+            ("a3",),
+            ("a4",),
+            ("a5",),
         ]
         mock_db.query.return_value.filter.return_value.scalar.return_value = 0
 
@@ -441,10 +452,20 @@ class TestMemberRecommendations:
 class TestTeamRecommendations:
     def test_flags_critical_members(self):
         member_results = [
-            {"member_name": "Alice", "risk_level": "critical", "score": 15, "artifacts_at_risk": 5,
-             "knowledge_areas_at_risk": ["k8s"]},
-            {"member_name": "Bob", "risk_level": "low", "score": 90, "artifacts_at_risk": 0,
-             "knowledge_areas_at_risk": []},
+            {
+                "member_name": "Alice",
+                "risk_level": "critical",
+                "score": 15,
+                "artifacts_at_risk": 5,
+                "knowledge_areas_at_risk": ["k8s"],
+            },
+            {
+                "member_name": "Bob",
+                "risk_level": "low",
+                "score": 90,
+                "artifacts_at_risk": 0,
+                "knowledge_areas_at_risk": [],
+            },
         ]
         recs = ContinuityScoreService._team_recommendations(member_results, ["k8s"])
 
@@ -452,10 +473,20 @@ class TestTeamRecommendations:
 
     def test_healthy_team_gets_positive_recommendation(self):
         member_results = [
-            {"member_name": "Alice", "risk_level": "low", "score": 90, "artifacts_at_risk": 0,
-             "knowledge_areas_at_risk": []},
-            {"member_name": "Bob", "risk_level": "low", "score": 85, "artifacts_at_risk": 0,
-             "knowledge_areas_at_risk": []},
+            {
+                "member_name": "Alice",
+                "risk_level": "low",
+                "score": 90,
+                "artifacts_at_risk": 0,
+                "knowledge_areas_at_risk": [],
+            },
+            {
+                "member_name": "Bob",
+                "risk_level": "low",
+                "score": 85,
+                "artifacts_at_risk": 0,
+                "knowledge_areas_at_risk": [],
+            },
         ]
         recs = ContinuityScoreService._team_recommendations(member_results, [])
 

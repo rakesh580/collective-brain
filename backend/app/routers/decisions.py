@@ -263,11 +263,7 @@ async def extract_decisions(
     # Validate artifacts exist
     db = _get_db()
     try:
-        existing = (
-            db.query(ArtifactRecord.id)
-            .filter(ArtifactRecord.id.in_(body.artifact_ids))
-            .all()
-        )
+        existing = db.query(ArtifactRecord.id).filter(ArtifactRecord.id.in_(body.artifact_ids)).all()
         existing_ids = {row.id for row in existing}
         missing = [aid for aid in body.artifact_ids if aid not in existing_ids]
         if missing:
@@ -296,7 +292,7 @@ async def extract_all_decisions(
         already_processed_subq = db.query(DecisionRecord.source_artifact_ids).all()
         processed_ids = set()
         for row in already_processed_subq:
-            for artifact_id in (row.source_artifact_ids or []):
+            for artifact_id in row.source_artifact_ids or []:
                 processed_ids.add(artifact_id)
 
         all_artifacts = db.query(ArtifactRecord.id).all()
