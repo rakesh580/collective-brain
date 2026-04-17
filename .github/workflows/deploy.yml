@@ -71,6 +71,11 @@ jobs:
           CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
           CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
         run: |
+          if [ -z "$CB_MIGRATION_DATABASE_URL" ] && [ -z "$CB_DATABASE_URL" ]; then
+            echo "::warning::Neither CB_MIGRATION_DATABASE_URL nor CB_DATABASE_URL secrets are set."
+            echo "Skipping migrations. Set secrets in GitHub repo → Settings → Environments → production."
+            exit 0
+          fi
           echo "Current revision:"
           python -m alembic current
           echo "Pending migrations:"
@@ -97,9 +102,20 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
         run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::warning::HF_TOKEN secret not set — skipping HF Spaces deployment."
+            echo "To enable: go to huggingface.co/settings/tokens, create a token with 'write' scope,"
+            echo "then run: gh secret set HF_TOKEN --env production --body 'hf_...'"
+            exit 0
+          fi
+          if [ -z "$HF_SPACE_NAME" ]; then
+            echo "::warning::HF_SPACE_NAME variable not set — skipping HF Spaces deployment."
+            exit 0
+          fi
           git remote add hf "https://HF_USER:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_NAME}" 2>/dev/null || \
             git remote set-url hf "https://HF_USER:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_NAME}"
           git push hf main --force
+          echo "Deployed to https://huggingface.co/spaces/${HF_SPACE_NAME}"
 
   # ── Deploy backend ─────────────────────────────────────────────────────────
   deploy-backend:
