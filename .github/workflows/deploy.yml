@@ -37,10 +37,15 @@ jobs:
         run: echo "CI OK, deploying."
 
   # ── Migrate: run Alembic before new code goes live ─────────────────────────
+  # NOTE: Supabase free tier only exposes IPv6 for direct connections.
+  # GitHub Actions runners cannot reach IPv6 — migrations may fail.
+  # The app also runs migrations at startup (database.py), so this is a
+  # best-effort pre-deploy step, not a hard blocker.
   migrate:
     name: Run Migrations
     runs-on: ubuntu-latest
     needs: check-ci
+    continue-on-error: true
     if: >
       github.event_name == 'workflow_dispatch' && github.event.inputs.run_migrations == 'true' ||
       github.event_name == 'workflow_run'
@@ -133,7 +138,8 @@ jobs:
   deploy-backend:
     name: Deploy Backend
     runs-on: ubuntu-latest
-    needs: migrate
+    needs: [check-ci, migrate]
+    if: always() && needs.check-ci.result == 'success'
     environment:
       name: production
       url: ${{ vars.BACKEND_URL }}
