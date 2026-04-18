@@ -62,6 +62,12 @@ async def list_decisions(
     user=Depends(get_current_user),
 ):
     """List all decisions with optional filters."""
+    redis = request.app.state.redis
+    cache_key = f"decisions:list:{decision_type or ''}:{status or ''}:{tag or ''}:{member_id or ''}:{limit}:{offset}"
+    cached = await redis.cache_get(cache_key)
+    if cached:
+        return cached
+
     db = _get_db()
     try:
         query = db.query(DecisionRecord)
@@ -79,10 +85,12 @@ async def list_decisions(
         total = query.count()
         decisions = query.order_by(DecisionRecord.created_at.desc()).offset(offset).limit(limit).all()
 
-        return {
+        result = {
             "decisions": [_serialize_decision(d) for d in decisions],
             "total": total,
         }
+        await redis.cache_set(cache_key, result, ttl_seconds=120)
+        return result
     finally:
         db.close()
 
@@ -374,6 +382,10 @@ async def update_decision(
         decision.updated_at = datetime.now(UTC)
         db.commit()
 
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("decisions:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
+
         # Refresh to get updated values
         db.refresh(decision)
         return _serialize_decision(decision)
@@ -432,6 +444,9 @@ async def link_decisions(
         db.add(link)
         db.commit()
 
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("decisions:list:*")
+
         return {
             "id": link_id,
             "from_decision_id": decision_id,
@@ -469,6 +484,10 @@ async def delete_decision(
         db.delete(decision)
         db.commit()
 
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("decisions:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
+
         return {"status": "deleted", "decision_id": decision_id}
     finally:
         db.close()
@@ -490,6 +509,9 @@ async def acknowledge_decision(
         decision.status = "active"
         decision.updated_at = datetime.now(UTC)
         db.commit()
+
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("decisions:list:*")
 
         return {
             "id": decision_id,
@@ -515,7 +537,7 @@ class RecordOutcomeRequest(BaseModel):
 
 
 @router.post("/{decision_id}/outcome")
-async def record_decision_outcome(decision_id: str, body: RecordOutcomeRequest, user=Depends(get_current_user)):
+async def record_decision_outcome(decision_id: str, body: RecordOutcomeRequest, request: Request, user=Depends(get_current_user)):
     """Record the outcome of a decision — did it work?"""
     db = _get_db()
     try:
@@ -541,6 +563,10 @@ async def record_decision_outcome(decision_id: str, body: RecordOutcomeRequest, 
         decision.outcome_summary = body.outcome_description
         decision.updated_at = datetime.now(UTC)
         db.commit()
+
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("decisions:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
 
         return {"status": "recorded", "outcome_id": outcome.id, "decision_id": decision_id}
     finally:

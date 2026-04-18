@@ -51,8 +51,8 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
 
     # Connection pool settings (PostgreSQL)
-    db_pool_size: int = 10
-    db_max_overflow: int = 20
+    db_pool_size: int = 25
+    db_max_overflow: int = 50
     db_pool_timeout: int = 30
     db_pool_recycle: int = 1800  # 30 minutes
 

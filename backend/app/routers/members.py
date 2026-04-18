@@ -25,6 +25,12 @@ async def list_members(request: Request, room_id: str | None = None, limit: int 
 
     get_current_user(request)
 
+    redis = request.app.state.redis
+    cache_key = f"members:list:{room_id or 'all'}:{limit}:{offset}"
+    cached = await redis.cache_get(cache_key)
+    if cached:
+        return cached
+
     db = _get_db()
     try:
         if room_id:
@@ -47,10 +53,12 @@ async def list_members(request: Request, room_id: str | None = None, limit: int 
             base_query = db.query(MemberRecord).order_by(MemberRecord.name)
             total = base_query.count()
             members = base_query.offset(offset).limit(limit).all()
-        return {
-            "members": [_to_response(m) for m in members],
+        result = {
+            "members": [_to_response(m).model_dump() for m in members],
             "total": total,
         }
+        await redis.cache_set(cache_key, result, ttl_seconds=120)
+        return result
     finally:
         db.close()
 
@@ -103,6 +111,9 @@ async def update_aliases(
         member.aliases = body.aliases
         db.commit()
         db.refresh(member)
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("members:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
         return _to_response(member)
     finally:
         db.close()
@@ -161,6 +172,9 @@ async def create_member(body: MemberCreateRequest, request: Request, user=Depend
         db.add(member)
         db.commit()
         db.refresh(member)
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("members:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
         return _to_response(member)
     finally:
         db.close()
@@ -188,6 +202,9 @@ async def update_member(
             member.weaknesses = body.weaknesses
         db.commit()
         db.refresh(member)
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("members:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
         return _to_response(member)
     finally:
         db.close()
@@ -209,6 +226,9 @@ async def delete_member(member_id: str, request: Request, user=Depends(require_r
                 a.member_ids = [mid for mid in a.member_ids if mid != member_id]
         db.delete(member)
         db.commit()
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("members:list:*")
+        await redis.cache_delete_pattern("dashboard:*")
         return {"status": "deleted", "member_id": member_id}
     finally:
         db.close()

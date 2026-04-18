@@ -61,7 +61,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(username, password);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
@@ -74,7 +74,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await googleLoginWithToken(accessToken);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       console.error("Google auth backend error:", err);
       setError(parseApiError(err));

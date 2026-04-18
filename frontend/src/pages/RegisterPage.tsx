@@ -82,7 +82,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await register(username, email, password, displayName || undefined);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
@@ -96,7 +96,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await googleLogin(credentialResponse.credential);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(parseApiError(err));
     } finally {

@@ -25,6 +25,15 @@ def _get_db():
     return create_session()
 
 
+async def _ingest_and_invalidate(request: Request, connector, source_input, source_path: str, room_id: str | None = None):
+    """Run ingestion then invalidate response caches."""
+    result = _run_ingestion(request, connector, source_input, source_path, room_id=room_id)
+    redis = request.app.state.redis
+    await redis.cache_delete_pattern("dashboard:*")
+    await redis.cache_delete_pattern("members:list:*")
+    return result
+
+
 def _resolve_or_create_member(db: Session, member_info: dict) -> MemberRecord:
     """Find existing member by alias match or create new one."""
     import re
@@ -327,7 +336,7 @@ async def ingest_markdown(body: MarkdownIngestRequest, request: Request, user=De
 
     settings = request.app.state.settings
     connector = MarkdownConnector(settings.chunk_size, settings.chunk_overlap)
-    return _run_ingestion(request, connector, resolved_path, body.directory_path, room_id=body.room_id)
+    return await _ingest_and_invalidate(request, connector, resolved_path, body.directory_path, room_id=body.room_id)
 
 
 @router.post("/git", response_model=IngestionResponse)
@@ -386,7 +395,7 @@ async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(requ
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
         )
-        return _run_ingestion(request, connector, resolved_path, repo_path, room_id=body.room_id)
+        return await _ingest_and_invalidate(request, connector, resolved_path, repo_path, room_id=body.room_id)
     finally:
         if clone_dir and os.path.exists(clone_dir):
             import shutil
@@ -445,7 +454,7 @@ async def ingest_markdown_upload(
         connector = MarkdownConnector(settings.chunk_size, settings.chunk_overlap)
 
         upload_names = ", ".join(f.filename or "file" for f in files)
-        return _run_ingestion(request, connector, doc_dir, f"upload: {upload_names}", room_id=room_id)
+        return await _ingest_and_invalidate(request, connector, doc_dir, f"upload: {upload_names}", room_id=room_id)
 
 
 @router.post("/slack", response_model=IngestionResponse)
@@ -481,7 +490,7 @@ async def ingest_slack(
             extract_dir = zip_path
 
         connector = SlackConnector(settings.chunk_size, settings.chunk_overlap)
-        return _run_ingestion(request, connector, extract_dir, file.filename or "slack_export", room_id=room_id)
+        return await _ingest_and_invalidate(request, connector, extract_dir, file.filename or "slack_export", room_id=room_id)
 
 
 @router.post("/discord", response_model=IngestionResponse)
@@ -506,7 +515,7 @@ async def ingest_discord(
             f.write(content)
 
         connector = DiscordConnector(settings.chunk_size, settings.chunk_overlap)
-        return _run_ingestion(request, connector, file_path, file.filename or "discord_export", room_id=room_id)
+        return await _ingest_and_invalidate(request, connector, file_path, file.filename or "discord_export", room_id=room_id)
 
 
 @router.post("/tasks", response_model=IngestionResponse)
@@ -531,7 +540,7 @@ async def ingest_tasks(
             f.write(content)
 
         connector = TaskConnector(settings.chunk_size, settings.chunk_overlap)
-        return _run_ingestion(request, connector, file_path, file.filename or "tasks", room_id=room_id)
+        return await _ingest_and_invalidate(request, connector, file_path, file.filename or "tasks", room_id=room_id)
 
 
 @router.post("/documents", response_model=IngestionResponse)
@@ -634,6 +643,10 @@ async def ingest_documents(
         finally:
             db.close()
 
+        redis = request.app.state.redis
+        await redis.cache_delete_pattern("dashboard:*")
+        await redis.cache_delete_pattern("members:list:*")
+
         return IngestionResponse(
             artifact_id=artifact_id,
             source_type="document",
@@ -676,7 +689,7 @@ async def ingest_notion(
         chunk_overlap=settings.chunk_overlap,
     )
     source_path = f"notion:{body.database_id or body.page_id}"
-    return _run_ingestion(request, connector, source_input, source_path, room_id=body.room_id)
+    return await _ingest_and_invalidate(request, connector, source_input, source_path, room_id=body.room_id)
 
 
 @router.post("/google-docs", response_model=IngestionResponse)
@@ -712,7 +725,7 @@ async def ingest_google_docs(
         chunk_overlap=settings.chunk_overlap,
     )
     source_path = f"google_docs:{body.folder_id or ','.join(body.document_ids or [])}"
-    return _run_ingestion(request, connector, source_input, source_path, room_id=body.room_id)
+    return await _ingest_and_invalidate(request, connector, source_input, source_path, room_id=body.room_id)
 
 
 @router.post("/confluence", response_model=IngestionResponse)
@@ -750,4 +763,4 @@ async def ingest_confluence(
         cloud=settings.confluence_cloud,
     )
     source_path = f"confluence:{body.space_key or ','.join(body.page_ids or [])}"
-    return _run_ingestion(request, connector, source_input, source_path, room_id=body.room_id)
+    return await _ingest_and_invalidate(request, connector, source_input, source_path, room_id=body.room_id)

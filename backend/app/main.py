@@ -299,6 +299,9 @@ class RequestContextFilter(logging.Filter):
 for _h in logging.root.handlers:
     _h.addFilter(RequestContextFilter())
 
+from starlette.middleware.gzip import GZipMiddleware
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(DeprecationMiddleware)
 app.add_middleware(RequestIDMiddleware)

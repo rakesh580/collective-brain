@@ -50,6 +50,9 @@ service-account*.json
 # Logs
 *.log
 
+# Load test results
+backend/tests/load/results/
+
 # Claude Code
 .claude/
 collective_brain_dev.db

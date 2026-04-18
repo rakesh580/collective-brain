@@ -59,6 +59,5 @@ ENV CB_GOOGLE_CLIENT_ID=""
 # HF Spaces uses port 7860, Render uses 8000
 EXPOSE 7860 8000
 
-# Single worker: WebSocket connections are process-local and don't
-# work across multiple workers without a Redis pub/sub layer.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
+# WebSockets work across workers via Redis pub/sub (see routers/rooms/_shared.py).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "4"]

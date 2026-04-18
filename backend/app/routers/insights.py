@@ -48,6 +48,12 @@ def _get_db():
 
 @router.get("/dashboard")
 async def get_dashboard(request: Request, room_id: str | None = None, user=Depends(get_current_user)):
+    redis = request.app.state.redis
+    cache_key = f"dashboard:{room_id or 'all'}"
+    cached = await redis.cache_get(cache_key)
+    if cached:
+        return cached
+
     db = _get_db()
     try:
         # Count total members (separate from top-10 query)
@@ -112,6 +118,7 @@ async def get_dashboard(request: Request, room_id: str | None = None, user=Depen
         result["recent_decisions"] = [
             {"id": d.id, "title": d.title, "type": d.decision_type, "status": d.status} for d in recent_decisions
         ]
+        await redis.cache_set(cache_key, result, ttl_seconds=60)
         return result
     finally:
         db.close()

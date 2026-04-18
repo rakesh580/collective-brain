@@ -39,7 +39,7 @@ export default function CommandPalette() {
   );
 
   const allItems: CommandItem[] = [
-    { id: "dash",    label: "Dashboard",   description: "Overview & stats",            icon: <LayoutDashboard size={16} />, action: () => go("/"),            category: "Navigate" },
+    { id: "dash",    label: "Dashboard",   description: "Overview & stats",            icon: <LayoutDashboard size={16} />, action: () => go("/dashboard"),   category: "Navigate" },
     { id: "chat",    label: "AI Chat",     description: "Ask questions about your team",icon: <MessageSquare size={16} />, action: () => go("/chat"),        category: "Navigate" },
     { id: "rooms",   label: "Rooms",       description: "Collaborative spaces",        icon: <Hash size={16} />,            action: () => go("/rooms"),       category: "Navigate" },
     { id: "disc",    label: "Discussions", description: "Threaded conversations",      icon: <MessagesSquare size={16} />,  action: () => go("/discussions"), category: "Navigate" },

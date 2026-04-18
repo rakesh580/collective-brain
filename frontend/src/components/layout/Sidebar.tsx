@@ -20,7 +20,7 @@ interface NavItem {
 }
 
 const links: NavItem[] = [
-  { to: "/",           label: "Dashboard",  icon: LayoutDashboard },
+  { to: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
   { to: "/chat",       label: "AI Chat",    icon: MessageSquare },
   { to: "/rooms",      label: "Rooms",      icon: Hash },
   { to: "/discussions",label: "Discussions",icon: MessagesSquare },
@@ -144,15 +144,15 @@ export default function Sidebar() {
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-none">
         {links.map((link) => {
           const isActive =
-            link.to === "/"
-              ? location.pathname === "/"
+            link.to === "/dashboard"
+              ? location.pathname === "/dashboard"
               : location.pathname.startsWith(link.to);
 
           return (
             <NavTooltip key={link.to} label={link.label} show={collapsed}>
               <NavLink
                 to={link.to}
-                end={link.to === "/"}
+                end={link.to === "/dashboard"}
                 className="block"
               >
                 <motion.div

@@ -1,8 +1,9 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import PageShell from "./components/layout/PageShell";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import FeatureErrorBoundary from "./components/FeatureErrorBoundary";
+import { useAuth } from "./hooks/useAuth";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -14,6 +15,7 @@ import SettingsPage from "./pages/SettingsPage";
 import RoomsPage from "./pages/RoomsPage";
 
 // Lazy-load heavy pages to reduce initial bundle size
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const GraphPage = lazy(() => import("./pages/GraphPage"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const DiscussionsPage = lazy(() => import("./pages/DiscussionsPage"));
@@ -48,9 +50,22 @@ function guarded(element: React.ReactNode, name: string) {
   );
 }
 
+/** Redirect to dashboard if authenticated, otherwise show landing page */
+function LandingOrDashboard() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageFallback />;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <LandingPage />
+    </Suspense>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingOrDashboard />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -61,7 +76,7 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={guarded(<DashboardPage />, "Dashboard")} />
+        <Route path="/dashboard" element={guarded(<DashboardPage />, "Dashboard")} />
         <Route path="/chat" element={guarded(<ChatPage />, "AI Chat")} />
         <Route path="/ingest" element={guarded(<IngestPage />, "Data Ingestion")} />
         <Route path="/members" element={guarded(<MemberList />, "Members")} />

@@ -52,7 +52,12 @@ def init_db(settings=None):
         _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
         # Run Alembic migrations using the direct session URL (not the pooler)
-        _run_alembic_migrations(settings)
+        import os
+
+        if os.environ.get("CB_RUN_MIGRATIONS", "true").lower() == "true":
+            _run_alembic_migrations(settings)
+        else:
+            logger.info("Skipping migrations (CB_RUN_MIGRATIONS=false)")
         logger.info("Database initialized (PostgreSQL/Supabase)")
 
     except Exception as pg_err:
