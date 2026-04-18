@@ -54,7 +54,7 @@ async def list_members(request: Request, room_id: str | None = None, limit: int 
             total = base_query.count()
             members = base_query.offset(offset).limit(limit).all()
         result = {
-            "members": [_to_response(m).model_dump() for m in members],
+            "members": [_to_response(m).model_dump(mode="json") for m in members],
             "total": total,
         }
         await redis.cache_set(cache_key, result, ttl_seconds=120)
