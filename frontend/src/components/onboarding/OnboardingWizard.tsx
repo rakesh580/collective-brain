@@ -16,7 +16,7 @@ type IngestMode = "git" | "upload" | "paste" | null;
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 240 : -240, opacity: 0 }),
-  center: { x: 0, opacity: 1, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
+  center: { x: 0, opacity: 1, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
   exit: (dir: number) => ({ x: dir > 0 ? -240 : 240, opacity: 0, transition: { duration: 0.25 } }),
 };
 
