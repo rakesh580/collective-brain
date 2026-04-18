@@ -1,38 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../hooks/useAuth";
-import { useGoogleAuthEnabled } from "../hooks/useGoogleAuth";
 import { LogoIcon } from "../components/layout/Logo";
 import { UserPlus } from "lucide-react";
-
-function SafeGoogleLogin({ onSuccess }: { onSuccess: (res: any) => void }) {
-  const enabled = useGoogleAuthEnabled();
-  if (!enabled) return null;
-  return (
-    <>
-      <div className="flex items-center gap-3 my-4">
-        <div className="flex-1 h-px bg-slate-600/50" />
-        <span className="text-xs text-slate-500 uppercase">or</span>
-        <div className="flex-1 h-px bg-slate-600/50" />
-      </div>
-      <div className="flex justify-center">
-        <GoogleLogin
-          onSuccess={onSuccess}
-          onError={() => {
-            // GSI initialization errors are expected in iframe/cross-origin contexts
-            // Only log, don't show user-facing error
-            console.info("GSI button error (expected in iframe); user can retry");
-          }}
-          theme="filled_black"
-          size="large"
-          text="continue_with"
-          shape="pill"
-        />
-      </div>
-    </>
-  );
-}
+import GoogleAuthButton from "../components/auth/GoogleAuthButton";
 
 function parseApiError(err: unknown): string {
   const msg = err instanceof Error ? err.message : "Registration failed";
@@ -56,7 +27,7 @@ function parseApiError(err: unknown): string {
 }
 
 export default function RegisterPage() {
-  const { register, googleLogin } = useAuth();
+  const { register, googleLoginWithToken } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -90,18 +61,21 @@ export default function RegisterPage() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
-    if (!credentialResponse.credential) return;
+  const handleGoogleAccessToken = async (accessToken: string) => {
     setError(null);
     setIsLoading(true);
     try {
-      await googleLogin(credentialResponse.credential);
+      await googleLoginWithToken(accessToken);
       navigate("/dashboard");
     } catch (err) {
       setError(parseApiError(err));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleError = () => {
+    setError("Google sign-in failed. The popup may have been blocked or closed. Please try again.");
   };
 
   const inputClass =
@@ -217,8 +191,9 @@ export default function RegisterPage() {
             {isLoading ? "Creating account..." : "Create Account"}
           </button>
 
-          <SafeGoogleLogin
-            onSuccess={handleGoogleSuccess}
+          <GoogleAuthButton
+            onError={handleGoogleError}
+            onAccessTokenSuccess={handleGoogleAccessToken}
           />
 
           <p className="text-center text-sm text-slate-400 mt-4">

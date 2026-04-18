@@ -2,7 +2,6 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
 import { GoogleAuthEnabledContext } from "./hooks/useGoogleAuth";
@@ -60,20 +59,13 @@ function Root() {
     </QueryClientProvider>
   );
 
-  // Only wrap with GoogleOAuthProvider when client ID is available
-  if (googleClientId) {
-    return (
-      <GoogleClientIdProvider value={googleClientId}>
-        <GoogleAuthEnabledContext.Provider value={true}>
-          <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider>
-        </GoogleAuthEnabledContext.Provider>
-      </GoogleClientIdProvider>
-    );
-  }
-
+  // Expose client ID + enabled flag to descendants; no GSI script is loaded —
+  // GoogleAuthButton drives the OAuth popup itself via window.open().
   return (
-    <GoogleClientIdProvider value="">
-      <GoogleAuthEnabledContext.Provider value={false}>{app}</GoogleAuthEnabledContext.Provider>
+    <GoogleClientIdProvider value={googleClientId}>
+      <GoogleAuthEnabledContext.Provider value={!!googleClientId}>
+        {app}
+      </GoogleAuthEnabledContext.Provider>
     </GoogleClientIdProvider>
   );
 }

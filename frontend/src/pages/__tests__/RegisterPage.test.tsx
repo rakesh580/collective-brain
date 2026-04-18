@@ -4,13 +4,13 @@ import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockRegister = vi.fn();
-const mockGoogleLogin = vi.fn();
+const mockGoogleLoginWithToken = vi.fn();
 const mockNavigate = vi.fn();
 
 vi.mock("../../hooks/useAuth", () => ({
   useAuth: () => ({
     register: mockRegister,
-    googleLogin: mockGoogleLogin,
+    googleLoginWithToken: mockGoogleLoginWithToken,
     user: null,
     isLoading: false,
     logout: vi.fn(),
@@ -25,17 +25,21 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-// Mock Google OAuth
-vi.mock("@react-oauth/google", () => ({
-  GoogleLogin: ({ onSuccess }: any) => (
-    <button data-testid="google-login" onClick={() => onSuccess({ credential: "mock-cred" })}>
-      Sign in with Google
-    </button>
+vi.mock("../../components/auth/GoogleAuthButton", () => ({
+  default: ({ onError, onAccessTokenSuccess }: any) => (
+    <>
+      <button
+        type="button"
+        data-testid="google-btn"
+        onClick={() => onAccessTokenSuccess("mock-token")}
+      >
+        Continue with Google
+      </button>
+      <button type="button" data-testid="google-error-btn" onClick={onError}>
+        Trigger Google Error
+      </button>
+    </>
   ),
-}));
-
-vi.mock("../../hooks/useGoogleAuth", () => ({
-  useGoogleAuthEnabled: () => true,
 }));
 
 // Mock Logo
@@ -56,7 +60,7 @@ function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRegister.mockResolvedValue(undefined);
-  mockGoogleLogin.mockResolvedValue(undefined);
+  mockGoogleLoginWithToken.mockResolvedValue(undefined);
 });
 
 describe("RegisterPage", () => {
@@ -150,19 +154,31 @@ describe("RegisterPage", () => {
 
   it("renders Google sign-in button", () => {
     renderPage();
-    expect(screen.getByTestId("google-login")).toBeInTheDocument();
+    expect(screen.getByTestId("google-btn")).toBeInTheDocument();
   });
 
-  it("calls googleLogin on Google auth success", async () => {
+  it("calls googleLoginWithToken on Google auth success", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByTestId("google-login"));
+    await user.click(screen.getByTestId("google-btn"));
 
     await waitFor(() => {
-      expect(mockGoogleLogin).toHaveBeenCalledWith("mock-cred");
+      expect(mockGoogleLoginWithToken).toHaveBeenCalledWith("mock-token");
     });
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
+    });
+  });
+
+  it("shows error on Google login failure", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByTestId("google-error-btn"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Google sign-in failed/i),
+      ).toBeInTheDocument();
     });
   });
 
