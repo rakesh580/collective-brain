@@ -17,6 +17,7 @@ from app.config import Settings
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _make_request(cache_get_return=None):
     """Build a mock FastAPI Request with redis + vector_store on app.state."""
     mock_request = MagicMock()
@@ -97,8 +98,8 @@ def _mock_user():
 
 # ── Dashboard Caching ───────────────────────────────────────────────────────
 
-class TestDashboardCaching:
 
+class TestDashboardCaching:
     @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_data(self):
         """When cache has data, should return it without DB queries."""
@@ -155,8 +156,8 @@ class TestDashboardCaching:
 
 # ── Members List Caching ────────────────────────────────────────────────────
 
-class TestMembersListCaching:
 
+class TestMembersListCaching:
     @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_data(self):
         """When cache has data, should return it without DB queries."""
@@ -212,8 +213,8 @@ class TestMembersListCaching:
 
 # ── Decisions List Caching ──────────────────────────────────────────────────
 
-class TestDecisionsListCaching:
 
+class TestDecisionsListCaching:
     @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_data(self):
         """When cache has data, should return it without DB queries."""
@@ -267,8 +268,8 @@ class TestDecisionsListCaching:
 
 # ── Cache Invalidation ──────────────────────────────────────────────────────
 
-class TestCacheInvalidation:
 
+class TestCacheInvalidation:
     @pytest.mark.asyncio
     async def test_member_create_clears_members_and_dashboard(self):
         """Creating a member should invalidate members:list:* and dashboard:*."""
@@ -408,8 +409,8 @@ class TestCacheInvalidation:
 
 # ── Migration Guard ─────────────────────────────────────────────────────────
 
-class TestMigrationGuard:
 
+class TestMigrationGuard:
     def test_cb_run_migrations_false_skips_migrations(self):
         """When CB_RUN_MIGRATIONS=false, _run_alembic_migrations should NOT be called."""
         with (

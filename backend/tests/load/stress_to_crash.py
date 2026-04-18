@@ -40,12 +40,14 @@ CRASH_AVG_RESPONSE = 10.0  # 10s avg = server is choking
 def register_user():
     """Register a test user, return token."""
     suffix = uuid.uuid4().hex[:10]
-    data = json.dumps({
-        "username": f"stress_{suffix}",
-        "email": f"stress_{suffix}@test.com",
-        "password": "StressT3st!Pass",
-        "display_name": f"Stress {suffix}",
-    }).encode()
+    data = json.dumps(
+        {
+            "username": f"stress_{suffix}",
+            "email": f"stress_{suffix}@test.com",
+            "password": "StressT3st!Pass",
+            "display_name": f"Stress {suffix}",
+        }
+    ).encode()
 
     req = urllib.request.Request(  # noqa: S310
         f"{HOST}/api/v1/auth/register",
@@ -125,10 +127,10 @@ def simulate_user(token, duration):
 
 def run_wave(wave_num, user_count, tokens):
     """Run a wave of concurrent users."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  WAVE {wave_num}: {user_count} CONCURRENT USERS")
     print(f"  Duration: {WAVE_DURATION}s")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # Use available tokens, cycling if needed
     wave_tokens = [tokens[i % len(tokens)] for i in range(user_count)]
@@ -137,10 +139,7 @@ def run_wave(wave_num, user_count, tokens):
     start = time.time()
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=user_count) as pool:
-        futures = [
-            pool.submit(simulate_user, t, WAVE_DURATION)
-            for t in wave_tokens
-        ]
+        futures = [pool.submit(simulate_user, t, WAVE_DURATION) for t in wave_tokens]
         for f in concurrent.futures.as_completed(futures):
             try:
                 all_results.extend(f.result())
@@ -175,7 +174,7 @@ def run_wave(wave_num, user_count, tokens):
 
     print("\n  Results:")
     print(f"  ├─ Total requests:   {total}")
-    print(f"  ├─ Errors:           {errors} ({error_rate*100:.1f}%)")
+    print(f"  ├─ Errors:           {errors} ({error_rate * 100:.1f}%)")
     print(f"  ├─ Requests/sec:     {rps:.1f}")
     print(f"  ├─ Avg latency:      {avg_lat:.0f}ms")
     print(f"  ├─ Median latency:   {med_lat:.0f}ms")
@@ -187,13 +186,13 @@ def run_wave(wave_num, user_count, tokens):
 
     # Health verdict
     if error_rate >= CRASH_ERROR_RATE:
-        print(f"\n  💥 SERVER BREAKING — {error_rate*100:.1f}% error rate (threshold: {CRASH_ERROR_RATE*100:.0f}%)")
+        print(f"\n  💥 SERVER BREAKING — {error_rate * 100:.1f}% error rate (threshold: {CRASH_ERROR_RATE * 100:.0f}%)")
         return True
     elif avg_lat >= CRASH_AVG_RESPONSE * 1000:
-        print(f"\n  💥 SERVER CHOKING — {avg_lat:.0f}ms avg response (threshold: {CRASH_AVG_RESPONSE*1000:.0f}ms)")
+        print(f"\n  💥 SERVER CHOKING — {avg_lat:.0f}ms avg response (threshold: {CRASH_AVG_RESPONSE * 1000:.0f}ms)")
         return True
     elif error_rate >= 0.10:
-        print(f"\n  ⚠️  SERVER STRESSED — {error_rate*100:.1f}% error rate")
+        print(f"\n  ⚠️  SERVER STRESSED — {error_rate * 100:.1f}% error rate")
     elif p95_lat >= 2000:
         print(f"\n  ⚠️  SERVER SLOW — p95 at {p95_lat:.0f}ms")
     else:
@@ -240,9 +239,9 @@ def main():
         time.sleep(5)
 
     # Final report
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("  FINAL REPORT")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     if crash_wave:
         wave_num, users = crash_wave
@@ -257,7 +256,7 @@ def main():
         print(f"\n  Server survived ALL waves up to {WAVES[-1]} users!")
         print("  This server is a beast. 💪")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
 
 
 if __name__ == "__main__":

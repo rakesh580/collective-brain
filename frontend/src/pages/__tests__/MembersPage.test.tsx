@@ -59,7 +59,7 @@ vi.mock("../../components/discussions/DiscussButton", () => ({
   default: () => <button data-testid="discuss-button">Discuss</button>,
 }));
 
-import { MemberList, MemberDetailView } from "../MembersPage";
+import { MemberList } from "../MembersPage";
 
 const baseMembers = {
   total: 3,

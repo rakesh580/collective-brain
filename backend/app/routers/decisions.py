@@ -537,7 +537,9 @@ class RecordOutcomeRequest(BaseModel):
 
 
 @router.post("/{decision_id}/outcome")
-async def record_decision_outcome(decision_id: str, body: RecordOutcomeRequest, request: Request, user=Depends(get_current_user)):
+async def record_decision_outcome(
+    decision_id: str, body: RecordOutcomeRequest, request: Request, user=Depends(get_current_user)
+):
     """Record the outcome of a decision — did it work?"""
     db = _get_db()
     try:

@@ -12,7 +12,7 @@ vi.mock("../../api/client", () => ({
 
 // Mock react-force-graph-2d
 vi.mock("react-force-graph-2d", () => ({
-  default: (props: any) => <div data-testid="force-graph" />,
+  default: (_props: any) => <div data-testid="force-graph" />,
 }));
 
 // Mock framer-motion

@@ -13,7 +13,7 @@ vi.mock("../../api/client", () => ({
 }));
 
 vi.mock("../../components/layout/Logo", () => ({
-  LogoIcon: ({ size }: any) => <div data-testid="logo-icon" />,
+  LogoIcon: ({ size: _size }: any) => <div data-testid="logo-icon" />,
 }));
 
 import ForgotPasswordPage from "../ForgotPasswordPage";

@@ -25,7 +25,9 @@ def _get_db():
     return create_session()
 
 
-async def _ingest_and_invalidate(request: Request, connector, source_input, source_path: str, room_id: str | None = None):
+async def _ingest_and_invalidate(
+    request: Request, connector, source_input, source_path: str, room_id: str | None = None
+):
     """Run ingestion then invalidate response caches."""
     result = _run_ingestion(request, connector, source_input, source_path, room_id=room_id)
     redis = request.app.state.redis
@@ -490,7 +492,9 @@ async def ingest_slack(
             extract_dir = zip_path
 
         connector = SlackConnector(settings.chunk_size, settings.chunk_overlap)
-        return await _ingest_and_invalidate(request, connector, extract_dir, file.filename or "slack_export", room_id=room_id)
+        return await _ingest_and_invalidate(
+            request, connector, extract_dir, file.filename or "slack_export", room_id=room_id
+        )
 
 
 @router.post("/discord", response_model=IngestionResponse)
@@ -515,7 +519,9 @@ async def ingest_discord(
             f.write(content)
 
         connector = DiscordConnector(settings.chunk_size, settings.chunk_overlap)
-        return await _ingest_and_invalidate(request, connector, file_path, file.filename or "discord_export", room_id=room_id)
+        return await _ingest_and_invalidate(
+            request, connector, file_path, file.filename or "discord_export", room_id=room_id
+        )
 
 
 @router.post("/tasks", response_model=IngestionResponse)
