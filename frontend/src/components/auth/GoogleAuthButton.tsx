@@ -14,13 +14,17 @@ function GoogleIcon() {
   );
 }
 
+const MESSAGE_TYPE = "cb-google-oauth";
+
 /**
- * Open Google OAuth popup manually — no GSI library dependency.
- * This avoids all the initTokenClient/error_callback issues in iframe contexts.
+ * Open Google OAuth in a popup. Uses postMessage from /auth/callback back to
+ * the opener — works under Cross-Origin-Opener-Policy (unlike popup.location
+ * polling), and the callback page also handles the case where the popup is
+ * opened as a new tab by the browser.
  */
 function openGoogleOAuthPopup(clientId: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const redirectUri = window.location.origin;
+    const redirectUri = `${window.location.origin}/auth/callback`;
     const scope = "openid email profile";
     const state = Math.random().toString(36).substring(2);
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -37,7 +41,7 @@ function openGoogleOAuthPopup(clientId: string): Promise<string> {
     const popup = window.open(
       authUrl.toString(),
       "google-auth",
-      `width=${width},height=${height},left=${left},top=${top},popup=yes`
+      `width=${width},height=${height},left=${left},top=${top},popup=yes`,
     );
 
     if (!popup) {
@@ -45,38 +49,50 @@ function openGoogleOAuthPopup(clientId: string): Promise<string> {
       return;
     }
 
-    // Poll the popup for the redirect with the access token
-    const interval = setInterval(() => {
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener("message", onMessage);
+      clearInterval(closedInterval);
+      clearTimeout(timeout);
+    };
+
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (!data || data.type !== MESSAGE_TYPE) return;
+      settled = true;
+      cleanup();
+      try { popup?.close(); } catch { /* popup may already be gone (COOP) */ }
+      if (data.error) {
+        reject(new Error(String(data.error)));
+      } else if (data.accessToken) {
+        resolve(String(data.accessToken));
+      } else {
+        reject(new Error("No access token received"));
+      }
+    }
+
+    window.addEventListener("message", onMessage);
+
+    // Detect if the user closed the popup themselves. Under COOP, popup.closed
+    // may always read true — require a short grace period before rejecting.
+    const openedAt = Date.now();
+    const closedInterval = setInterval(() => {
+      if (settled) return;
       try {
-        if (popup.closed) {
-          clearInterval(interval);
+        if (popup.closed && Date.now() - openedAt > 1000) {
+          cleanup();
           reject(new Error("Popup was closed"));
-          return;
-        }
-        // When the popup redirects back to our origin, we can read its URL
-        const popupUrl = popup.location.href;
-        if (popupUrl.startsWith(redirectUri)) {
-          clearInterval(interval);
-          popup.close();
-          // Extract access_token from the URL fragment
-          const hash = new URL(popupUrl).hash.substring(1);
-          const params = new URLSearchParams(hash);
-          const accessToken = params.get("access_token");
-          if (accessToken) {
-            resolve(accessToken);
-          } else {
-            reject(new Error(params.get("error") || "No access token received"));
-          }
         }
       } catch {
-        // Cross-origin error — popup hasn't redirected back yet, keep polling
+        // ignore — COOP may block access to popup.closed
       }
-    }, 200);
+    }, 500);
 
-    // Timeout after 2 minutes
-    setTimeout(() => {
-      clearInterval(interval);
-      if (!popup.closed) popup.close();
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      cleanup();
+      try { popup?.close(); } catch { /* ignore */ }
       reject(new Error("Authentication timed out"));
     }, 120000);
   });
