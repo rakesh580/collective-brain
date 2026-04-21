@@ -10,6 +10,7 @@ import type {
   MemberActivity, TopicTrends,
 } from "../types";
 import { BarChart3, TrendingUp, PieChart as PieIcon, Users, Tag } from "lucide-react";
+import { cleanTopicLabel } from "../lib/textFormat";
 
 const BRAND_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#10b981", "#f59e0b", "#06b6d4", "#f43f5e", "#3b82f6"];
 
@@ -326,28 +327,43 @@ export default function AnalyticsPage() {
                 animate="show"
                 className="flex flex-wrap gap-2"
               >
-                {topicTrends.topics.map((t, i) => (
-                  <motion.div
-                    key={t.topic}
-                    variants={item}
-                    whileHover={{ scale: 1.05 }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium cursor-default"
-                    style={{
-                      background: "var(--bg-muted)",
-                      border: "1px solid var(--border-default)",
-                      color: "var(--text-secondary)",
-                      fontSize: Math.max(11, Math.min(15, 11 + (topicTrends.topics.length - i) / topicTrends.topics.length * 4)),
-                    }}
-                  >
-                    {t.topic}
-                    <span
-                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                      style={{ background: "var(--bg-elevated)", color: "var(--brand-400)" }}
+                {(() => {
+                  const merged = new Map<string, { label: string; original: string; count: number }>();
+                  for (const t of topicTrends.topics) {
+                    const label = cleanTopicLabel(t.topic, 32);
+                    if (!label) continue;
+                    const existing = merged.get(label);
+                    if (existing) {
+                      existing.count += t.count;
+                    } else {
+                      merged.set(label, { label, original: t.topic, count: t.count });
+                    }
+                  }
+                  const sorted = Array.from(merged.values()).sort((a, b) => b.count - a.count);
+                  return sorted.map((t, i) => (
+                    <motion.div
+                      key={t.label}
+                      variants={item}
+                      whileHover={{ scale: 1.05 }}
+                      title={t.original !== t.label ? t.original : undefined}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium cursor-default"
+                      style={{
+                        background: "var(--bg-muted)",
+                        border: "1px solid var(--border-default)",
+                        color: "var(--text-secondary)",
+                        fontSize: Math.max(11, Math.min(15, 11 + (sorted.length - i) / sorted.length * 4)),
+                      }}
                     >
-                      {t.count}
-                    </span>
-                  </motion.div>
-                ))}
+                      {t.label}
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: "var(--bg-elevated)", color: "var(--brand-400)" }}
+                      >
+                        {t.count}
+                      </span>
+                    </motion.div>
+                  ));
+                })()}
               </motion.div>
             </ChartCard>
           )}

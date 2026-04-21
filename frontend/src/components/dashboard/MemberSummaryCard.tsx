@@ -1,5 +1,6 @@
 import type { Member } from "../../types";
 import { Link } from "react-router-dom";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 interface Props {
   member: Member;
@@ -50,14 +51,23 @@ export default function MemberSummaryCard({ member }: Props) {
       </div>
       {member.expertise_tags.length > 0 && (
         <div className="mt-2.5 flex gap-1 flex-wrap">
-          {member.expertise_tags.slice(0, 4).map((tag) => (
-            <span
-              key={tag}
-              className="text-2xs bg-muted text-slate-600 px-2 py-0.5 rounded-full"
-            >
-              {tag}
-            </span>
-          ))}
+          {Array.from(
+            new Map(
+              member.expertise_tags
+                .map((tag) => [cleanTopicLabel(tag, 20), tag] as const)
+                .filter(([label]) => label.length > 0),
+            ).entries(),
+          )
+            .slice(0, 4)
+            .map(([label, original]) => (
+              <span
+                key={label}
+                title={original !== label ? original : undefined}
+                className="text-2xs bg-muted text-slate-600 px-2 py-0.5 rounded-full"
+              >
+                {label}
+              </span>
+            ))}
         </div>
       )}
     </Link>

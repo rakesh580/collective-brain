@@ -1,6 +1,7 @@
 import React from "react";
 import type { Member } from "../../types";
 import { Link } from "react-router-dom";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 interface Props {
   member: Member;
@@ -55,14 +56,23 @@ const MemberProfile = React.memo(function MemberProfile({ member }: Props) {
 
       {member.expertise_tags.length > 0 && (
         <div className="flex gap-1 flex-wrap mb-3">
-          {member.expertise_tags.slice(0, 6).map((tag) => (
-            <span
-              key={tag}
-              className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full"
-            >
-              {tag}
-            </span>
-          ))}
+          {Array.from(
+            new Map(
+              member.expertise_tags
+                .map((tag) => [cleanTopicLabel(tag, 22), tag] as const)
+                .filter(([label]) => label.length > 0),
+            ).entries(),
+          )
+            .slice(0, 6)
+            .map(([label, original]) => (
+              <span
+                key={label}
+                title={original !== label ? original : undefined}
+                className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full"
+              >
+                {label}
+              </span>
+            ))}
         </div>
       )}
 
@@ -70,7 +80,9 @@ const MemberProfile = React.memo(function MemberProfile({ member }: Props) {
         <div className="space-y-1.5">
           {topExpertise.map(([topic, score]) => (
             <div key={topic} className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 w-20 truncate">{topic}</span>
+              <span className="text-xs text-slate-600 w-20 truncate" title={topic}>
+                {cleanTopicLabel(topic, 18) || topic}
+              </span>
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"

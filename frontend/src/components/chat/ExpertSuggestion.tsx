@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Users, Sparkles, Clock, CheckCircle2, X, MessageCircle } from "lucide-react";
 import type { ExpertRecommendation } from "../../types";
 import { api } from "../../api/client";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 interface Props {
   query: string;
@@ -142,19 +143,31 @@ export default function ExpertSuggestion({ query, experts, onDismiss }: Props) {
 
                 {/* Expertise tags */}
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {expert.expertise_topics.slice(0, 3).map((topic) => (
-                    <span
-                      key={topic}
-                      className="text-2xs font-medium px-1.5 py-0.5 rounded-full "
-                    >
-                      {topic}
-                    </span>
-                  ))}
-                  {expert.expertise_topics.length > 3 && (
-                    <span className="text-2xs self-center">
-                      +{expert.expertise_topics.length - 3}
-                    </span>
-                  )}
+                  {(() => {
+                    const cleaned = Array.from(
+                      new Map(
+                        expert.expertise_topics
+                          .map((topic) => [cleanTopicLabel(topic, 20), topic] as const)
+                          .filter(([label]) => label.length > 0),
+                      ).entries(),
+                    );
+                    return (
+                      <>
+                        {cleaned.slice(0, 3).map(([label, original]) => (
+                          <span
+                            key={label}
+                            title={original !== label ? original : undefined}
+                            className="text-2xs font-medium px-1.5 py-0.5 rounded-full "
+                          >
+                            {label}
+                          </span>
+                        ))}
+                        {cleaned.length > 3 && (
+                          <span className="text-2xs self-center">+{cleaned.length - 3}</span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Last active */}

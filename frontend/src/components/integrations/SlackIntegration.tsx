@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../api/client";
 import type { SlackWorkspace, SlackChannel, DigestPreview, DigestConfig } from "../../types";
+import { cleanTopicLabel } from "../../lib/textFormat";
 import {
  MessageSquare, RefreshCw, Trash2, Play, Square, History, ExternalLink,
  Hash, Lock, AlertTriangle, CheckCircle2, Settings,
@@ -600,11 +601,19 @@ export default function SlackIntegration(_props?: SlackIntegrationProps) {
  <div className="space-y-1">
  <h6 className="text-xs font-medium text-slate-600">Trending Topics</h6>
  <div className="flex flex-wrap gap-1.5">
- {digestPreview.trending_topics.map((t, i) => (
+ {Array.from(
+ new Map(
+ digestPreview.trending_topics
+ .map((t) => [cleanTopicLabel(t, 28), t] as const)
+ .filter(([label]) => label.length > 0),
+ ).entries(),
+ ).map(([label, original]) => (
  <span
- key={i}
- className="px-2 py-0.5 text-2xs font-medium bg-indigo-50 text-indigo-600 rounded-full" >
- {t}
+ key={label}
+ title={original !== label ? original : undefined}
+ className="px-2 py-0.5 text-2xs font-medium bg-indigo-50 text-indigo-600 rounded-full"
+ >
+ {label}
  </span>
  ))}
  </div>

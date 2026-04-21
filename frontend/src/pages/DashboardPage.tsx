@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { api } from "../api/client";
 import type { DashboardData, ActivityTimeline, TopicTrends } from "../types";
+import { cleanTopicLabel } from "../lib/textFormat";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -366,28 +367,45 @@ export default function DashboardPage() {
               </h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {topics.topics.slice(0, 14).map((t, i) => (
-                <motion.span
-                  key={t.topic}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.04, duration: 0.25 }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:-translate-y-0.5"
-                  style={{
-                    background: "rgba(99,102,241,0.1)",
-                    color: "var(--brand-300)",
-                    border: "1px solid rgba(99,102,241,0.18)",
-                  }}
-                >
-                  {t.topic}
-                  <span
-                    className="text-[10px] font-bold px-1 rounded-full"
-                    style={{ background: "rgba(99,102,241,0.2)", color: "var(--brand-300)" }}
+              {(() => {
+                const merged = new Map<string, { label: string; original: string; count: number }>();
+                for (const t of topics.topics) {
+                  const label = cleanTopicLabel(t.topic, 28);
+                  if (!label) continue;
+                  const existing = merged.get(label);
+                  if (existing) {
+                    existing.count += t.count;
+                  } else {
+                    merged.set(label, { label, original: t.topic, count: t.count });
+                  }
+                }
+                const sorted = Array.from(merged.values())
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 14);
+                return sorted.map((t, i) => (
+                  <motion.span
+                    key={t.label}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.04, duration: 0.25 }}
+                    title={t.original !== t.label ? t.original : undefined}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:-translate-y-0.5"
+                    style={{
+                      background: "rgba(99,102,241,0.1)",
+                      color: "var(--brand-300)",
+                      border: "1px solid rgba(99,102,241,0.18)",
+                    }}
                   >
-                    {t.count}
-                  </span>
-                </motion.span>
-              ))}
+                    {t.label}
+                    <span
+                      className="text-[10px] font-bold px-1 rounded-full"
+                      style={{ background: "rgba(99,102,241,0.2)", color: "var(--brand-300)" }}
+                    >
+                      {t.count}
+                    </span>
+                  </motion.span>
+                ));
+              })()}
             </div>
           </div>
         )}

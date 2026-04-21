@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../api/client";
 import type { Member, MemberDetail } from "../types";
+import { cleanTopicLabel, cleanDescription } from "../lib/textFormat";
 import MemberFormModal from "../components/members/MemberFormModal";
 import ConfirmDialog from "../components/members/ConfirmDialog";
 import OffboardingModal from "../components/members/OffboardingModal";
@@ -86,9 +87,13 @@ function MemberCard({ member }: { member: Member }) {
 
           {member.expertise_tags && member.expertise_tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {member.expertise_tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="badge badge-brand text-[10px]">{tag}</span>
-              ))}
+              {member.expertise_tags.slice(0, 3).map((tag) => {
+                const label = cleanTopicLabel(tag, 22);
+                if (!label) return null;
+                return (
+                  <span key={tag} className="badge badge-brand text-[10px]" title={tag !== label ? tag : undefined}>{label}</span>
+                );
+              })}
               {member.expertise_tags.length > 3 && (
                 <span className="badge badge-slate text-[10px]">+{member.expertise_tags.length - 3}</span>
               )}
@@ -423,16 +428,26 @@ function MemberDetailView() {
         </div>
 
         {/* Expertise tags */}
-        {member.expertise_tags.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-tertiary)" }}>Expertise</h3>
-            <div className="flex gap-1.5 flex-wrap">
-              {member.expertise_tags.map((tag) => (
-                <span key={tag} className="badge badge-brand">{tag}</span>
-              ))}
+        {(() => {
+          const cleanedTags = Array.from(
+            new Map(
+              member.expertise_tags
+                .map((tag) => [cleanTopicLabel(tag, 32), tag] as const)
+                .filter(([label]) => label.length > 0),
+            ).entries(),
+          );
+          if (cleanedTags.length === 0) return null;
+          return (
+            <div className="mb-4">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-tertiary)" }}>Expertise</h3>
+              <div className="flex gap-1.5 flex-wrap">
+                {cleanedTags.map(([label, original]) => (
+                  <span key={label} className="badge badge-brand" title={original !== label ? original : undefined}>{label}</span>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Strengths */}
         {member.strengths.length > 0 && (
@@ -509,10 +524,22 @@ function MemberDetailView() {
                       {new Date(c.timestamp).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm line-clamp-2" style={{ color: "var(--text-secondary)" }}>{c.description}</p>
+                  <p
+                    className="text-sm line-clamp-2"
+                    style={{ color: "var(--text-secondary)" }}
+                    title={c.description && c.description !== cleanDescription(c.description) ? c.description : undefined}
+                  >
+                    {cleanDescription(c.description) || "(no description)"}
+                  </p>
                   {c.topics.length > 0 && (
-                    <div className="flex gap-1.5 mt-1.5">
-                      {c.topics.map((t) => (
+                    <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                      {Array.from(
+                        new Set(
+                          c.topics
+                            .map((t) => cleanTopicLabel(t, 24))
+                            .filter((t) => t.length > 0),
+                        ),
+                      ).map((t) => (
                         <span key={t} className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>#{t}</span>
                       ))}
                     </div>

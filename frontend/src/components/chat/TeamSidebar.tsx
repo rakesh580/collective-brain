@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Member } from "../../types";
 import { Search, MessageCircle } from "lucide-react";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 const avatarColors = [
   "from-indigo-500 to-violet-500",
@@ -106,11 +107,21 @@ export default function TeamSidebar({ onAskAbout }: Props) {
                 >
                   {m.name}
                 </button>
-                {m.expertise_tags.length > 0 && (
-                  <p className="text-2xs text-slate-400 truncate">
-                    {m.expertise_tags.slice(0, 3).join(", ")}
-                  </p>
-                )}
+                {m.expertise_tags.length > 0 && (() => {
+                  const cleaned = Array.from(
+                    new Set(
+                      m.expertise_tags
+                        .map((t) => cleanTopicLabel(t, 20))
+                        .filter((t) => t.length > 0),
+                    ),
+                  ).slice(0, 3);
+                  if (cleaned.length === 0) return null;
+                  return (
+                    <p className="text-2xs text-slate-400 truncate">
+                      {cleaned.join(", ")}
+                    </p>
+                  );
+                })()}
               </div>
               <button
                 onClick={() => onAskAbout(m.name)}
