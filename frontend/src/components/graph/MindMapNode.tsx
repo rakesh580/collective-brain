@@ -1,5 +1,6 @@
 import type { LayoutNode } from "./MindMapLayout";
 import { MEMBER_COLOR, TOPIC_COLOR, ARTIFACT_COLOR } from "./MindMapLayout";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 interface MindMapNodeProps {
   node: LayoutNode;
@@ -138,7 +139,7 @@ export default function MindMapNode({
           fontFamily="Inter, system-ui, sans-serif"
           opacity={nodeOpacity}
         >
-          {node.label.length > 22 ? node.label.slice(0, 20) + "\u2026" : node.label}
+          {cleanTopicLabel(node.label, 22) || node.label}
         </text>
       )}
     </g>

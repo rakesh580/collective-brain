@@ -1,5 +1,6 @@
 import type { LayoutNode, LayoutEdge } from "./MindMapLayout";
 import { MEMBER_COLOR, TOPIC_COLOR, ARTIFACT_COLOR } from "./MindMapLayout";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 interface MindMapTooltipProps {
   node: LayoutNode;
@@ -16,7 +17,7 @@ export default function MindMapTooltip({ node, layoutEdges }: MindMapTooltipProp
           className={`w-2.5 h-2.5 ${node.type === "topic" ? "rounded-sm" : "rounded-full"}`}
           style={{ backgroundColor: node.type === "member" ? MEMBER_COLOR : node.type === "topic" ? TOPIC_COLOR : ARTIFACT_COLOR }}
         />
-        <span className="text-xs font-bold">{node.label}</span>
+        <span className="text-xs font-bold break-words" title={node.label}>{cleanTopicLabel(node.label, 60) || node.label}</span>
         <span className="text-2xs text-slate-400 uppercase">{node.type}</span>
       </div>
       <div className="flex items-center gap-3 text-2xs text-slate-400">

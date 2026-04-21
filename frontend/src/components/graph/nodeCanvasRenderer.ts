@@ -1,5 +1,43 @@
 import { BADGE_COLOR } from "./graphConstants";
 import { getCommunityColor } from "./graphUtils";
+import { cleanTopicLabel } from "../../lib/textFormat";
+
+const labelCache = new Map<string, string>();
+
+function getDisplayLabel(node: any, maxLen = 26): string {
+  const raw = String(node.label ?? "");
+  const key = `${maxLen}:${raw}`;
+  const cached = labelCache.get(key);
+  if (cached !== undefined) return cached;
+  const cleaned = cleanTopicLabel(raw, maxLen) || raw.slice(0, maxLen);
+  labelCache.set(key, cleaned);
+  return cleaned;
+}
+
+function shouldDrawLabel(
+  node: any,
+  globalScale: number,
+  isHovered: boolean,
+  isFocused: boolean,
+  isHighlighted: boolean,
+  activeHighlight: boolean,
+): boolean {
+  if (isHovered || isFocused) return true;
+  if (activeHighlight && isHighlighted) return true;
+
+  if (node.type === "member") {
+    return globalScale > 0.35;
+  }
+  if (node.type === "topic") {
+    if (globalScale >= 1.4) return true;
+    if (globalScale >= 0.85) return (node.member_count || 0) >= 2 || (node.size || 0) >= 2;
+    if (globalScale >= 0.55) return (node.member_count || 0) >= 3;
+    return false;
+  }
+  if (globalScale >= 1.6) return true;
+  if (globalScale >= 1.0) return (node.member_count || 0) >= 2;
+  return false;
+}
 
 /**
  * Canvas rendering callback for nodes in the force graph.
@@ -79,7 +117,8 @@ function paintMemberNode(
   ctx.stroke();
 
   // Initials
-  const initials = node.label.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+  const rawLabel = String(node.label ?? "");
+  const initials = rawLabel.split(" ").map((w: string) => w[0] || "").join("").slice(0, 2).toUpperCase() || "?";
   const fontSize = Math.max(radius * 0.65, 4);
   ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
   ctx.textAlign = "center";
@@ -87,12 +126,13 @@ function paintMemberNode(
   ctx.fillStyle = "#ffffff";
   ctx.fillText(initials, node.x, node.y);
 
-  // Label below
-  const labelSize = Math.max(11 / globalScale, 3);
+  // Label below — zoom-aware
+  if (!shouldDrawLabel(node, globalScale, isHovered, isFocused, isHighlighted, highlightNodes.size > 0)) return;
+  const labelSize = Math.min(Math.max(11 / globalScale, 3), 18 / Math.max(globalScale, 0.7));
   ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "600" : "500"} ${labelSize}px Inter, system-ui, sans-serif`;
   ctx.textBaseline = "top";
   ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
-  ctx.fillText(node.label, node.x, node.y + radius + 4 / globalScale);
+  ctx.fillText(getDisplayLabel(node, 24), node.x, node.y + radius + 4 / globalScale);
 }
 
 function paintTopicNode(
@@ -154,13 +194,14 @@ function paintTopicNode(
     ctx.fillText(String(node.member_count), bx, by);
   }
 
-  // Label
-  const labelSize = Math.max(9 / globalScale, 2.5);
+  // Label — zoom-aware
+  if (!shouldDrawLabel(node, globalScale, isHovered, false, isHighlighted, highlightNodes.size > 0)) return;
+  const labelSize = Math.min(Math.max(9 / globalScale, 2.5), 14 / Math.max(globalScale, 0.7));
   ctx.font = `${isHighlighted && highlightNodes.size > 0 ? "600" : "400"} ${labelSize}px Inter, system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
-  ctx.fillText(node.label, node.x, node.y + size + 3 / globalScale);
+  ctx.fillText(getDisplayLabel(node, 22), node.x, node.y + size + 3 / globalScale);
 }
 
 function paintArtifactNode(
@@ -202,14 +243,14 @@ function paintArtifactNode(
   ctx.fillRect(node.x - iconSize * 0.5, node.y - iconSize * 0.3, iconSize, iconSize * 0.15);
   ctx.fillRect(node.x - iconSize * 0.5, node.y + iconSize * 0.05, iconSize, iconSize * 0.15);
 
-  // Label
-  const labelSize = Math.max(8 / globalScale, 2);
+  // Label — zoom-aware
+  if (!shouldDrawLabel(node, globalScale, isHovered, false, isHighlighted, _highlightNodes.size > 0)) return;
+  const labelSize = Math.min(Math.max(8 / globalScale, 2), 13 / Math.max(globalScale, 0.7));
   ctx.font = `400 ${labelSize}px Inter, system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   ctx.fillStyle = isHighlighted ? labelColor : dimLabelColor;
-  const truncLabel = node.label.length > 20 ? node.label.slice(0, 18) + "\u2026" : node.label;
-  ctx.fillText(truncLabel, node.x, node.y + size + 3 / globalScale);
+  ctx.fillText(getDisplayLabel(node, 20), node.x, node.y + size + 3 / globalScale);
 }
 
 /**

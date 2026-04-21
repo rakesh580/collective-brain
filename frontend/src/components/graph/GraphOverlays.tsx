@@ -1,5 +1,6 @@
 import type { MutableRefObject } from "react";
 import type { GraphEdge } from "../../types";
+import { cleanTopicLabel } from "../../lib/textFormat";
 
 interface FocusModeIndicatorProps {
  onClear: () => void;
@@ -57,15 +58,24 @@ interface HoverTooltipProps {
 }
 
 export function HoverTooltip({ tooltip, containerWidth, nodeEdgeMap }: HoverTooltipProps) {
+ const rawLabel = String(tooltip.node.label || "");
+ const cleanLabel = cleanTopicLabel(rawLabel, 40) || rawLabel.slice(0, 40);
+ const showOriginal = rawLabel.length > cleanLabel.length && rawLabel !== cleanLabel;
+ const TOOLTIP_WIDTH = 240;
  return (
  <div
- className="absolute z-20 bg-slate-900/95 text-white rounded-lg px-3 py-2 text-xs shadow-xl pointer-events-none max-w-48" style={{
- left: `${Math.min(tooltip.x, containerWidth - 200)}px`,
+ className="absolute z-20 bg-slate-900/95 text-white rounded-lg px-3 py-2 text-xs shadow-xl pointer-events-none"
+ style={{
+ width: `${TOOLTIP_WIDTH}px`,
+ left: `${Math.max(8, Math.min(tooltip.x - TOOLTIP_WIDTH / 2, containerWidth - TOOLTIP_WIDTH - 8))}px`,
  top: `${Math.max(10, tooltip.y - 60)}px`,
  }}
  >
- <p className="font-bold text-sm">{tooltip.node.label}</p>
- <p className="text-slate-400 text-2xs capitalize">{tooltip.node.type}</p>
+ <p className="font-bold text-sm leading-tight break-words">{cleanLabel}</p>
+ {showOriginal && (
+ <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-2 leading-snug">{rawLabel}</p>
+ )}
+ <p className="text-slate-400 text-2xs capitalize mt-1">{tooltip.node.type}</p>
  {tooltip.node.pagerank > 0 && (
  <div className="flex items-center gap-1.5 mt-1">
  <span className="text-slate-400">PageRank:</span>

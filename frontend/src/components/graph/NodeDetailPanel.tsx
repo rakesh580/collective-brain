@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { GraphNode, GraphEdge, GraphData } from "../../types";
 import { NODE_TYPE_COLORS, NODE_FALLBACK_COLOR } from "./graphConstants";
+import { cleanTopicLabel, cleanDescription } from "../../lib/textFormat";
 
 interface NodeDetailPanelProps {
  selectedNode: GraphNode;
@@ -18,8 +19,13 @@ export default function NodeDetailPanel({
 }: NodeDetailPanelProps) {
  const navigate = useNavigate();
 
+ const rawLabel = String(selectedNode.label ?? "");
+ const cleanLabel = cleanTopicLabel(rawLabel, 60) || rawLabel;
+ const fullDescription = cleanDescription(rawLabel, 280);
+ const showFullText = fullDescription && fullDescription !== cleanLabel;
+
  return (
- <div className="w-72 bg-elevated border-l border-default flex flex-col">
+ <div className="w-80 max-w-[90vw] bg-elevated border-l border-default flex flex-col">
  <div className="flex items-center justify-between p-4 border-b border-subtle">
  <div className="flex items-center gap-2">
  <div
@@ -30,10 +36,14 @@ export default function NodeDetailPanel({
  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">{selectedNode.type}</h3>
  </div>
  </div>
- <button onClick={onClose} className="text-slate-400 text-lg leading-none">&times;</button>
+ <button onClick={onClose} className="text-slate-400 text-lg leading-none" aria-label="Close">&times;</button>
  </div>
  <div className="flex-1 overflow-auto p-4">
- <h2 className="text-lg font-bold text-slate-800 mb-4">{selectedNode.label}</h2>
+ <h2 className="text-base font-bold text-slate-800 mb-1 break-words leading-snug" title={rawLabel !== cleanLabel ? rawLabel : undefined}>{cleanLabel}</h2>
+ {showFullText && (
+ <p className="text-xs text-slate-500 mb-4 break-words leading-snug">{fullDescription}</p>
+ )}
+ {!showFullText && <div className="mb-4" />}
 
  {/* Quick action buttons */}
  <div className="flex gap-1.5 mb-4">
@@ -69,12 +79,24 @@ export default function NodeDetailPanel({
  <span className="text-2xs font-bold text-slate-400 uppercase tracking-wide">{key.replace(/_/g, " ")}</span>
  {Array.isArray(value) ? (
  <div className="flex gap-1 flex-wrap mt-1">
- {(value as string[]).map((v) => (
- <span key={v} className="text-xs bg-muted text-slate-600 px-2 py-0.5 rounded-full">{v}</span>
+ {Array.from(
+ new Map(
+ (value as string[])
+ .map((v) => [cleanTopicLabel(v, 24), v] as const)
+ .filter(([label]) => label.length > 0),
+ ).entries(),
+ ).map(([label, original]) => (
+ <span
+ key={label}
+ title={original !== label ? original : undefined}
+ className="text-xs bg-muted text-slate-600 px-2 py-0.5 rounded-full"
+ >
+ {label}
+ </span>
  ))}
  </div>
  ) : (
- <p className="text-sm text-slate-700 mt-0.5">{String(value)}</p>
+ <p className="text-sm text-slate-700 mt-0.5 break-words">{String(value)}</p>
  )}
  </div>
  );
@@ -101,7 +123,9 @@ export default function NodeDetailPanel({
  style={{ backgroundColor: NODE_TYPE_COLORS[cn.type] || NODE_FALLBACK_COLOR }}
  />
  <div className="flex-1 min-w-0">
- <span className="text-xs font-medium text-slate-700 truncate block">{cn.label}</span>
+ <span className="text-xs font-medium text-slate-700 truncate block" title={cn.label}>
+ {cleanTopicLabel(cn.label, 30) || cn.label}
+ </span>
  {edge && (
  <span className="text-2xs text-slate-400">
  {edge.type.replace(/_/g, " ").toLowerCase()}
