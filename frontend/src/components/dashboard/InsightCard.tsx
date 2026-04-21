@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type { Insight } from "../../types";
 import { api } from "../../api/client";
 import { AlertTriangle, Lightbulb, BarChart3, RefreshCw, CheckCircle2, Globe, Loader2 } from "lucide-react";
+import { cleanTopicLabel, cleanDescription } from "../../lib/textFormat";
 
 interface Props {
   insight: Insight;
@@ -59,10 +60,22 @@ export default function InsightCard({ insight, showActions = false }: Props) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{insight.title}</h3>
+            <h3
+              className="text-sm font-semibold truncate"
+              style={{ color: "var(--text-primary)" }}
+              title={insight.title}
+            >
+              {cleanTopicLabel(insight.title, 60) || insight.title}
+            </h3>
             <span className="text-xs shrink-0 ml-2" style={{ color: "var(--text-tertiary)" }}>{Math.round(insight.confidence * 100)}%</span>
           </div>
-          <p className="text-xs mt-1 line-clamp-3" style={{ color: "var(--text-secondary)" }}>{insight.body}</p>
+          <p
+            className="text-xs mt-1 line-clamp-3 break-words"
+            style={{ color: "var(--text-secondary)" }}
+            title={insight.body && insight.body !== cleanDescription(insight.body) ? insight.body : undefined}
+          >
+            {cleanDescription(insight.body, 280)}
+          </p>
 
           {showActions && (
             <div className="flex items-center gap-2 mt-3">

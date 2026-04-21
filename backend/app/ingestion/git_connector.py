@@ -1,10 +1,10 @@
 import re
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from git import Repo
 
 from app.ingestion.base import BaseConnector, ParsedChunk
+from app.ingestion.topic_extractor import extract_topics_from_commit
 
 
 class GitConnector(BaseConnector):
@@ -48,7 +48,7 @@ class GitConnector(BaseConnector):
             )
 
             # Extract topics from file paths and commit message
-            topics = self._extract_topics(commit.message, stats.keys())
+            topics = extract_topics_from_commit(commit.message, list(stats.keys()))
 
             chunks.append(
                 ParsedChunk(
@@ -99,28 +99,3 @@ class GitConnector(BaseConnector):
                 }
 
         return list(members.values())
-
-    def _extract_topics(self, message: str, file_paths) -> list[str]:
-        topics = set()
-
-        # From commit message prefixes
-        prefix_match = re.match(
-            r"^(feat|fix|refactor|docs|test|chore|perf|ci|build)\(?([^)]*)\)?:",
-            message.strip(),
-            re.IGNORECASE,
-        )
-        if prefix_match:
-            topics.add(prefix_match.group(1).lower())
-            scope = prefix_match.group(2).strip()
-            if scope:
-                topics.add(scope.lower())
-
-        # From file paths (first meaningful directory)
-        for fp in file_paths:
-            parts = Path(fp).parts
-            for part in parts[:-1]:  # Exclude filename
-                if part not in ("src", "lib", "app", ".", ".."):
-                    topics.add(part.lower())
-                    break
-
-        return list(topics)[:5]

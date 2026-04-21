@@ -7,6 +7,11 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.ingestion.base import ParsedChunk
+from app.ingestion.topic_extractor import (
+    canonicalize_list,
+    extract_topics_from_commit,
+    extract_topics_from_labels,
+)
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.models.member import MemberRecord
@@ -56,76 +61,8 @@ def _resolve_github_member(db: Session, username: str, email: str | None = None)
     return member
 
 
-def _extract_topics_from_commit(message: str, files: list[str]) -> list[str]:
-    """Extract topics from commit message and file paths."""
-    topics: set[str] = set()
-
-    # Conventional commit prefixes
-    prefix_map = {
-        "feat": "feature",
-        "fix": "bugfix",
-        "refactor": "refactoring",
-        "docs": "documentation",
-        "test": "testing",
-        "chore": "maintenance",
-        "ci": "ci-cd",
-        "perf": "performance",
-        "style": "code-style",
-        "build": "build-system",
-    }
-    msg_lower = message.lower().strip()
-    for prefix, topic in prefix_map.items():
-        if msg_lower.startswith(f"{prefix}:") or msg_lower.startswith(f"{prefix}("):
-            topics.add(topic)
-            # Extract scope: feat(auth): ...
-            if "(" in msg_lower and ")" in msg_lower:
-                scope = msg_lower.split("(")[1].split(")")[0].strip()
-                if scope and len(scope) < 30:
-                    topics.add(scope)
-
-    # Topics from file extensions and directories
-    ext_topics = {
-        ".py": "python",
-        ".js": "javascript",
-        ".ts": "typescript",
-        ".tsx": "react",
-        ".jsx": "react",
-        ".go": "golang",
-        ".rs": "rust",
-        ".java": "java",
-        ".rb": "ruby",
-        ".yml": "devops",
-        ".yaml": "devops",
-        ".tf": "terraform",
-        ".sql": "database",
-        ".css": "frontend",
-        ".html": "frontend",
-        ".dockerfile": "docker",
-        ".sh": "scripting",
-    }
-    dir_topics = {
-        "api": "api",
-        "auth": "authentication",
-        "test": "testing",
-        "deploy": "deployment",
-        "infra": "infrastructure",
-        "docs": "documentation",
-        "frontend": "frontend",
-        "backend": "backend",
-        "models": "data-models",
-        "migrations": "database",
-    }
-
-    for f in files[:20]:  # Limit to avoid huge PRs
-        parts = f.lower().split("/")
-        for part in parts:
-            if part in dir_topics:
-                topics.add(dir_topics[part])
-        ext = "." + f.rsplit(".", 1)[-1].lower() if "." in f else ""
-        if ext in ext_topics:
-            topics.add(ext_topics[ext])
-
-    return list(topics)[:10]
+# Topic extraction lives in app.ingestion.topic_extractor; call sites below
+# use extract_topics_from_commit / extract_topics_from_labels directly.
 
 
 class GitHubEventProcessor:
@@ -223,7 +160,7 @@ class GitHubEventProcessor:
             files_removed = commit.get("removed", [])
             all_files = files_added + files_modified + files_removed
 
-            topics = _extract_topics_from_commit(message, all_files)
+            topics = extract_topics_from_commit(message, all_files)
 
             # Build chunk text
             file_summary = ""
@@ -304,13 +241,11 @@ class GitHubEventProcessor:
             except (ValueError, TypeError):
                 ts = datetime.now(UTC)
 
-        # Extract topics from title and labels
-        topics: list[str] = []
-        for label in pr.get("labels", []):
-            label_name = label.get("name", "").lower()
-            if label_name and len(label_name) < 30:
-                topics.append(label_name)
-        topics.extend(_extract_topics_from_commit(pr_title, []))
+        # Extract topics from title and labels — canonicalized through the allowlist
+        label_names = [label.get("name", "") for label in pr.get("labels", [])]
+        topics = canonicalize_list(
+            extract_topics_from_labels(label_names) + extract_topics_from_commit(pr_title, []),
+        )
 
         status_text = "merged" if merged else state
         text = f"[PR #{pr_number}] {pr_title} ({status_text})\nAuthor: {author}\nRepository: {repo_name}\n"
@@ -382,7 +317,10 @@ class GitHubEventProcessor:
             except (ValueError, TypeError):
                 ts = datetime.now(UTC)
 
-        topics = [label.get("name", "").lower() for label in issue.get("labels", []) if label.get("name")]
+        label_names = [label.get("name", "") for label in issue.get("labels", []) if label.get("name")]
+        topics = canonicalize_list(
+            extract_topics_from_labels(label_names) + extract_topics_from_commit(title, []),
+        )
 
         text = f"[Issue #{issue_number}] {title} ({action})\nAuthor: {author}\n\n{body[:500]}"
 
@@ -392,7 +330,7 @@ class GitHubEventProcessor:
             source_ref=f"issue-{issue_number}",
             author=author,
             timestamp=ts,
-            topics=topics[:10],
+            topics=topics,
         )
 
         member_ids: set[str] = set()
