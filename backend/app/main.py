@@ -38,6 +38,7 @@ from app.routers import notifications as notifications_mod
 from app.routers import onboarding as onboarding_mod
 from app.routers import org_xray as org_xray_mod
 from app.routers import risk_radar as risk_radar_router_mod
+from app.routers.admin import router as admin_router
 from app.routers.offboarding import router as offboarding_router
 from app.routers.organizations import router as organizations_router
 from app.routers.public_kb import manage_router as public_kb_manage_router
@@ -366,6 +367,7 @@ api_v1.include_router(saml_router, tags=["sso"])
 api_v1.include_router(scim_router, tags=["scim"])
 # Phase 6 — Offboarding + Public Knowledge Base
 api_v1.include_router(offboarding_router, tags=["offboarding"])
+api_v1.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_v1.include_router(public_kb_manage_router, tags=["public-kb"])
 app.include_router(api_v1)
 
