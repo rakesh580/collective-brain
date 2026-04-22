@@ -14,6 +14,8 @@ class OrganizationRecord(Base):
     slug = Column(String, nullable=False, unique=True, index=True)  # URL-safe identifier
     plan = Column(String, nullable=False, default="free")  # "free", "pro", "enterprise"
     is_active = Column(Boolean, default=True)
+    digest_enabled = Column(Boolean, nullable=False, default=True)
+    digest_timezone = Column(String, nullable=False, default="UTC")  # IANA tz, e.g. "America/Los_Angeles"
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     settings_json = Column(JSON, default=dict)  # org-level config (SSO, branding, etc.)
     metadata_json = Column(JSON, default=dict)

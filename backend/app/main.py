@@ -218,6 +218,17 @@ def _register_scheduled_jobs(scheduler: Scheduler) -> None:
         description="Compute and persist org health snapshot (bus factor, coverage, collab).",
     )
 
+    from app.services.digest_dispatcher import run_due_digests_job
+
+    scheduler.register(
+        name="weekly_digest_dispatcher",
+        func=run_due_digests_job,
+        # Runs every hour on the hour (UTC). Each SlackDigestConfig row
+        # specifies its own weekday+hour; the dispatcher picks the matches.
+        trigger=CronTrigger(minute=0),
+        description="Fire weekly Slack digests for every due SlackDigestConfig.",
+    )
+
 
 app = FastAPI(title="Collective Brain", version="0.5.0", lifespan=lifespan)
 

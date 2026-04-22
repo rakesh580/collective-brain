@@ -13,6 +13,7 @@ from app.models.decision import (
     NotificationWebhook,
     RiskAlert,
 )
+from app.models.digest_log import DigestLog
 from app.models.discussion import DiscussionMessage, DiscussionThread
 from app.models.health_snapshot import HealthSnapshot
 from app.models.help_request import HelpRequest
@@ -59,4 +60,5 @@ __all__ = [
     "NotificationWebhook",
     "NotificationLog",
     "ContributionRollup",
+    "DigestLog",
 ]
