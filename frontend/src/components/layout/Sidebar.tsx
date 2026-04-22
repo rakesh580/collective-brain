@@ -2,11 +2,9 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, MessageSquare, MessagesSquare, Upload,
-  Users, Network, BarChart3, Settings, LogOut, Sun, Moon,
-  PanelLeftClose, PanelLeftOpen, Hash, Heart, Brain,
-  ChevronRight, Globe, Building2, GitBranch, ShieldAlert, Shield,
-  GitMerge, UserCheck, BookOpen, Scan,
+  LayoutDashboard, MessageSquare, Network, LogOut, Sun, Moon,
+  PanelLeftClose, PanelLeftOpen, Brain, ChevronRight,
+  GitBranch, Activity,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
@@ -20,25 +18,11 @@ interface NavItem {
 }
 
 const links: NavItem[] = [
-  { to: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
-  { to: "/chat",       label: "AI Chat",    icon: MessageSquare },
-  { to: "/rooms",      label: "Rooms",      icon: Hash },
-  { to: "/discussions",label: "Discussions",icon: MessagesSquare },
-  { to: "/ingest",     label: "Ingest",     icon: Upload },
-  { to: "/members",    label: "Members",    icon: Users },
-  { to: "/graph",      label: "Graph",      icon: Network },
-  { to: "/analytics",  label: "Analytics",  icon: BarChart3 },
-  { to: "/health",     label: "Team Health",icon: Heart },
-  { to: "/decisions",  label: "Decisions",  icon: GitBranch },
-  { to: "/risk-radar", label: "Risk Radar", icon: ShieldAlert },
-  { to: "/continuity", label: "Continuity", icon: Shield },
-  { to: "/decision-graph", label: "Decision Map", icon: GitMerge },
-  { to: "/who-decides",    label: "Who Decides",  icon: UserCheck },
-  { to: "/onboarding",     label: "Onboarding",   icon: BookOpen },
-  { to: "/org-xray",       label: "Org X-Ray",    icon: Scan },
-  { to: "/public-kb",  label: "Public KB",  icon: Globe },
-  { to: "/organizations", label: "Organizations", icon: Building2 },
-  { to: "/settings",   label: "Settings",   icon: Settings },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/pulse",     label: "Pulse",     icon: Activity },
+  { to: "/graph",     label: "Graph",     icon: Network },
+  { to: "/decisions", label: "Decisions", icon: GitBranch },
+  { to: "/ask",       label: "Ask",       icon: MessageSquare },
 ];
 
 const sidebarVariants = {

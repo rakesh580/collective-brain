@@ -6,9 +6,8 @@ import type { Member, MemberDetail } from "../types";
 import { cleanTopicLabel, cleanDescription } from "../lib/textFormat";
 import MemberFormModal from "../components/members/MemberFormModal";
 import ConfirmDialog from "../components/members/ConfirmDialog";
-import OffboardingModal from "../components/members/OffboardingModal";
 import DiscussButton from "../components/discussions/DiscussButton";
-import { UserPlus, ArrowLeft, Edit3, Trash2, Users, Search, ChevronRight, UserX } from "lucide-react";
+import { UserPlus, ArrowLeft, Edit3, Trash2, Users, Search, ChevronRight } from "lucide-react";
 
 const avatarColors: [string, string][] = [
   ["#6366f1", "#8b5cf6"],
@@ -308,7 +307,6 @@ function MemberDetailView() {
   const [error, setError] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [showOffboarding, setShowOffboarding] = useState(false);
 
   const loadMember = useCallback(() => {
     if (id) {
@@ -403,16 +401,6 @@ function MemberDetailView() {
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)"; (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)"; }}
             >
               <Edit3 size={13} /> Edit
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={() => setShowOffboarding(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all"
-              style={{ border: "1px solid rgba(245,158,11,0.2)", color: "#fbbf24", background: "rgba(245,158,11,0.05)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(245,158,11,0.12)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(245,158,11,0.05)"; }}
-            >
-              <UserX size={13} /> Offboard
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.96 }}
@@ -580,12 +568,6 @@ function MemberDetailView() {
             setShowDelete(false);
           }
         }}
-      />
-      <OffboardingModal
-        member={member}
-        isOpen={showOffboarding}
-        onClose={() => setShowOffboarding(false)}
-        onComplete={() => loadMember()}
       />
     </motion.div>
   );

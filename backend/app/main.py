@@ -18,7 +18,6 @@ from app.routers import (
     artifacts,
     auth,
     conversations,
-    discussions,
     expert_routing,
     github_webhooks,
     graph,
@@ -27,7 +26,6 @@ from app.routers import (
     insights,
     members,
     query,
-    rooms,
     search,
     slack,
 )
@@ -35,14 +33,10 @@ from app.routers import continuity as continuity_router_mod
 from app.routers import decision_recommender as decision_recommender_mod
 from app.routers import decisions as decisions_router_mod
 from app.routers import notifications as notifications_mod
-from app.routers import onboarding as onboarding_mod
-from app.routers import org_xray as org_xray_mod
 from app.routers import risk_radar as risk_radar_router_mod
 from app.routers.admin import router as admin_router
 from app.routers.offboarding import router as offboarding_router
 from app.routers.organizations import router as organizations_router
-from app.routers.public_kb import manage_router as public_kb_manage_router
-from app.routers.public_kb import public_router as public_kb_router
 from app.routers.saml import router as saml_router
 from app.routers.scim import router as scim_router
 from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerError
@@ -121,13 +115,6 @@ async def lifespan(app: FastAPI):
 
     # ── Circuit Breakers ──
     app.state.embedding_breaker = CircuitBreaker("embedding_service", failure_threshold=5, recovery_timeout=60.0)
-
-    # ── Initialize Redis references in routers ──
-    from app.routers.discussions import init_redis_from_app as discussions_init_redis
-    from app.routers.rooms import init_redis_from_app as rooms_init_redis
-
-    rooms_init_redis(app)
-    discussions_init_redis(app)
 
     redis_ok = await redis.ping()
 
@@ -347,8 +334,6 @@ api_v1.include_router(artifacts.router, prefix="/artifacts", tags=["artifacts"])
 api_v1.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_v1.include_router(search.router, prefix="/search", tags=["search"])
 api_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_v1.include_router(discussions.router, prefix="/discussions", tags=["discussions"])
-api_v1.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
 api_v1.include_router(slack.router, prefix="/slack", tags=["slack"])
 api_v1.include_router(github_webhooks.router, prefix="/github", tags=["github"])
 api_v1.include_router(expert_routing.router, prefix="/experts", tags=["experts"])
@@ -356,50 +341,17 @@ api_v1.include_router(expert_routing.router, prefix="/experts", tags=["experts"]
 api_v1.include_router(decisions_router_mod.router, prefix="/decisions", tags=["decisions"])
 api_v1.include_router(risk_radar_router_mod.router, prefix="/risk-radar", tags=["risk-radar"])
 api_v1.include_router(continuity_router_mod.router, prefix="/continuity", tags=["continuity"])
-# Phase 8 — Decision Recommender, Onboarding, Notifications, Org X-Ray
+# Phase 8 — Decision Recommender, Notifications
 api_v1.include_router(decision_recommender_mod.router, prefix="/decision-recommender", tags=["decision-recommender"])
-api_v1.include_router(onboarding_mod.router, prefix="/onboarding", tags=["onboarding"])
 api_v1.include_router(notifications_mod.router, prefix="/notifications", tags=["notifications"])
-api_v1.include_router(org_xray_mod.router, prefix="/org-xray", tags=["org-xray"])
 # Phase 4 — Enterprise (organizations, SAML SSO, SCIM provisioning)
 api_v1.include_router(organizations_router, tags=["organizations"])
 api_v1.include_router(saml_router, tags=["sso"])
 api_v1.include_router(scim_router, tags=["scim"])
-# Phase 6 — Offboarding + Public Knowledge Base
+# Phase 6 — Offboarding (backend kept: Continuity depends on offboarding reports)
 api_v1.include_router(offboarding_router, tags=["offboarding"])
 api_v1.include_router(admin_router, prefix="/admin", tags=["admin"])
-api_v1.include_router(public_kb_manage_router, tags=["public-kb"])
 app.include_router(api_v1)
-
-# Public Knowledge Base — no auth, under /api/v1/public
-app.include_router(public_kb_router, prefix="/api/v1/public", tags=["public-kb"])
-
-# ── Legacy /api/* routes (deprecated) ────────────────────────────────────────
-app.include_router(health.router, prefix="/api/health", tags=["health"], deprecated=True)
-app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"], deprecated=True)
-app.include_router(query.router, prefix="/api", tags=["query"], deprecated=True)
-app.include_router(members.router, prefix="/api/members", tags=["members"], deprecated=True)
-app.include_router(insights.router, prefix="/api/insights", tags=["insights"], deprecated=True)
-app.include_router(graph.router, prefix="/api/graph", tags=["graph"], deprecated=True)
-app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"], deprecated=True)
-app.include_router(artifacts.router, prefix="/api/artifacts", tags=["artifacts"], deprecated=True)
-app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"], deprecated=True)
-app.include_router(search.router, prefix="/api/search", tags=["search"], deprecated=True)
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"], deprecated=True)
-app.include_router(discussions.router, prefix="/api/discussions", tags=["discussions"], deprecated=True)
-app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], deprecated=True)
-app.include_router(slack.router, prefix="/api/slack", tags=["slack"], deprecated=True)
-app.include_router(github_webhooks.router, prefix="/api/github", tags=["github"], deprecated=True)
-app.include_router(expert_routing.router, prefix="/api/experts", tags=["experts"], deprecated=True)
-app.include_router(decisions_router_mod.router, prefix="/api/decisions", tags=["decisions"], deprecated=True)
-app.include_router(risk_radar_router_mod.router, prefix="/api/risk-radar", tags=["risk-radar"], deprecated=True)
-app.include_router(continuity_router_mod.router, prefix="/api/continuity", tags=["continuity"], deprecated=True)
-app.include_router(
-    decision_recommender_mod.router, prefix="/api/decision-recommender", tags=["decision-recommender"], deprecated=True
-)
-app.include_router(onboarding_mod.router, prefix="/api/onboarding", tags=["onboarding"], deprecated=True)
-app.include_router(notifications_mod.router, prefix="/api/notifications", tags=["notifications"], deprecated=True)
-app.include_router(org_xray_mod.router, prefix="/api/org-xray", tags=["org-xray"], deprecated=True)
 
 # ── Frontend SPA fallback ─────────────────────────────────────────────────────
 _static_dir = Path(__file__).resolve().parent.parent / "static"
