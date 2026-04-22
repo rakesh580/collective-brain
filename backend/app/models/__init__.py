@@ -2,6 +2,7 @@ from app.db.database import Base
 from app.models.artifact import ArtifactRecord
 from app.models.audit_log import AuditLog
 from app.models.contribution import ContributionRecord
+from app.models.contribution_rollup import ContributionRollup
 from app.models.conversation import ConversationParticipant, ConversationRecord, MessageRecord
 from app.models.decision import (
     ContinuityScore,
@@ -57,4 +58,5 @@ __all__ = [
     "DecisionOutcome",
     "NotificationWebhook",
     "NotificationLog",
+    "ContributionRollup",
 ]

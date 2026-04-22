@@ -44,6 +44,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import LLMService
 from app.services.metrics import APP_INFO
 from app.services.redis_service import RedisService
+from app.services.scheduler import Scheduler
 from app.services.task_queue import TaskQueue
 from app.services.telemetry import current_trace_id, setup_telemetry
 from app.services.vector_store import VectorStoreService
@@ -105,6 +106,12 @@ async def lifespan(app: FastAPI):
     task_queue = TaskQueue(max_concurrent=3)
     await task_queue.start()
     app.state.task_queue = task_queue
+
+    # ── Scheduler (APScheduler) ──
+    scheduler = Scheduler()
+    _register_scheduled_jobs(scheduler)
+    await scheduler.start()
+    app.state.scheduler = scheduler
 
     # ── Core Services ──
     from app.db.database import get_session_factory
@@ -169,9 +176,47 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Graceful Shutdown ──
+    await scheduler.stop()
     await task_queue.stop()
     await redis.close()
     logger.info("Collective Brain shut down gracefully")
+
+
+def _register_scheduled_jobs(scheduler: Scheduler) -> None:
+    """Register every scheduled background job. Called once at lifespan start.
+
+    Keep this list short and intentional — every job is a moving part that can
+    fail in production. Each job must be idempotent and safe to re-run.
+    """
+    from apscheduler.triggers.cron import CronTrigger
+
+    def _nightly_health_snapshot() -> dict:
+        from app.db.database import create_session
+        from app.services.team_health_service import save_health_snapshot
+
+        db = create_session()
+        try:
+            return save_health_snapshot(db)
+        finally:
+            db.close()
+
+    from app.services.contribution_rollup_service import run_contribution_rollup_job
+
+    # ContributionRollup is the "first job" per the roadmap — per-member 7d/30d
+    # stats feed deltas, strengths/weaknesses, and silent-area signals.
+    scheduler.register(
+        name="contribution_rollup",
+        func=run_contribution_rollup_job,
+        trigger=CronTrigger(hour=2, minute=30),  # 02:30 UTC — runs before health snapshot
+        description="Per-member 7d/30d activity rollups (contributions, artifacts, topics).",
+    )
+
+    scheduler.register(
+        name="nightly_health_snapshot",
+        func=_nightly_health_snapshot,
+        trigger=CronTrigger(hour=3, minute=15),  # 03:15 UTC daily
+        description="Compute and persist org health snapshot (bus factor, coverage, collab).",
+    )
 
 
 app = FastAPI(title="Collective Brain", version="0.5.0", lifespan=lifespan)
