@@ -26,6 +26,7 @@ from app.models.room import ChatRoom, ChatRoomMember, ChatRoomMessage
 from app.models.slack_digest_config import SlackDigestConfig
 from app.models.slack_integration import SlackChannelSync, SlackWorkspace
 from app.models.user import UserRecord
+from app.models.work_item import WorkItem
 
 __all__ = [
     "Base",
@@ -61,4 +62,5 @@ __all__ = [
     "NotificationLog",
     "ContributionRollup",
     "DigestLog",
+    "WorkItem",
 ]
