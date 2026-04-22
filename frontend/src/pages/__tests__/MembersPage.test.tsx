@@ -51,10 +51,6 @@ vi.mock("../../components/members/ConfirmDialog", () => ({
   default: ({ isOpen }: any) =>
     isOpen ? <div data-testid="confirm-dialog">Confirm Dialog</div> : null,
 }));
-vi.mock("../../components/members/OffboardingModal", () => ({
-  default: ({ isOpen }: any) =>
-    isOpen ? <div data-testid="offboarding-modal">Offboarding Modal</div> : null,
-}));
 vi.mock("../../components/discussions/DiscussButton", () => ({
   default: () => <button data-testid="discuss-button">Discuss</button>,
 }));

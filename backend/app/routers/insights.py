@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.db.database import create_session
 from app.dependencies import get_current_user
 from app.models.artifact import ArtifactRecord
+from app.models.digest_log import DigestLog
 from app.models.insight import InsightRecord
 from app.models.member import MemberRecord
 from app.schemas.responses import (
@@ -334,5 +335,40 @@ async def list_insights_by_verification(
             }
             for i in insights
         ]
+    finally:
+        db.close()
+
+
+@router.get("/latest-digest")
+async def get_latest_digest(request: Request, user=Depends(get_current_user)):
+    """Return the most recent digest delivery + a fresh preview for the Dashboard card.
+
+    Response shape:
+      {
+        "last": { "sent_at", "delivery_channel", "status", "period_end" } | null,
+        "preview": { ...weekly digest data... }
+      }
+    """
+    from app.services.digest_service import generate_weekly_digest
+
+    db = _get_db()
+    try:
+        org_id = getattr(user, "organization_id", None)
+        q = db.query(DigestLog).filter(DigestLog.status == "sent")
+        if org_id:
+            q = q.filter(DigestLog.organization_id == org_id)
+        last = q.order_by(DigestLog.sent_at.desc()).first()
+
+        last_payload = None
+        if last is not None:
+            last_payload = {
+                "sent_at": last.sent_at.isoformat() if last.sent_at else None,
+                "delivery_channel": last.delivery_channel,
+                "status": last.status,
+                "period_end": last.period_end.isoformat() if last.period_end else None,
+            }
+
+        preview = generate_weekly_digest(db)
+        return {"last": last_payload, "preview": preview}
     finally:
         db.close()

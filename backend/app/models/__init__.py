@@ -2,6 +2,7 @@ from app.db.database import Base
 from app.models.artifact import ArtifactRecord
 from app.models.audit_log import AuditLog
 from app.models.contribution import ContributionRecord
+from app.models.contribution_rollup import ContributionRollup
 from app.models.conversation import ConversationParticipant, ConversationRecord, MessageRecord
 from app.models.decision import (
     ContinuityScore,
@@ -12,6 +13,7 @@ from app.models.decision import (
     NotificationWebhook,
     RiskAlert,
 )
+from app.models.digest_log import DigestLog
 from app.models.discussion import DiscussionMessage, DiscussionThread
 from app.models.health_snapshot import HealthSnapshot
 from app.models.help_request import HelpRequest
@@ -24,6 +26,7 @@ from app.models.room import ChatRoom, ChatRoomMember, ChatRoomMessage
 from app.models.slack_digest_config import SlackDigestConfig
 from app.models.slack_integration import SlackChannelSync, SlackWorkspace
 from app.models.user import UserRecord
+from app.models.work_item import WorkItem
 
 __all__ = [
     "Base",
@@ -57,4 +60,7 @@ __all__ = [
     "DecisionOutcome",
     "NotificationWebhook",
     "NotificationLog",
+    "ContributionRollup",
+    "DigestLog",
+    "WorkItem",
 ]

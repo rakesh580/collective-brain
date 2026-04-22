@@ -1,8 +1,9 @@
 """Admin-only maintenance endpoints.
 
-Currently exposes:
-- POST /admin/backfill-topics — re-canonicalize topics & expertise_tags
-  against the current allowlist. Idempotent. Requires admin/owner role.
+Exposes:
+- POST /admin/backfill-topics — re-canonicalize topics & expertise_tags.
+- GET /admin/jobs — list registered scheduled jobs.
+- POST /admin/trigger-job/{job_name} — manually run a registered job.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.db.database import create_session
+from app.services.scheduler import run_to_dict
 from app.services.topic_backfill import run_topic_backfill
 
 logger = logging.getLogger("collective_brain.routers.admin")
@@ -50,3 +52,23 @@ async def backfill_topics(
             logger.warning("Failed to invalidate graph cache: %s", exc)
 
     return {"status": "ok", "dry_run": dry_run, **result.as_dict()}
+
+
+@router.get("/jobs")
+async def list_jobs(request: Request):
+    """List every scheduled job with its last-run summary."""
+    _require_admin(request)
+    scheduler = request.app.state.scheduler
+    return {"jobs": scheduler.list_jobs()}
+
+
+@router.post("/trigger-job/{job_name}")
+async def trigger_job(request: Request, job_name: str):
+    """Manually run a registered job. Blocks until completion."""
+    _require_admin(request)
+    scheduler = request.app.state.scheduler
+    try:
+        run = await scheduler.run_now(job_name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown job '{job_name}'") from None
+    return {"status": "ok", "run": run_to_dict(run)}

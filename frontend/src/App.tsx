@@ -13,24 +13,13 @@ import ChatPage from "./pages/ChatPage";
 import IngestPage from "./pages/IngestPage";
 import { MemberList, MemberDetailView } from "./pages/MembersPage";
 import SettingsPage from "./pages/SettingsPage";
-import RoomsPage from "./pages/RoomsPage";
 
 // Lazy-load heavy pages to reduce initial bundle size
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const GraphPage = lazy(() => import("./pages/GraphPage"));
-const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
-const DiscussionsPage = lazy(() => import("./pages/DiscussionsPage"));
-const RoomChatPage = lazy(() => import("./pages/RoomChatPage"));
-const TeamHealthPage = lazy(() => import("./pages/TeamHealthPage"));
-const PublicKBPage = lazy(() => import("./pages/PublicKBPage"));
+const PulsePage = lazy(() => import("./pages/PulsePage"));
+const DecisionsHubPage = lazy(() => import("./pages/DecisionsHubPage"));
 const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage"));
-const DecisionsPage = lazy(() => import("./pages/DecisionsPage"));
-const RiskRadarPage = lazy(() => import("./pages/RiskRadarPage"));
-const ContinuityPage = lazy(() => import("./pages/ContinuityPage"));
-const DecisionGraphPage = lazy(() => import("./pages/DecisionGraphPage"));
-const WhoShouldDecidePage = lazy(() => import("./pages/WhoShouldDecidePage"));
-const OnboardingBriefingPage = lazy(() => import("./pages/OnboardingBriefingPage"));
-const OrgXrayPage = lazy(() => import("./pages/OrgXrayPage"));
 
 function PageFallback() {
   return (
@@ -79,25 +68,30 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={guarded(<DashboardPage />, "Dashboard")} />
-        <Route path="/chat" element={guarded(<ChatPage />, "AI Chat")} />
+        <Route path="/pulse" element={guarded(<PulsePage />, "Pulse")} />
+        <Route path="/graph" element={guarded(<GraphPage />, "Knowledge Graph")} />
+        <Route path="/decisions" element={guarded(<DecisionsHubPage />, "Decisions")} />
+        <Route path="/ask" element={guarded(<ChatPage />, "Ask")} />
+        {/* Legacy deep-link redirects */}
+        <Route path="/chat" element={<Navigate to="/ask" replace />} />
+        <Route path="/analytics" element={<Navigate to="/pulse#analytics" replace />} />
+        <Route path="/health" element={<Navigate to="/pulse#health" replace />} />
+        <Route path="/risk-radar" element={<Navigate to="/pulse#risk" replace />} />
+        <Route path="/continuity" element={<Navigate to="/pulse#continuity" replace />} />
+        <Route path="/decision-graph" element={<Navigate to="/decisions#map" replace />} />
+        <Route path="/who-decides" element={<Navigate to="/decisions#who" replace />} />
+        {/* Removed features — redirect to dashboard */}
+        <Route path="/rooms" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/rooms/:roomId" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/discussions" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/org-xray" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/public-kb" element={<Navigate to="/dashboard" replace />} />
+        {/* Accessible but not in sidebar — reachable via Dashboard / Member detail / Settings */}
         <Route path="/ingest" element={guarded(<IngestPage />, "Data Ingestion")} />
         <Route path="/members" element={guarded(<MemberList />, "Members")} />
         <Route path="/members/:id" element={guarded(<MemberDetailView />, "Member Detail")} />
-        <Route path="/graph" element={guarded(<GraphPage />, "Knowledge Graph")} />
-        <Route path="/analytics" element={guarded(<AnalyticsPage />, "Analytics")} />
-        <Route path="/health" element={guarded(<TeamHealthPage />, "Team Health")} />
-        <Route path="/decisions" element={guarded(<DecisionsPage />, "Decisions")} />
-        <Route path="/risk-radar" element={guarded(<RiskRadarPage />, "Risk Radar")} />
-        <Route path="/continuity" element={guarded(<ContinuityPage />, "Continuity")} />
-        <Route path="/decision-graph" element={guarded(<DecisionGraphPage />, "Decision Graph")} />
-        <Route path="/who-decides" element={guarded(<WhoShouldDecidePage />, "Who Decides")} />
-        <Route path="/onboarding" element={guarded(<OnboardingBriefingPage />, "Onboarding")} />
-        <Route path="/org-xray" element={guarded(<OrgXrayPage />, "Org X-Ray")} />
-        <Route path="/rooms" element={guarded(<RoomsPage />, "Rooms")} />
-        <Route path="/rooms/:roomId" element={guarded(<RoomChatPage />, "Room Chat")} />
-        <Route path="/discussions" element={guarded(<DiscussionsPage />, "Discussions")} />
         <Route path="/settings" element={guarded(<SettingsPage />, "Settings")} />
-        <Route path="/public-kb" element={guarded(<PublicKBPage />, "Public KB")} />
         <Route path="/organizations" element={guarded(<OrganizationsPage />, "Organizations")} />
       </Route>
     </Routes>

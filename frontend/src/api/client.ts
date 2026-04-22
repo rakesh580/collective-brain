@@ -278,6 +278,26 @@ export const api = {
     const p = roomId ? `?room_id=${roomId}` : "";
     return request<WeeklySummary>(`/insights/weekly${p}`);
   },
+  getLatestDigest: () =>
+    request<{
+      last: {
+        sent_at: string | null;
+        delivery_channel: string;
+        status: string;
+        period_end: string | null;
+      } | null;
+      preview: {
+        period_start: string;
+        period_end: string;
+        total_contributions: number;
+        active_contributors: number;
+        new_members_count: number;
+        new_artifacts_count: number;
+        top_topics: { topic: string; count: number }[];
+        top_contributors: { member_id: string; name: string; count: number }[];
+        bus_factor_risk_count: number;
+      };
+    }>(`/insights/latest-digest`),
   getPatterns: (roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
     return request<Insight[]>(`/insights/patterns${p}`);

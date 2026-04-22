@@ -15,6 +15,7 @@ from app.ingestion.topic_extractor import (
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.models.member import MemberRecord
+from app.models.work_item import WorkItem
 from app.services.memory_graph import invalidate_graph_cache
 
 logger = logging.getLogger("collective_brain.github")
@@ -63,6 +64,148 @@ def _resolve_github_member(db: Session, username: str, email: str | None = None)
 
 # Topic extraction lives in app.ingestion.topic_extractor; call sites below
 # use extract_topics_from_commit / extract_topics_from_labels directly.
+
+
+def _upsert_work_item(
+    db: Session,
+    *,
+    source: str,
+    external_id: str,
+    repo: str,
+    title: str,
+    state: str,
+    author_member_id: str | None,
+    created_at: datetime | None,
+    completed_at: datetime | None,
+    labels: list[str],
+    topics: list[str],
+) -> WorkItem:
+    """Idempotently upsert a work item. Computes cycle_time_hours on close.
+
+    Webhooks re-deliver: we look up by (source, external_id, repo) and patch
+    existing rows rather than creating duplicates. Terminal states (merged,
+    closed) set completed_at once and compute cycle time from created_at.
+    """
+    existing = (
+        db.query(WorkItem)
+        .filter(
+            WorkItem.source == source,
+            WorkItem.external_id == external_id,
+            WorkItem.repo == repo,
+        )
+        .first()
+    )
+
+    if existing is None:
+        wi = WorkItem(
+            id=str(uuid4()),
+            source=source,
+            external_id=external_id,
+            repo=repo,
+            title=title,
+            state=state,
+            author_member_id=author_member_id,
+            created_at=created_at or datetime.now(UTC),
+            labels=labels,
+            topics=topics,
+        )
+        if state in ("merged", "closed"):
+            wi.completed_at = completed_at or datetime.now(UTC)
+            wi.cycle_time_hours = _hours_between(wi.created_at, wi.completed_at)
+        db.add(wi)
+        return wi
+
+    # Update existing row. Only move to a terminal state once.
+    existing.title = title or existing.title
+    existing.labels = labels or existing.labels
+    existing.topics = topics or existing.topics
+    if author_member_id and not existing.author_member_id:
+        existing.author_member_id = author_member_id
+
+    if state in ("merged", "closed") and existing.state not in ("merged", "closed"):
+        existing.state = state
+        existing.completed_at = completed_at or datetime.now(UTC)
+        existing.cycle_time_hours = _hours_between(existing.created_at, existing.completed_at)
+    elif state == "open" and existing.state in ("merged", "closed"):
+        # Reopen: clear terminal state, keep history by not deleting cycle_time.
+        existing.state = "open"
+        existing.completed_at = None
+    elif existing.state not in ("merged", "closed"):
+        existing.state = state
+
+    return existing
+
+
+def _hours_between(start: datetime | None, end: datetime | None) -> float | None:
+    if start is None or end is None:
+        return None
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=UTC)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=UTC)
+    delta = end - start
+    return round(delta.total_seconds() / 3600.0, 2)
+
+
+def _pr_state(action: str, merged: bool, raw_state: str) -> str:
+    """Map a GitHub PR webhook action to a WorkItem state."""
+    if action == "closed":
+        return "merged" if merged else "closed"
+    if action in ("opened", "reopened", "synchronize"):
+        return "open"
+    return raw_state or "open"
+
+
+def _parse_ts(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _mark_work_item_reviewed(
+    db: Session,
+    *,
+    repo: str,
+    pr_external_id: str,
+    review_submitted_at: datetime | None,
+) -> WorkItem | None:
+    """Move an open PR WorkItem to ``in_progress`` on its first review.
+
+    Idempotent: if the WorkItem is already in a terminal (merged/closed) or
+    ``in_progress`` state, only ``started_at`` gets back-filled to the earlier
+    of the current value and the review timestamp. Never un-merges.
+    """
+    wi = (
+        db.query(WorkItem)
+        .filter(
+            WorkItem.source == "github_pr",
+            WorkItem.external_id == pr_external_id,
+            WorkItem.repo == repo,
+        )
+        .first()
+    )
+    if wi is None:
+        return None
+
+    submitted = review_submitted_at or datetime.now(UTC)
+    if submitted.tzinfo is None:
+        submitted = submitted.replace(tzinfo=UTC)
+
+    # Earliest review wins for started_at.
+    if wi.started_at is None:
+        wi.started_at = submitted
+    else:
+        existing = wi.started_at if wi.started_at.tzinfo else wi.started_at.replace(tzinfo=UTC)
+        if submitted < existing:
+            wi.started_at = submitted
+
+    if wi.state == "open":
+        wi.state = "in_progress"
+
+    return wi
 
 
 class GitHubEventProcessor:
@@ -266,9 +409,11 @@ class GitHubEventProcessor:
 
         # Resolve members
         member_ids: set[str] = set()
+        author_member_id: str | None = None
         if author:
             member = _resolve_github_member(self.db, author)
             if member:
+                author_member_id = member.id
                 member_ids.add(member.id)
         for reviewer in reviewers:
             member = _resolve_github_member(self.db, reviewer)
@@ -288,6 +433,24 @@ class GitHubEventProcessor:
             room_id=self.room_id,
         )
         self.db.add(artifact)
+
+        # Upsert WorkItem for cycle-time analysis.
+        pr_state = _pr_state(action, merged, state)
+        created_at = _parse_ts(pr.get("created_at"))
+        completed_at = _parse_ts(pr.get("closed_at")) if pr_state in ("merged", "closed") else None
+        _upsert_work_item(
+            self.db,
+            source="github_pr",
+            external_id=str(pr_number),
+            repo=repo_name,
+            title=pr_title,
+            state=pr_state,
+            author_member_id=author_member_id,
+            created_at=created_at,
+            completed_at=completed_at,
+            labels=label_names,
+            topics=topics,
+        )
 
         self._store_chunks([chunk], artifact_id, f"github:{repo_name}")
         self.db.commit()
@@ -334,9 +497,11 @@ class GitHubEventProcessor:
         )
 
         member_ids: set[str] = set()
+        author_member_id: str | None = None
         if author:
             member = _resolve_github_member(self.db, author)
             if member:
+                author_member_id = member.id
                 member_ids.add(member.id)
 
         artifact_id = str(uuid4())
@@ -351,6 +516,23 @@ class GitHubEventProcessor:
             room_id=self.room_id,
         )
         self.db.add(artifact)
+
+        issue_state = "closed" if action == "closed" else "open"
+        created_at = _parse_ts(issue.get("created_at"))
+        completed_at = _parse_ts(issue.get("closed_at")) if issue_state == "closed" else None
+        _upsert_work_item(
+            self.db,
+            source="github_issue",
+            external_id=str(issue_number),
+            repo=repo_name,
+            title=title,
+            state=issue_state,
+            author_member_id=author_member_id,
+            created_at=created_at,
+            completed_at=completed_at,
+            labels=label_names,
+            topics=topics,
+        )
 
         self._store_chunks([chunk], artifact_id, f"github:{repo_name}")
         self.db.commit()
@@ -420,6 +602,15 @@ class GitHubEventProcessor:
             room_id=self.room_id,
         )
         self.db.add(artifact)
+
+        # Mark the PR's WorkItem as "in_progress" on the first review submitted.
+        # Later reviews don't reset started_at — it's the earliest review timestamp.
+        _mark_work_item_reviewed(
+            self.db,
+            repo=repo_name,
+            pr_external_id=str(pr_number),
+            review_submitted_at=ts,
+        )
 
         self._store_chunks([chunk], artifact_id, f"github:{repo_name}")
         self.db.commit()
