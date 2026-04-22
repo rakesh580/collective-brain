@@ -298,6 +298,32 @@ export const api = {
         bus_factor_risk_count: number;
       };
     }>(`/insights/latest-digest`),
+
+  // Pattern-detection signals (W9-10)
+  getSignals: (status: "open" | "acknowledged" | "resolved" | "all" = "open", limit = 50) =>
+    request<{
+      signals: {
+        id: string;
+        organization_id: string | null;
+        signal_type: string;
+        severity: "low" | "medium" | "high";
+        title: string;
+        description: string;
+        evidence: Record<string, unknown>;
+        suggested_action: string | null;
+        dedup_key: string;
+        detected_at: string | null;
+        acknowledged_by: string | null;
+        acknowledged_at: string | null;
+        resolved_at: string | null;
+      }[];
+      count: number;
+    }>(`/signals?status=${status}&limit=${limit}`),
+  acknowledgeSignal: (id: string) =>
+    request<{ status: string }>(`/signals/${id}/acknowledge`, { method: "POST" }),
+  resolveSignal: (id: string) =>
+    request<{ status: string }>(`/signals/${id}/resolve`, { method: "POST" }),
+
   getPatterns: (roomId?: string) => {
     const p = roomId ? `?room_id=${roomId}` : "";
     return request<Insight[]>(`/insights/patterns${p}`);
