@@ -6,8 +6,9 @@ COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
 
-# All backend routes are under /api prefix to avoid collision with SPA routes
-ENV VITE_API_BASE="/api"
+# All backend routes are under /api/v1 (the deprecated /api/* duplicates were
+# removed in the W1-2 scope cut — the bare "/api" prefix no longer resolves).
+ENV VITE_API_BASE="/api/v1"
 # Limit Node.js memory for HuggingFace cpu-basic (2GB RAM)
 ENV NODE_OPTIONS="--max-old-space-size=512"
 RUN npm run build
