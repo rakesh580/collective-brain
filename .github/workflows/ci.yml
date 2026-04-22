@@ -154,8 +154,8 @@ jobs:
             "GET /api/v1/continuity/dashboard" \
             "GET /api/v1/decisions/graph/data" \
             "GET /api/v1/decision-recommender/influence-map" \
-            "GET /api/v1/org-xray/report" \
-            "GET /api/v1/notifications/webhooks"; do
+            "GET /api/v1/notifications/webhooks" \
+            "GET /api/v1/insights/latest-digest"; do
             METHOD=$(echo "$ENDPOINT" | cut -d' ' -f1)
             PATH_URL=$(echo "$ENDPOINT" | cut -d' ' -f2)
             STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X "$METHOD" \

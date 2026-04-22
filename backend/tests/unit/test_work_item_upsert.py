@@ -250,9 +250,7 @@ class TestMarkWorkItemReviewed:
         db = _db_with(existing=wi)
 
         submitted = datetime(2026, 4, 22, 12, 0, tzinfo=UTC)
-        result = _mark_work_item_reviewed(
-            db, repo="foo/bar", pr_external_id="42", review_submitted_at=submitted
-        )
+        result = _mark_work_item_reviewed(db, repo="foo/bar", pr_external_id="42", review_submitted_at=submitted)
 
         assert result is wi
         assert wi.state == "in_progress"
@@ -266,9 +264,7 @@ class TestMarkWorkItemReviewed:
         db = _db_with(existing=wi)
 
         later = datetime(2026, 4, 22, 14, 0, tzinfo=UTC)
-        _mark_work_item_reviewed(
-            db, repo="foo/bar", pr_external_id="42", review_submitted_at=later
-        )
+        _mark_work_item_reviewed(db, repo="foo/bar", pr_external_id="42", review_submitted_at=later)
         assert wi.started_at == first  # later review must not overwrite
 
     def test_earlier_review_backfills(self):
@@ -279,9 +275,7 @@ class TestMarkWorkItemReviewed:
         db = _db_with(existing=wi)
 
         earlier = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
-        _mark_work_item_reviewed(
-            db, repo="foo/bar", pr_external_id="42", review_submitted_at=earlier
-        )
+        _mark_work_item_reviewed(db, repo="foo/bar", pr_external_id="42", review_submitted_at=earlier)
         assert wi.started_at == earlier
 
     def test_merged_state_preserved(self):
@@ -316,7 +310,5 @@ class TestMarkWorkItemReviewed:
         db = _db_with(existing=wi)
 
         earlier = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
-        _mark_work_item_reviewed(
-            db, repo="foo/bar", pr_external_id="42", review_submitted_at=earlier
-        )
+        _mark_work_item_reviewed(db, repo="foo/bar", pr_external_id="42", review_submitted_at=earlier)
         assert wi.started_at == earlier

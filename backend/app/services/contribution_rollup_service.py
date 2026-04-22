@@ -34,9 +34,7 @@ def _floor_to_day(ts: datetime) -> datetime:
     return ts.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
 
 
-def _member_window_stats(
-    db: Session, member_id: str, window_days: int, now: datetime
-) -> dict[str, Any]:
+def _member_window_stats(db: Session, member_id: str, window_days: int, now: datetime) -> dict[str, Any]:
     cutoff = now - timedelta(days=window_days)
     rows = (
         db.query(ContributionRecord)

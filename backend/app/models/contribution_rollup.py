@@ -59,8 +59,6 @@ class ContributionRollup(Base):
     __table_args__ = (
         # One row per (member, window, run-day). Two runs in the same UTC day
         # will overwrite each other; the service handles that via upsert.
-        UniqueConstraint(
-            "member_id", "window_days", "computed_at", name="uq_rollup_member_window_at"
-        ),
+        UniqueConstraint("member_id", "window_days", "computed_at", name="uq_rollup_member_window_at"),
         Index("ix_rollups_member_window", "member_id", "window_days"),
     )

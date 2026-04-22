@@ -63,9 +63,7 @@ def _respect_rate_limit(resp: httpx.Response) -> None:
         return
     if r < _RATE_LIMIT_FLOOR:
         wait = max(0, reset_at - int(time.time()))
-        logger.warning(
-            "GitHub rate limit low (remaining=%d). Sleeping %ds until reset.", r, wait
-        )
+        logger.warning("GitHub rate limit low (remaining=%d). Sleeping %ds until reset.", r, wait)
         time.sleep(wait + 1)
 
 
@@ -245,14 +243,10 @@ def main(argv: list[str] | None = None) -> int:
     totals = {"prs": 0, "issues": 0, "skipped": 0}
     for repo in args.repo:
         logger.info("Backfilling %s (last %d days, dry_run=%s)", repo, args.days, args.dry_run)
-        counts = backfill_repo(
-            repo, token=args.token, days=args.days, dry_run=args.dry_run
-        )
+        counts = backfill_repo(repo, token=args.token, days=args.days, dry_run=args.dry_run)
         for k, v in counts.items():
             totals[k] += v
-        sys.stdout.write(
-            f"{repo}: prs={counts['prs']} issues={counts['issues']} skipped={counts['skipped']}\n"
-        )
+        sys.stdout.write(f"{repo}: prs={counts['prs']} issues={counts['issues']} skipped={counts['skipped']}\n")
 
     sys.stdout.write(
         f"TOTAL: prs={totals['prs']} issues={totals['issues']} "

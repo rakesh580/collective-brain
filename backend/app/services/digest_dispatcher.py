@@ -49,12 +49,8 @@ from app.services.email_service import EmailNotConfigured, send_email
 # Module-level breakers. One digest tick can touch N Slack workspaces and M
 # email orgs; these trip independently so a flapping Slack doesn't silence
 # email, and vice-versa.
-_slack_breaker = CircuitBreaker(
-    "digest_slack", failure_threshold=5, recovery_timeout=60.0
-)
-_email_breaker = CircuitBreaker(
-    "digest_email", failure_threshold=5, recovery_timeout=120.0
-)
+_slack_breaker = CircuitBreaker("digest_slack", failure_threshold=5, recovery_timeout=60.0)
+_email_breaker = CircuitBreaker("digest_email", failure_threshold=5, recovery_timeout=120.0)
 
 
 def reset_breakers_for_tests() -> None:
@@ -81,6 +77,7 @@ async def _send_email_via_breaker(**kwargs) -> dict:
         # Breaker counted this as a failure — undo so it stays CLOSED.
         _email_breaker.reset()
         raise
+
 
 logger = logging.getLogger("collective_brain.digest_dispatcher")
 
@@ -251,9 +248,7 @@ async def _dispatch_slack_for_org(
                 error=f"{type(exc).__name__}: {exc}",
                 now=now_utc,
             )
-            logger.exception(
-                "Slack digest failed for org=%s channel=%s", org.id, cfg.channel_id
-            )
+            logger.exception("Slack digest failed for org=%s channel=%s", org.id, cfg.channel_id)
     return has_configs
 
 

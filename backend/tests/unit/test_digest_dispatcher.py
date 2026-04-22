@@ -183,8 +183,7 @@ class TestRunDueDigests:
         send.assert_awaited_once_with(db=db, workspace_id="W1", channel_id="C1")
         # Expect a digest_log row appended.
         assert any(
-            getattr(row, "delivery_channel", None) == "slack"
-            and getattr(row, "status", None) == "sent"
+            getattr(row, "delivery_channel", None) == "slack" and getattr(row, "status", None) == "sent"
             for row in db.added_rows
         )
 
@@ -224,9 +223,7 @@ class TestRunDueDigests:
 
         assert summary["failed"] == 1
         assert summary["sent"] == 0
-        assert any(
-            getattr(row, "status", None) == "failed" for row in db.added_rows
-        )
+        assert any(getattr(row, "status", None) == "failed" for row in db.added_rows)
 
     @pytest.mark.asyncio
     async def test_email_fallback_when_no_slack_config(self, monkeypatch):
@@ -245,9 +242,7 @@ class TestRunDueDigests:
             "generate_weekly_digest",
             lambda db: {"period_start": None, "period_end": None},
         )
-        monkeypatch.setattr(
-            digest_dispatcher, "format_text_digest", lambda d: "digest body"
-        )
+        monkeypatch.setattr(digest_dispatcher, "format_text_digest", lambda d: "digest body")
         monkeypatch.setattr(
             digest_dispatcher,
             "_admin_emails_for_org",
@@ -271,10 +266,7 @@ class TestRunDueDigests:
 
         assert summary["sent"] == 1
         assert called["to"] == ["alice@acme.com"]
-        assert any(
-            getattr(row, "delivery_channel", None) == "email"
-            for row in db.added_rows
-        )
+        assert any(getattr(row, "delivery_channel", None) == "email" for row in db.added_rows)
 
     @pytest.mark.asyncio
     async def test_email_fallback_no_recipients_logs_skip(self, monkeypatch):
@@ -282,9 +274,7 @@ class TestRunDueDigests:
         org = _org(digest_timezone="UTC")
         db = _make_db(OrganizationRecord=[org], SlackDigestConfig=[])
 
-        monkeypatch.setattr(
-            digest_dispatcher, "_admin_emails_for_org", lambda db, org_id: []
-        )
+        monkeypatch.setattr(digest_dispatcher, "_admin_emails_for_org", lambda db, org_id: [])
         monkeypatch.setattr(
             digest_dispatcher,
             "_recent_digest_log_exists",
@@ -301,8 +291,7 @@ class TestRunDueDigests:
         assert summary["sent"] == 0
         # logged in_app skipped
         assert any(
-            getattr(row, "delivery_channel", None) == "in_app"
-            and getattr(row, "status", None) == "skipped"
+            getattr(row, "delivery_channel", None) == "in_app" and getattr(row, "status", None) == "skipped"
             for row in db.added_rows
         )
 
@@ -329,9 +318,7 @@ class TestRunDueDigests:
             "generate_weekly_digest",
             lambda db: {"period_start": None, "period_end": None},
         )
-        monkeypatch.setattr(
-            digest_dispatcher, "format_text_digest", lambda d: "body"
-        )
+        monkeypatch.setattr(digest_dispatcher, "format_text_digest", lambda d: "body")
 
         def unconfigured(**kwargs):
             raise EmailNotConfigured("CB_SMTP_HOST is not set")
@@ -343,8 +330,7 @@ class TestRunDueDigests:
         assert summary["sent"] == 1
         # Captured as in_app "sent" so the dashboard card still renders.
         assert any(
-            getattr(row, "delivery_channel", None) == "in_app"
-            and getattr(row, "status", None) == "sent"
+            getattr(row, "delivery_channel", None) == "in_app" and getattr(row, "status", None) == "sent"
             for row in db.added_rows
         )
 
@@ -373,10 +359,7 @@ class TestCircuitBreakers:
 
         now = datetime(2026, 4, 24, 23, 0, tzinfo=UTC)
         org = _org(digest_timezone="America/Los_Angeles")
-        configs = [
-            _cfg(cfg_id=f"cfg{i}", workspace_id="W1", channel_id=f"C{i}", day=4, hour=16)
-            for i in range(7)
-        ]
+        configs = [_cfg(cfg_id=f"cfg{i}", workspace_id="W1", channel_id=f"C{i}", day=4, hour=16) for i in range(7)]
         db = _make_db(OrganizationRecord=[org], SlackDigestConfig=configs)
 
         async def always_fail(db, workspace_id, channel_id):
@@ -389,13 +372,8 @@ class TestCircuitBreakers:
         # 5 real failures open the breaker; the remaining 2 get
         # CircuitBreakerError — still counted as failed.
         assert summary["failed"] == 7
-        errors = [
-            row for row in db.added_rows if getattr(row, "status", None) == "failed"
-        ]
-        assert any(
-            "CircuitBreakerError" in (getattr(r, "error", "") or "")
-            for r in errors
-        )
+        errors = [row for row in db.added_rows if getattr(row, "status", None) == "failed"]
+        assert any("CircuitBreakerError" in (getattr(r, "error", "") or "") for r in errors)
         # Final state: breaker is OPEN.
         assert not digest_dispatcher._slack_breaker.is_available
         # CircuitBreakerError import used for clarity:
@@ -460,12 +438,8 @@ class TestIntegrationEndToEnd:
             "generate_weekly_digest",
             lambda db: {"period_start": None, "period_end": None},
         )
-        monkeypatch.setattr(
-            digest_dispatcher, "format_text_digest", lambda d: "body"
-        )
-        monkeypatch.setattr(
-            digest_dispatcher, "send_email", lambda **kw: {"ok": True}
-        )
+        monkeypatch.setattr(digest_dispatcher, "format_text_digest", lambda d: "body")
+        monkeypatch.setattr(digest_dispatcher, "send_email", lambda **kw: {"ok": True})
 
         summary = await run_due_digests(db, now=now)
 

@@ -64,9 +64,7 @@ class TestMemberWindowStats:
 
     def test_topic_histogram_capped_at_10(self):
         now = datetime(2026, 4, 22, tzinfo=UTC)
-        contribs = [
-            _contrib(now - timedelta(days=1), topics=[f"t{i}"]) for i in range(15)
-        ]
+        contribs = [_contrib(now - timedelta(days=1), topics=[f"t{i}"]) for i in range(15)]
         db = _db_with_contribs(contribs)
 
         stats = _member_window_stats(db, "alice", 7, now)
