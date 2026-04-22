@@ -1,16 +1,18 @@
 import { lazy, Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Activity, BarChart3, Heart, ShieldAlert, Shield } from "lucide-react";
+import { Activity, BarChart3, Bell, Heart, ShieldAlert, Shield } from "lucide-react";
 
 const AnalyticsPage = lazy(() => import("./AnalyticsPage"));
 const TeamHealthPage = lazy(() => import("./TeamHealthPage"));
 const RiskRadarPage = lazy(() => import("./RiskRadarPage"));
 const ContinuityPage = lazy(() => import("./ContinuityPage"));
+const SignalsTab = lazy(() => import("../components/signals/SignalsTab"));
 
-type PulseTab = "analytics" | "health" | "risk" | "continuity";
+type PulseTab = "signals" | "analytics" | "health" | "risk" | "continuity";
 
 const TABS: { id: PulseTab; label: string; icon: typeof BarChart3; hash: string }[] = [
+  { id: "signals", label: "Signals", icon: Bell, hash: "#signals" },
   { id: "analytics", label: "Analytics", icon: BarChart3, hash: "#analytics" },
   { id: "health", label: "Team Health", icon: Heart, hash: "#health" },
   { id: "risk", label: "Risk Radar", icon: ShieldAlert, hash: "#risk" },
@@ -19,7 +21,7 @@ const TABS: { id: PulseTab; label: string; icon: typeof BarChart3; hash: string 
 
 function resolveTabFromHash(hash: string): PulseTab {
   const match = TABS.find((t) => t.hash === hash);
-  return match?.id ?? "analytics";
+  return match?.id ?? "signals";
 }
 
 function TabFallback() {
@@ -101,6 +103,7 @@ export default function PulsePage() {
       </div>
 
       <Suspense fallback={<TabFallback />}>
+        {tab === "signals" && <SignalsTab />}
         {tab === "analytics" && <AnalyticsPage />}
         {tab === "health" && <TeamHealthPage />}
         {tab === "risk" && <RiskRadarPage />}

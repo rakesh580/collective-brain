@@ -34,6 +34,7 @@ from app.routers import decision_recommender as decision_recommender_mod
 from app.routers import decisions as decisions_router_mod
 from app.routers import notifications as notifications_mod
 from app.routers import risk_radar as risk_radar_router_mod
+from app.routers import signals as signals_router_mod
 from app.routers.admin import router as admin_router
 from app.routers.offboarding import router as offboarding_router
 from app.routers.organizations import router as organizations_router
@@ -229,6 +230,17 @@ def _register_scheduled_jobs(scheduler: Scheduler) -> None:
         description="Fire weekly Slack digests for every due SlackDigestConfig.",
     )
 
+    from app.services.pattern_detection import run_pattern_detection_job
+
+    scheduler.register(
+        name="pattern_detection",
+        func=run_pattern_detection_job,
+        # 04:00 UTC — after contribution_rollup (02:30) and health_snapshot (03:15)
+        # so the rollup data is fresh for silent-area / load-skew detection.
+        trigger=CronTrigger(hour=4, minute=0),
+        description="Detect slow lanes, silent areas, load skew, Friday-land, and review bottlenecks.",
+    )
+
 
 app = FastAPI(title="Collective Brain", version="0.5.0", lifespan=lifespan)
 
@@ -400,6 +412,8 @@ api_v1.include_router(continuity_router_mod.router, prefix="/continuity", tags=[
 # Phase 8 — Decision Recommender, Notifications
 api_v1.include_router(decision_recommender_mod.router, prefix="/decision-recommender", tags=["decision-recommender"])
 api_v1.include_router(notifications_mod.router, prefix="/notifications", tags=["notifications"])
+# Phase 9 — Pattern-detection signals (Pulse "Signals" tab)
+api_v1.include_router(signals_router_mod.router, prefix="/signals", tags=["signals"])
 # Phase 4 — Enterprise (organizations, SAML SSO, SCIM provisioning)
 api_v1.include_router(organizations_router, tags=["organizations"])
 api_v1.include_router(saml_router, tags=["sso"])

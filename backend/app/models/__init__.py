@@ -23,6 +23,7 @@ from app.models.member import MemberRecord
 from app.models.offboarding_report import OffboardingReport
 from app.models.organization import OrganizationMembership, OrganizationRecord
 from app.models.room import ChatRoom, ChatRoomMember, ChatRoomMessage
+from app.models.signal import Signal
 from app.models.slack_digest_config import SlackDigestConfig
 from app.models.slack_integration import SlackChannelSync, SlackWorkspace
 from app.models.user import UserRecord
@@ -63,4 +64,5 @@ __all__ = [
     "ContributionRollup",
     "DigestLog",
     "WorkItem",
+    "Signal",
 ]
