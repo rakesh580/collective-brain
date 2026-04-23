@@ -1,0 +1,13 @@
+{
+  "name": "collective-brain-dev-hooks",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Root-level dev tooling (husky + lint-staged) for the Collective Brain monorepo. Frontend app lives in ./frontend, backend in ./backend.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10"
+  }
+}

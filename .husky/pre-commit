@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Pre-commit hook for the Collective Brain monorepo.
+#
+# Fast local guard against the exact checks that CI enforces on every PR:
+#   - backend/ changes  → ruff check + ruff format --check
+#   - frontend/ changes → eslint via lint-staged (auto-fixes what it can)
+#
+# Heavy checks (pytest, vitest, npm run build, docker build) stay in CI —
+# we keep this hook sub-5s so commits never feel blocked.
+#
+# Bypass one-off with `git commit --no-verify`; real fixes should go through
+# the hook rather than bypassing it.
+
+set -euo pipefail
+
+STAGED="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+# ── Backend: ruff lint + format check ─────────────────────────────────────
+if echo "$STAGED" | grep -qE '^backend/.*\.py$'; then
+  echo "[pre-commit] backend/ change detected → running ruff…"
+  if [ -d backend/.venv ]; then
+    # shellcheck source=/dev/null
+    source backend/.venv/bin/activate
+  fi
+  ruff check backend/
+  ruff format --check backend/
+fi
+
+# ── Frontend: lint-staged (eslint --fix on staged files) ──────────────────
+if echo "$STAGED" | grep -qE '^frontend/.*\.(ts|tsx|js|jsx|css|json)$'; then
+  echo "[pre-commit] frontend/ change detected → running lint-staged…"
+  npx lint-staged
+fi
+
+echo "[pre-commit] OK"
