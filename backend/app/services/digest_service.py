@@ -123,8 +123,7 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
         members_by_id = {m.id: m.name for m in members}
 
     top_contributors = [
-        {"member_id": mid, "name": members_by_id.get(mid, mid), "count": count}
-        for mid, count in top_contributors_raw
+        {"member_id": mid, "name": members_by_id.get(mid, mid), "count": count} for mid, count in top_contributors_raw
     ]
 
     # ── Graph stats ───────────────────────────────────────────
@@ -212,8 +211,7 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
         f"{_format_delta_suffix(digest_data['contributions_delta'])}",
         f"*Active contributors:* {digest_data['active_contributors']}"
         f"{_format_delta_suffix(digest_data['active_contributors_delta'])}",
-        f"*New members:* {digest_data['new_members_count']}"
-        f"{_format_delta_suffix(digest_data['new_members_delta'])}",
+        f"*New members:* {digest_data['new_members_count']}{_format_delta_suffix(digest_data['new_members_delta'])}",
         f"*New artifacts:* {digest_data['new_artifacts_count']}"
         f"{_format_delta_suffix(digest_data['new_artifacts_delta'])}",
     ]
@@ -357,8 +355,7 @@ def format_text_digest(digest_data: dict) -> str:
         f"{_format_delta_suffix(digest_data['contributions_delta'])}",
         f"Active contributors: {digest_data['active_contributors']}"
         f"{_format_delta_suffix(digest_data['active_contributors_delta'])}",
-        f"New members: {digest_data['new_members_count']}"
-        f"{_format_delta_suffix(digest_data['new_members_delta'])}",
+        f"New members: {digest_data['new_members_count']}{_format_delta_suffix(digest_data['new_members_delta'])}",
         f"New artifacts: {digest_data['new_artifacts_count']}"
         f"{_format_delta_suffix(digest_data['new_artifacts_delta'])}",
         "",

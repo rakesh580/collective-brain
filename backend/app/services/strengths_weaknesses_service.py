@@ -60,9 +60,7 @@ def _member_strengths_and_weaknesses(
     prior = _topic_counts(prior_rows)
 
     strengths = [
-        {"topic": topic, "count": count}
-        for topic, count in current.most_common()
-        if count >= MIN_TOPIC_COUNT
+        {"topic": topic, "count": count} for topic, count in current.most_common() if count >= MIN_TOPIC_COUNT
     ][:MAX_MEMBER_STRENGTHS]
 
     weaknesses = [
@@ -172,11 +170,7 @@ def compute_and_save_strengths_weaknesses(
     current_rows_by_member: dict[str, list[ContributionRecord]] = defaultdict(list)
     prior_rows_by_member: dict[str, list[ContributionRecord]] = defaultdict(list)
 
-    window_rows = (
-        db.query(ContributionRecord)
-        .filter(ContributionRecord.timestamp >= prior_cutoff)
-        .all()
-    )
+    window_rows = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= prior_cutoff).all()
     for r in window_rows:
         if not r.member_id:
             continue
