@@ -16,6 +16,7 @@ import TeamProgressRing from "../components/dashboard/TeamProgressRing";
 import OnboardingWizard from "../components/onboarding/OnboardingWizard";
 import FreshnessAlerts from "../components/insights/FreshnessAlerts";
 import LatestDigestCard from "../components/dashboard/LatestDigestCard";
+import TeamStrengthsCard from "../components/dashboard/TeamStrengthsCard";
 import {
   Users, Database, Boxes, ArrowRight, MessageSquare,
   Upload, TrendingUp, Sparkles, Brain, Target,
@@ -499,6 +500,11 @@ export default function DashboardPage() {
       {/* ── Latest digest (proactive brain touchpoint) ── */}
       <motion.div variants={item} className="mb-6">
         <LatestDigestCard />
+      </motion.div>
+
+      {/* ── Team strengths & gaps (W11-12 nightly analyzer) ── */}
+      <motion.div variants={item} className="mb-6">
+        <TeamStrengthsCard />
       </motion.div>
 
       {/* ── Freshness alerts ── */}

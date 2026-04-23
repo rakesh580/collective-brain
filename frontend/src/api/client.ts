@@ -299,6 +299,16 @@ export const api = {
       };
     }>(`/insights/latest-digest`),
 
+  // Team strengths / weaknesses snapshot (W11-12 nightly analyzer)
+  getTeamStrengths: () =>
+    request<{
+      computed_at: string | null;
+      strengths: { topic: string; count: number; contributors: number }[];
+      weaknesses: { topic: string; prior_count: number; current_count: number }[];
+      bus_factor: { topic: string; sole_expert_name: string; count: number }[];
+      top_members: { member_id: string; name: string; count: number }[];
+    }>(`/insights/team-strengths`),
+
   // Pattern-detection signals (W9-10)
   getSignals: (status: "open" | "acknowledged" | "resolved" | "all" = "open", limit = 50) =>
     request<{
