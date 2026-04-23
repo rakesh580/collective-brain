@@ -223,14 +223,20 @@ jobs:
         run: npm ci
       - name: Run tests
         working-directory: frontend
-        run: npx vitest run --reporter=verbose
+        run: npx vitest run --reporter=verbose 2>&1 | tee /tmp/vitest.log
       - name: Verify test count
         working-directory: frontend
         run: |
-          COUNT=$(npx vitest run 2>&1 | grep -oP '\d+ passed' | grep -oP '\d+')
-          echo "Frontend tests passed: $COUNT"
-          if [ "$COUNT" -lt 80 ]; then
-            echo "Expected at least 80 frontend tests, got $COUNT"
+          # Vitest prints both "Test Files  N passed" and "Tests  M passed".
+          # Strip ANSI color codes first, then grab the LAST "N passed" match —
+          # that's the Tests total (M), not the Test Files count.
+          COUNT=$(sed -E 's/\x1B\[[0-9;]*m//g' /tmp/vitest.log \
+            | grep -oE '[0-9]+ passed' \
+            | tail -1 \
+            | grep -oE '^[0-9]+' || true)
+          echo "Frontend tests passed: ${COUNT:-unknown}"
+          if [ -z "$COUNT" ] || ! [ "$COUNT" -ge 80 ] 2>/dev/null; then
+            echo "::error::Expected at least 80 frontend tests, got '${COUNT:-unknown}'"
             exit 1
           fi
 
