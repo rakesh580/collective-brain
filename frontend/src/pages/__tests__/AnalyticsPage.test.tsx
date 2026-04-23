@@ -223,10 +223,13 @@ describe("AnalyticsPage", () => {
   it("re-fetches data when date range changes", async () => {
     const user = userEvent.setup();
     renderPage();
+    // findByRole waits for the combobox to appear — the page renders loading
+    // skeletons first (no combobox in the DOM) until the initial fetch
+    // resolves. getByRole raced that transition on slower CI runners.
+    const select = await screen.findByRole("combobox");
     await waitFor(() => {
       expect(mockApi.getActivityTimeline).toHaveBeenCalledWith(30);
     });
-    const select = screen.getByRole("combobox");
     await user.selectOptions(select, "7");
     await waitFor(() => {
       expect(mockApi.getActivityTimeline).toHaveBeenCalledWith(7);
