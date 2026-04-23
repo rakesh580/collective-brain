@@ -6,6 +6,7 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.exc import ProgrammingError
 
 from app.db.database import create_session
 from app.dependencies import get_current_user
@@ -44,7 +45,14 @@ async def list_signals(
     limit: int = Query(default=50, ge=1, le=200),
     user=Depends(get_current_user),
 ):
-    """List signals for the current user's org, filtered by lifecycle status."""
+    """List signals for the current user's org, filtered by lifecycle status.
+
+    Degrades to an empty list if the ``signals`` table is absent — this
+    happens when migration 012 has not been applied on the target DB (e.g.
+    Supabase startup migration failed). A missing table should not 500 the
+    whole Pulse tab; the nightly detection job will populate rows once
+    migrations are rerun.
+    """
     db = _get_db()
     try:
         org_id = getattr(user, "organization_id", None)
@@ -60,7 +68,16 @@ async def list_signals(
             q = q.filter(Signal.resolved_at.isnot(None))
         # "all" → no filter
 
-        rows = q.order_by(Signal.detected_at.desc()).limit(limit).all()
+        try:
+            rows = q.order_by(Signal.detected_at.desc()).limit(limit).all()
+        except ProgrammingError as e:
+            logger.error(
+                "signals table unreachable — returning empty list so the tab renders. "
+                "Run `alembic upgrade head` to apply migration 012. Underlying error: %s",
+                e,
+                exc_info=True,
+            )
+            return {"signals": [], "count": 0}
         return {"signals": [_serialize(r) for r in rows], "count": len(rows)}
     finally:
         db.close()
