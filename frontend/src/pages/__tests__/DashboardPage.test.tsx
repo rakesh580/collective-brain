@@ -72,6 +72,9 @@ vi.mock("../../components/insights/FreshnessAlerts", () => ({
 vi.mock("../../components/dashboard/LatestDigestCard", () => ({
   default: () => <div data-testid="latest-digest-card">Latest Digest</div>,
 }));
+vi.mock("../../components/dashboard/TeamStrengthsCard", () => ({
+  default: () => <div data-testid="team-strengths-card">Team Strengths</div>,
+}));
 
 import DashboardPage from "../DashboardPage";
 

@@ -51,7 +51,7 @@ from app.services.telemetry import current_trace_id, setup_telemetry
 from app.services.vector_store import VectorStoreService
 
 # ── OpenTelemetry must be set up before any instrumented code runs ──
-setup_telemetry(service_name="collective-brain", version="0.5.0")
+setup_telemetry(service_name="collective-brain", version="0.6.0")
 
 # ── Log record factory: inject request_id, trace_id, org_id ──────────────────
 _old_factory = logging.getLogRecordFactory()
@@ -129,7 +129,7 @@ async def lifespan(app: FastAPI):
     # ── Publish app info to Prometheus ──
     APP_INFO.info(
         {
-            "version": "0.5.0",
+            "version": "0.6.0",
             "llm_provider": settings.llm_provider,
             "agent_mode": settings.agent_mode,
             "embedding_model": settings.embedding_model,
@@ -254,7 +254,7 @@ def _register_scheduled_jobs(scheduler: Scheduler) -> None:
     )
 
 
-app = FastAPI(title="Collective Brain", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="Collective Brain", version="0.6.0", lifespan=lifespan)
 
 # ── Prometheus /metrics endpoint ─────────────────────────────────────────────
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -392,12 +392,27 @@ async def circuit_breaker_handler(request, exc: CircuitBreakerError):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    logger.error("Unhandled error: %s", exc, exc_info=True)
     from fastapi.responses import JSONResponse
+
+    # Stable error reference users can quote when reporting a 500. Pairs with
+    # the logged traceback for cross-referencing in HF Spaces / Render logs.
+    error_ref = uuid.uuid4().hex[:8]
+    logger.error(
+        "Unhandled error ref=%s path=%s method=%s: %s",
+        error_ref,
+        getattr(request.url, "path", "?"),
+        getattr(request, "method", "?"),
+        exc,
+        exc_info=True,
+    )
 
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "detail": "Internal server error",
+            "error_ref": error_ref,
+            "error_type": type(exc).__name__,
+        },
     )
 
 

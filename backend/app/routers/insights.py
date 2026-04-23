@@ -9,6 +9,7 @@ from app.models.artifact import ArtifactRecord
 from app.models.digest_log import DigestLog
 from app.models.insight import InsightRecord
 from app.models.member import MemberRecord
+from app.models.organization import OrganizationRecord
 from app.schemas.responses import (
     DashboardResponse,
     InsightResponse,
@@ -370,5 +371,41 @@ async def get_latest_digest(request: Request, user=Depends(get_current_user)):
 
         preview = generate_weekly_digest(db)
         return {"last": last_payload, "preview": preview}
+    finally:
+        db.close()
+
+
+@router.get("/team-strengths")
+async def get_team_strengths(user=Depends(get_current_user)):
+    """Return the latest strengths/weaknesses snapshot for the caller's org.
+
+    Shape matches the nightly ``strengths_weaknesses_analyzer`` write:
+      {
+        "computed_at": iso | null,
+        "strengths": [{"topic", "count", "contributors"}, ...],
+        "weaknesses": [{"topic", "prior_count", "current_count"}, ...],
+        "bus_factor": [{"topic", "sole_expert_name", "count"}, ...],
+        "top_members": [{"member_id", "name", "count"}, ...],
+      }
+
+    Returns an empty payload when the nightly job has not yet run for the org.
+    """
+    org_id = getattr(user, "organization_id", None)
+    if not org_id:
+        return {"computed_at": None, "strengths": [], "weaknesses": [], "bus_factor": [], "top_members": []}
+
+    db = _get_db()
+    try:
+        org = db.query(OrganizationRecord).filter(OrganizationRecord.id == org_id).first()
+        payload = (org.strengths_weaknesses_json if org else None) or {}
+        # Shape hardening — keep the response contract stable even if the DB
+        # has a partial payload (e.g. first night before the analyzer ran).
+        return {
+            "computed_at": payload.get("computed_at"),
+            "strengths": payload.get("strengths", []),
+            "weaknesses": payload.get("weaknesses", []),
+            "bus_factor": payload.get("bus_factor", []),
+            "top_members": payload.get("top_members", []),
+        }
     finally:
         db.close()
