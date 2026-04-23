@@ -8,7 +8,6 @@ import httpx
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.models.member import MemberRecord
 from app.models.slack_integration import SlackWorkspace
@@ -19,45 +18,113 @@ logger = logging.getLogger("collective_brain.digest")
 SLACK_API_BASE = "https://slack.com/api"
 
 
-def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
-    """Compile a structured weekly digest from the last 7 days of activity.
+def _compute_window_stats(
+    db: Session,
+    *,
+    start: datetime,
+    end: datetime,
+    room_id: str | None,
+) -> dict:
+    """Aggregate raw counts and top-topic/top-contributor maps for one window.
 
-    Returns a DigestData dict with all metrics, highlights, and risks.
+    Used twice per digest — once for the current week and once for the prior
+    week — so the digest can render week-over-week deltas.
     """
-    now = datetime.now(UTC)
-    week_ago = now - timedelta(days=7)
-
-    # ── Recent contributions (last 7 days) ────────────────────
-    contrib_query = db.query(ContributionRecord).filter(ContributionRecord.timestamp >= week_ago)
+    q = db.query(ContributionRecord).filter(
+        ContributionRecord.timestamp >= start,
+        ContributionRecord.timestamp < end,
+    )
     if room_id:
-        contrib_query = contrib_query.filter(ContributionRecord.room_id == room_id)
-    recent_contribs = contrib_query.order_by(ContributionRecord.timestamp.desc()).all()
+        q = q.filter(ContributionRecord.room_id == room_id)
+    rows = q.all()
 
-    # ── Count new members this week ───────────────────────────
-    new_members_query = db.query(MemberRecord).filter(MemberRecord.first_seen >= week_ago)
-    new_members = new_members_query.all()
-
-    # ── Count new artifacts this week ─────────────────────────
-    new_artifacts_query = db.query(ArtifactRecord)
-    if room_id:
-        new_artifacts_query = new_artifacts_query.filter(ArtifactRecord.room_id == room_id)
-    # ArtifactRecord may not have created_at; count artifacts that have contributions this week
-    artifact_ids_this_week = list({c.artifact_id for c in recent_contribs if c.artifact_id})
-
-    # ── Topics this week ──────────────────────────────────────
     topic_counts: dict[str, int] = defaultdict(int)
+    member_counts: dict[str, int] = defaultdict(int)
+    type_counts: dict[str, int] = defaultdict(int)
     contributor_set: set[str] = set()
-    contribution_type_counts: dict[str, int] = defaultdict(int)
+    artifact_ids: set[str] = set()
 
-    for c in recent_contribs:
+    for c in rows:
         if c.member_id:
             contributor_set.add(c.member_id)
+            member_counts[c.member_id] += 1
         if c.contribution_type:
-            contribution_type_counts[c.contribution_type] += 1
+            type_counts[c.contribution_type] += 1
+        if c.artifact_id:
+            artifact_ids.add(c.artifact_id)
         for topic in c.topics or []:
             topic_counts[topic] += 1
 
-    top_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    return {
+        "contributions": len(rows),
+        "active_contributors": len(contributor_set),
+        "new_artifacts": len(artifact_ids),
+        "topic_counts": dict(topic_counts),
+        "member_counts": dict(member_counts),
+        "type_counts": dict(type_counts),
+    }
+
+
+def _delta(current: int, previous: int) -> dict:
+    """Build a delta dict from two integer counts.
+
+    `pct` is None when the previous window was zero (undefined growth rate).
+    Callers render "new" instead of "+∞%" in that case.
+    """
+    diff = current - previous
+    pct: float | None = None if previous == 0 else round(diff / previous * 100, 1)
+    return {"current": current, "previous": previous, "delta": diff, "pct": pct}
+
+
+def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
+    """Compile a structured weekly digest with week-over-week deltas.
+
+    The prior-week window (14d → 7d ago) powers delta fields on top-level
+    metrics and topic counts, so digest readers see movement rather than
+    raw numbers.
+    """
+    now = datetime.now(UTC)
+    week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+
+    current = _compute_window_stats(db, start=week_ago, end=now, room_id=room_id)
+    previous = _compute_window_stats(db, start=two_weeks_ago, end=week_ago, room_id=room_id)
+
+    # ── New members this week ─────────────────────────────────
+    new_members_query = db.query(MemberRecord).filter(MemberRecord.first_seen >= week_ago)
+    new_members = new_members_query.all()
+
+    # ── Count new members last week (for delta) ───────────────
+    new_members_prev = (
+        db.query(MemberRecord)
+        .filter(MemberRecord.first_seen >= two_weeks_ago, MemberRecord.first_seen < week_ago)
+        .count()
+    )
+
+    # ── Top topics with prior-week comparison ─────────────────
+    top_topics_raw = sorted(current["topic_counts"].items(), key=lambda x: x[1], reverse=True)[:10]
+    prev_topic_counts = previous["topic_counts"]
+    top_topics = [
+        {
+            "topic": t,
+            "count": c,
+            "previous": prev_topic_counts.get(t, 0),
+            "delta": c - prev_topic_counts.get(t, 0),
+        }
+        for t, c in top_topics_raw
+    ]
+
+    # ── Top contributors this week ────────────────────────────
+    top_contributors_raw = sorted(current["member_counts"].items(), key=lambda x: x[1], reverse=True)[:5]
+    top_contributor_ids = [mid for mid, _ in top_contributors_raw]
+    members_by_id: dict[str, str] = {}
+    if top_contributor_ids:
+        members = db.query(MemberRecord).filter(MemberRecord.id.in_(top_contributor_ids)).all()
+        members_by_id = {m.id: m.name for m in members}
+
+    top_contributors = [
+        {"member_id": mid, "name": members_by_id.get(mid, mid), "count": count} for mid, count in top_contributors_raw
+    ]
 
     # ── Graph stats ───────────────────────────────────────────
     graph = MemoryGraph(db, room_id=room_id)
@@ -67,36 +134,25 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
     expertise_gaps = graph.get_expertise_gaps()
     bus_factor_risks = [r for r in expertise_gaps.get("bus_factor_risks", []) if r.get("severity") == "high"][:10]
 
-    # ── Top contributors this week ────────────────────────────
-    member_contrib_counts: dict[str, int] = defaultdict(int)
-    for c in recent_contribs:
-        if c.member_id:
-            member_contrib_counts[c.member_id] += 1
-
-    top_contributors_raw = sorted(member_contrib_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-
-    # Resolve member names
-    top_contributor_ids = [mid for mid, _ in top_contributors_raw]
-    members_by_id = {}
-    if top_contributor_ids:
-        members = db.query(MemberRecord).filter(MemberRecord.id.in_(top_contributor_ids)).all()
-        members_by_id = {m.id: m.name for m in members}
-
-    top_contributors = [
-        {"member_id": mid, "name": members_by_id.get(mid, mid), "count": count} for mid, count in top_contributors_raw
-    ]
-
     digest_data = {
         "period_start": week_ago.isoformat(),
         "period_end": now.isoformat(),
-        "total_contributions": len(recent_contribs),
-        "active_contributors": len(contributor_set),
+        "prior_period_start": two_weeks_ago.isoformat(),
+        "prior_period_end": week_ago.isoformat(),
+        # Raw current-week totals (kept for backward compatibility).
+        "total_contributions": current["contributions"],
+        "active_contributors": current["active_contributors"],
         "new_members": [{"id": m.id, "name": m.name} for m in new_members],
         "new_members_count": len(new_members),
-        "new_artifacts_count": len(artifact_ids_this_week),
-        "top_topics": [{"topic": t, "count": c} for t, c in top_topics],
+        "new_artifacts_count": current["new_artifacts"],
+        # Week-over-week deltas for the same metrics.
+        "contributions_delta": _delta(current["contributions"], previous["contributions"]),
+        "active_contributors_delta": _delta(current["active_contributors"], previous["active_contributors"]),
+        "new_artifacts_delta": _delta(current["new_artifacts"], previous["new_artifacts"]),
+        "new_members_delta": _delta(len(new_members), new_members_prev),
+        "top_topics": top_topics,
         "top_contributors": top_contributors,
-        "contribution_types": dict(contribution_type_counts),
+        "contribution_types": current["type_counts"],
         "graph_stats": graph_stats,
         "bus_factor_risks": [
             {
@@ -109,6 +165,25 @@ def generate_weekly_digest(db: Session, room_id: str | None = None) -> dict:
     }
 
     return digest_data
+
+
+def _format_delta_suffix(delta: dict) -> str:
+    """Render a human-readable delta tag like ' (▲ 12, +34.2%)'.
+
+    Returns '' when previous and current are both zero — no narrative value.
+    Uses "new" when previous was zero and current is positive.
+    """
+    if delta["current"] == 0 and delta["previous"] == 0:
+        return ""
+    if delta["previous"] == 0:
+        return f" ({delta['current']} new)" if delta["current"] > 0 else ""
+    diff = delta["delta"]
+    pct = delta["pct"]
+    if diff == 0:
+        return " (flat)"
+    arrow = "▲" if diff > 0 else "▼"
+    sign = "+" if diff > 0 else ""
+    return f" ({arrow} {abs(diff)}, {sign}{pct}%)"
 
 
 def format_slack_blocks(digest_data: dict) -> list[dict]:
@@ -130,12 +205,15 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
         }
     )
 
-    # ── Overview section ──────────────────────────────────────
+    # ── Overview section with WoW deltas ──────────────────────
     overview_lines = [
-        f"*Contributions:* {digest_data['total_contributions']}",
-        f"*Active contributors:* {digest_data['active_contributors']}",
-        f"*New members:* {digest_data['new_members_count']}",
-        f"*New artifacts:* {digest_data['new_artifacts_count']}",
+        f"*Contributions:* {digest_data['total_contributions']}"
+        f"{_format_delta_suffix(digest_data['contributions_delta'])}",
+        f"*Active contributors:* {digest_data['active_contributors']}"
+        f"{_format_delta_suffix(digest_data['active_contributors_delta'])}",
+        f"*New members:* {digest_data['new_members_count']}{_format_delta_suffix(digest_data['new_members_delta'])}",
+        f"*New artifacts:* {digest_data['new_artifacts_count']}"
+        f"{_format_delta_suffix(digest_data['new_artifacts_delta'])}",
     ]
     blocks.append(
         {
@@ -170,7 +248,18 @@ def format_slack_blocks(digest_data: dict) -> list[dict]:
 
     # ── Trending Topics ───────────────────────────────────────
     if digest_data["top_topics"]:
-        topic_lines = [f"  {t['topic']} ({t['count']} mentions)" for t in digest_data["top_topics"][:7]]
+        topic_lines = []
+        for t in digest_data["top_topics"][:7]:
+            topic_delta = t["count"] - t["previous"]
+            if t["previous"] == 0 and t["count"] > 0:
+                tag = " (new)"
+            elif topic_delta > 0:
+                tag = f" (▲ {topic_delta})"
+            elif topic_delta < 0:
+                tag = f" (▼ {abs(topic_delta)})"
+            else:
+                tag = ""
+            topic_lines.append(f"  {t['topic']} ({t['count']} mentions){tag}")
         blocks.append(
             {
                 "type": "section",
@@ -262,10 +351,13 @@ def format_text_digest(digest_data: dict) -> str:
     lines = [
         f"=== Weekly Knowledge Digest: {period_start} to {period_end} ===",
         "",
-        f"Contributions: {digest_data['total_contributions']}",
-        f"Active contributors: {digest_data['active_contributors']}",
-        f"New members: {digest_data['new_members_count']}",
-        f"New artifacts: {digest_data['new_artifacts_count']}",
+        f"Contributions: {digest_data['total_contributions']}"
+        f"{_format_delta_suffix(digest_data['contributions_delta'])}",
+        f"Active contributors: {digest_data['active_contributors']}"
+        f"{_format_delta_suffix(digest_data['active_contributors_delta'])}",
+        f"New members: {digest_data['new_members_count']}{_format_delta_suffix(digest_data['new_members_delta'])}",
+        f"New artifacts: {digest_data['new_artifacts_count']}"
+        f"{_format_delta_suffix(digest_data['new_artifacts_delta'])}",
         "",
     ]
 
@@ -278,7 +370,16 @@ def format_text_digest(digest_data: dict) -> str:
     if digest_data["top_topics"]:
         lines.append("-- Trending Topics --")
         for t in digest_data["top_topics"][:7]:
-            lines.append(f"  - {t['topic']} ({t['count']} mentions)")
+            topic_delta = t["count"] - t["previous"]
+            if t["previous"] == 0 and t["count"] > 0:
+                tag = " (new)"
+            elif topic_delta > 0:
+                tag = f" (+{topic_delta})"
+            elif topic_delta < 0:
+                tag = f" ({topic_delta})"
+            else:
+                tag = ""
+            lines.append(f"  - {t['topic']} ({t['count']} mentions){tag}")
         lines.append("")
 
     if digest_data["bus_factor_risks"]:

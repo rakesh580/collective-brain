@@ -230,6 +230,18 @@ def _register_scheduled_jobs(scheduler: Scheduler) -> None:
         description="Fire weekly Slack digests for every due SlackDigestConfig.",
     )
 
+    from app.services.strengths_weaknesses_service import run_strengths_weaknesses_job
+
+    scheduler.register(
+        name="strengths_weaknesses_analyzer",
+        func=run_strengths_weaknesses_job,
+        # 03:30 UTC — after contribution_rollup (02:30) and health_snapshot (03:15)
+        # but before pattern_detection (04:00) so downstream signals can read
+        # member.strengths / .weaknesses if needed.
+        trigger=CronTrigger(hour=3, minute=30),
+        description="Per-member strengths/weaknesses + per-org aggregate snapshot.",
+    )
+
     from app.services.pattern_detection import run_pattern_detection_job
 
     scheduler.register(
