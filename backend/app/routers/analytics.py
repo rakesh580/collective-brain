@@ -262,29 +262,32 @@ async def get_health(request: Request, user=Depends(get_current_user)):
 async def get_health_trends_endpoint(
     request: Request, days: int = Query(default=90, ge=1, le=365), user=Depends(get_current_user)
 ):
-    """Historical trend data for team health."""
+    """Historical trend data for team health (scoped to caller's org)."""
     db = _get_db()
     try:
-        return get_health_trends(db, period_days=days)
+        org_id = getattr(user, "organization_id", None)
+        return get_health_trends(db, period_days=days, organization_id=org_id)
     finally:
         db.close()
 
 
 @router.get("/health/predictions")
 async def get_health_predictions(request: Request, user=Depends(get_current_user)):
-    """Risk predictions based on health trends."""
+    """Risk predictions based on health trends (scoped to caller's org)."""
     db = _get_db()
     try:
-        return predict_risks(db)
+        org_id = getattr(user, "organization_id", None)
+        return predict_risks(db, organization_id=org_id)
     finally:
         db.close()
 
 
 @router.post("/health/snapshot")
 async def trigger_health_snapshot(request: Request, user=Depends(get_current_user)):
-    """Manually trigger a health snapshot save."""
+    """Manually trigger a health snapshot save for the caller's org."""
     db = _get_db()
     try:
-        return save_health_snapshot(db)
+        org_id = getattr(user, "organization_id", None)
+        return save_health_snapshot(db, organization_id=org_id)
     finally:
         db.close()

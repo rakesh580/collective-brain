@@ -109,8 +109,12 @@ def _run_alembic_migrations(settings):
         command.upgrade(alembic_cfg, "head")
         logger.info("Alembic migrations applied (head)")
     except Exception as e:
-        # Log but don't crash — the DB may already be at head
-        logger.warning("Alembic migration step raised: %s", e)
+        # Log but don't crash — the DB may already be at head, or the
+        # connection may be transiently unreachable. Promoted from warning
+        # to error with full traceback so production logs surface broken
+        # migrations (they manifest later as 500s on endpoints that expect
+        # missing tables/columns).
+        logger.error("Alembic migration step raised: %s", e, exc_info=True)
 
 
 # ---------------------------------------------------------------------------

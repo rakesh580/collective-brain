@@ -392,12 +392,27 @@ async def circuit_breaker_handler(request, exc: CircuitBreakerError):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    logger.error("Unhandled error: %s", exc, exc_info=True)
     from fastapi.responses import JSONResponse
+
+    # Stable error reference users can quote when reporting a 500. Pairs with
+    # the logged traceback for cross-referencing in HF Spaces / Render logs.
+    error_ref = uuid.uuid4().hex[:8]
+    logger.error(
+        "Unhandled error ref=%s path=%s method=%s: %s",
+        error_ref,
+        getattr(request.url, "path", "?"),
+        getattr(request, "method", "?"),
+        exc,
+        exc_info=True,
+    )
 
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "detail": "Internal server error",
+            "error_ref": error_ref,
+            "error_type": type(exc).__name__,
+        },
     )
 
 

@@ -14,9 +14,29 @@ logger = logging.getLogger("collective_brain.team_health")
 
 
 def compute_health_snapshot(db: Session) -> dict:
-    """Calculate current team health metrics from the knowledge graph."""
-    mg = MemoryGraph(db)
-    G = mg._get_or_build_nx_graph()
+    """Calculate current team health metrics from the knowledge graph.
+
+    Best-effort: any unexpected failure is caught and a zero-initialised
+    snapshot is returned so the Team Health tab never 500s on a cold org
+    or a transient graph-build error. The caller can still detect the
+    degraded state via ``health_score == 0`` and empty metrics.
+    """
+    try:
+        mg = MemoryGraph(db)
+        G = mg._get_or_build_nx_graph()
+    except Exception:
+        logger.exception("compute_health_snapshot: graph build failed; returning empty snapshot")
+        now = datetime.now(UTC)
+        return {
+            "bus_factor_count": 0,
+            "coverage_pct": 0.0,
+            "collab_density": 0.0,
+            "active_member_pct": 0.0,
+            "avg_breadth": 0.0,
+            "health_score": 0.0,
+            "top_risk": None,
+            "computed_at": now.isoformat(),
+        }
 
     # ── Collect node sets ──
     member_nodes = {nid: d for nid, d in G.nodes(data=True) if d.get("node_type") == "member"}
@@ -113,8 +133,14 @@ def compute_health_snapshot(db: Session) -> dict:
     }
 
 
-def save_health_snapshot(db: Session) -> dict:
-    """Persist a health snapshot with timestamp."""
+def save_health_snapshot(db: Session, organization_id: str | None = None) -> dict:
+    """Persist a health snapshot with timestamp.
+
+    ``organization_id`` is stored alongside the snapshot so multi-tenant
+    deployments can scope trend/prediction queries per org. Nightly scheduler
+    runs pass ``None`` (org-wide snapshot); manual triggers pass the caller's
+    org so the tenant sees their own timeline.
+    """
     snapshot = compute_health_snapshot(db)
     snapshot_id = str(uuid.uuid4())
     now = datetime.now(UTC)
@@ -124,13 +150,14 @@ def save_health_snapshot(db: Session) -> dict:
     db.execute(
         text(
             "INSERT INTO health_snapshots "
-            "(id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+            "(id, organization_id, timestamp, bus_factor_count, coverage_pct, collab_density, "
             "active_member_pct, avg_breadth, health_score, risk_summary, created_at) "
-            "VALUES (:id, :timestamp, :bus_factor_count, :coverage_pct, :collab_density, "
+            "VALUES (:id, :organization_id, :timestamp, :bus_factor_count, :coverage_pct, :collab_density, "
             ":active_member_pct, :avg_breadth, :health_score, :risk_summary, :created_at)"
         ),
         {
             "id": snapshot_id,
+            "organization_id": organization_id,
             "timestamp": now,
             "bus_factor_count": snapshot["bus_factor_count"],
             "coverage_pct": snapshot["coverage_pct"],
@@ -151,20 +178,38 @@ def save_health_snapshot(db: Session) -> dict:
     }
 
 
-def get_health_trends(db: Session, period_days: int = 90) -> dict:
-    """Return historical snapshots for charting."""
+def get_health_trends(db: Session, period_days: int = 90, organization_id: str | None = None) -> dict:
+    """Return historical snapshots for charting.
+
+    When ``organization_id`` is provided, restrict the query to that org's
+    snapshots plus any legacy rows where organization_id IS NULL (from
+    scheduler-written nightly snapshots pre-dating per-tenant scoping).
+    """
     cutoff = datetime.now(UTC) - timedelta(days=period_days)
 
-    rows = db.execute(
-        text(
-            "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
-            "active_member_pct, avg_breadth, health_score, risk_summary "
-            "FROM health_snapshots "
-            "WHERE timestamp >= :cutoff "
-            "ORDER BY timestamp ASC"
-        ),
-        {"cutoff": cutoff},
-    ).fetchall()
+    if organization_id:
+        rows = db.execute(
+            text(
+                "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+                "active_member_pct, avg_breadth, health_score, risk_summary "
+                "FROM health_snapshots "
+                "WHERE timestamp >= :cutoff "
+                "AND (organization_id = :org OR organization_id IS NULL) "
+                "ORDER BY timestamp ASC"
+            ),
+            {"cutoff": cutoff, "org": organization_id},
+        ).fetchall()
+    else:
+        rows = db.execute(
+            text(
+                "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+                "active_member_pct, avg_breadth, health_score, risk_summary "
+                "FROM health_snapshots "
+                "WHERE timestamp >= :cutoff "
+                "ORDER BY timestamp ASC"
+            ),
+            {"cutoff": cutoff},
+        ).fetchall()
 
     snapshots = []
     for row in rows:
@@ -194,9 +239,9 @@ def get_health_trends(db: Session, period_days: int = 90) -> dict:
     return {"snapshots": snapshots, "period_days": period_days}
 
 
-def predict_risks(db: Session, horizon_days: int = 90) -> dict:
+def predict_risks(db: Session, horizon_days: int = 90, organization_id: str | None = None) -> dict:
     """Simple linear extrapolation based on recent trends."""
-    trends = get_health_trends(db, period_days=180)
+    trends = get_health_trends(db, period_days=180, organization_id=organization_id)
     snapshots = trends["snapshots"]
 
     predictions: list[dict] = []
