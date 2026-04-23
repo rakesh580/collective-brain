@@ -19,6 +19,10 @@ class OrganizationRecord(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     settings_json = Column(JSON, default=dict)  # org-level config (SSO, branding, etc.)
     metadata_json = Column(JSON, default=dict)
+    # Nightly strengths/weaknesses analyzer writes a shape like:
+    # {"computed_at": iso, "strengths": [...], "weaknesses": [...],
+    #  "bus_factor": [...], "top_members": [...]}
+    strengths_weaknesses_json = Column(JSON, nullable=False, default=dict)
 
     memberships = relationship(
         "OrganizationMembership",
