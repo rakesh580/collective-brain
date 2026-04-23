@@ -163,3 +163,57 @@ def test_predict_risks_forwards_org_to_trends(monkeypatch):
 
     assert seen_orgs == ["org-xyz"]
     assert "predictions" in result
+
+
+def test_predict_risks_survives_null_metric_values(monkeypatch):
+    """Regression for production TypeError (error_ref=022b7601).
+
+    Old health_snapshots rows can have NULL numeric columns (written before
+    defaults were applied, or from a manual backfill). The previous code did
+    ``sum([None, 65.0, ...]) / n`` and crashed with TypeError, 500ing the
+    entire Team Health tab — not just the row in question. Users saw only
+    the red error banner, with no snapshot, trend, or prediction rendered.
+
+    Behavior asserted: when any snapshot has a NULL metric, predict_risks
+    returns a full predictions payload rather than raising. None values are
+    treated as 0 for the linear-regression math.
+    """
+
+    def fake_trends(db, period_days, organization_id=None):
+        return {
+            "snapshots": [
+                {
+                    "health_score": None,  # Null from an old row.
+                    "coverage_pct": 30.0,
+                    "bus_factor_count": 2,
+                    "collab_density": None,
+                    "active_member_pct": 50.0,
+                    "avg_breadth": 1.5,
+                    "timestamp": "2026-03-01T00:00:00+00:00",
+                },
+                {
+                    "health_score": 65.0,
+                    "coverage_pct": 50.0,
+                    "bus_factor_count": 1,
+                    "collab_density": 0.3,
+                    "active_member_pct": 75.0,
+                    "avg_breadth": 2.5,
+                    "timestamp": "2026-04-01T00:00:00+00:00",
+                },
+            ],
+            "period_days": period_days,
+        }
+
+    monkeypatch.setattr(svc, "get_health_trends", fake_trends)
+
+    # Must not raise. Must return one prediction per known metric.
+    result = svc.predict_risks(MagicMock(), organization_id="org-1")
+
+    metric_names = {p["metric"] for p in result["predictions"]}
+    assert "Overall Health Score" in metric_names
+    assert "Collaboration Density" in metric_names
+    # Every prediction should have a numeric current_value — None would have
+    # propagated if coercion didn't happen.
+    for pred in result["predictions"]:
+        assert isinstance(pred["current_value"], int | float)
+        assert isinstance(pred["predicted_value"], int | float)

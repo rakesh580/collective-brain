@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.services.memory_graph import MemoryGraph
@@ -187,29 +188,36 @@ def get_health_trends(db: Session, period_days: int = 90, organization_id: str |
     """
     cutoff = datetime.now(UTC) - timedelta(days=period_days)
 
-    if organization_id:
-        rows = db.execute(
-            text(
-                "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
-                "active_member_pct, avg_breadth, health_score, risk_summary "
-                "FROM health_snapshots "
-                "WHERE timestamp >= :cutoff "
-                "AND (organization_id = :org OR organization_id IS NULL) "
-                "ORDER BY timestamp ASC"
-            ),
-            {"cutoff": cutoff, "org": organization_id},
-        ).fetchall()
-    else:
-        rows = db.execute(
-            text(
-                "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
-                "active_member_pct, avg_breadth, health_score, risk_summary "
-                "FROM health_snapshots "
-                "WHERE timestamp >= :cutoff "
-                "ORDER BY timestamp ASC"
-            ),
-            {"cutoff": cutoff},
-        ).fetchall()
+    try:
+        if organization_id:
+            rows = db.execute(
+                text(
+                    "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+                    "active_member_pct, avg_breadth, health_score, risk_summary "
+                    "FROM health_snapshots "
+                    "WHERE timestamp >= :cutoff "
+                    "AND (organization_id = :org OR organization_id IS NULL) "
+                    "ORDER BY timestamp ASC"
+                ),
+                {"cutoff": cutoff, "org": organization_id},
+            ).fetchall()
+        else:
+            rows = db.execute(
+                text(
+                    "SELECT id, timestamp, bus_factor_count, coverage_pct, collab_density, "
+                    "active_member_pct, avg_breadth, health_score, risk_summary "
+                    "FROM health_snapshots "
+                    "WHERE timestamp >= :cutoff "
+                    "ORDER BY timestamp ASC"
+                ),
+                {"cutoff": cutoff},
+            ).fetchall()
+    except ProgrammingError as e:
+        # Same defensive pattern as the signals router: if the table /
+        # organization_id column is missing on this deployment, return an
+        # empty timeline rather than 500ing the Team Health tab.
+        logger.error("health_snapshots unreachable — returning empty trends. Error: %s", e, exc_info=True)
+        return {"snapshots": [], "period_days": period_days}
 
     snapshots = []
     for row in rows:
@@ -257,8 +265,9 @@ def predict_risks(db: Session, horizon_days: int = 90, organization_id: str | No
 
     for metric_key, metric_label in metrics:
         if len(snapshots) < 2:
-            # Not enough data to predict
-            current_val = snapshots[-1][metric_key] if snapshots else 0
+            # Not enough data to predict. Same None-coercion as the regression
+            # path below — a single row with NULL metrics must not crash.
+            current_val = float((snapshots[-1][metric_key] if snapshots else 0) or 0)
             predictions.append(
                 {
                     "metric": metric_label,
@@ -272,8 +281,12 @@ def predict_risks(db: Session, horizon_days: int = 90, organization_id: str | No
             )
             continue
 
-        # Linear regression on the metric values
-        values = [s[metric_key] for s in snapshots]
+        # Linear regression on the metric values. Old snapshot rows can have
+        # NULL numeric columns (written before defaults existed, or from a
+        # backfill). Coerce None→0.0 so sum() and arithmetic below don't
+        # TypeError — the regression degrades to "treat missing as zero"
+        # rather than 500ing the whole Team Health tab.
+        values = [float(s.get(metric_key) or 0) for s in snapshots]
         n = len(values)
         x_vals = list(range(n))
         x_mean = sum(x_vals) / n
