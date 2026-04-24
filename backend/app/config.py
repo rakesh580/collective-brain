@@ -110,21 +110,34 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        """Runtime DB URL — must be set via CB_DATABASE_URL."""
+        """Runtime DB URL — must be set via CB_DATABASE_URL.
+
+        Whitespace is stripped to defend against env vars copy-pasted with
+        trailing spaces/newlines — we hit a production incident where a
+        trailing-space in the DB name caused psycopg2 to report
+        ``database "postgres  " does not exist``.
+        """
         if not self.database_url:
             raise RuntimeError(
                 "CB_DATABASE_URL is not set. Copy .env.example to backend/.env and fill in your Supabase pooler URL."
             )
-        return self.database_url
+        return self.database_url.strip()
 
     @property
     def effective_migration_url(self) -> str:
-        """Direct URL for Alembic migrations — falls back to database_url if unset."""
-        return self.migration_database_url or self.database_url
+        """Direct URL for Alembic migrations — falls back to database_url if unset.
+
+        Same strip() defense as above. Alembic needs a session-mode (port
+        5432) connection, not the transaction pooler (port 6543), because
+        prepared statements + advisory locks don't survive pgbouncer in
+        transaction mode.
+        """
+        raw = self.migration_database_url or self.database_url
+        return (raw or "").strip()
 
     @property
     def is_postgres(self) -> bool:
-        return self.database_url.startswith("postgresql")
+        return self.database_url.strip().startswith("postgresql")
 
     model_config = {"env_file": ".env", "env_prefix": "CB_", "extra": "ignore"}
 
