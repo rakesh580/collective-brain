@@ -369,10 +369,17 @@ for _h in logging.root.handlers:
 
 from starlette.middleware.gzip import GZipMiddleware
 
+from app.middleware.access_log import AccessLogMiddleware
+
+# Middleware order (outermost first — Starlette applies in LIFO):
+# GZip -> SecurityHeaders -> Deprecation -> RequestID -> AccessLog
+# AccessLog wraps innermost so the latency measurement is closest to the
+# actual handler time (excludes GZip compression of large responses).
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(DeprecationMiddleware)
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(AccessLogMiddleware)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────

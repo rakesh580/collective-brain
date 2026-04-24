@@ -154,6 +154,15 @@ def _record_log(
     )
     db.add(entry)
 
+    # Business-outcome metric: one counter increment per delivery attempt.
+    # Paired with the DigestLog row so Prometheus queries and DB audit agree.
+    try:
+        from app.services.metrics import DIGESTS_SENT_TOTAL
+
+        DIGESTS_SENT_TOTAL.labels(delivery_channel=delivery_channel, status=status).inc()
+    except Exception:  # pragma: no cover — metrics must never break delivery
+        logger.warning("Could not record digest delivery metric", exc_info=True)
+
 
 def _recent_digest_log_exists(
     db: Session,

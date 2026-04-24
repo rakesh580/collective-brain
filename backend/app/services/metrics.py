@@ -117,6 +117,30 @@ CIRCUIT_BREAKER_TRIPS_TOTAL = Counter(
     ["service"],
 )
 
+# ── HTTP latency histogram (Week 14 — SLO foundation) ────────────────────────
+# Paired with cb_http_requests_total. Used for p50 / p95 / p99 latency SLOs.
+HTTP_REQUEST_DURATION = Histogram(
+    "cb_http_request_duration_seconds",
+    "HTTP request duration in seconds (app handler time, excludes GZip)",
+    ["method", "path_template", "status_code"],
+    buckets=[0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
+)
+
+
+# ── Business-outcome metrics (Week 14 — alert on outcomes, not just liveness) ─
+SIGNALS_DETECTED_TOTAL = Counter(
+    "cb_signals_detected_total",
+    "Signals written by the nightly pattern-detection job",
+    ["signal_type", "severity", "outcome"],  # outcome: created | updated
+)
+
+DIGESTS_SENT_TOTAL = Counter(
+    "cb_digests_sent_total",
+    "Weekly digest delivery attempts",
+    ["delivery_channel", "status"],  # channel: slack|email|in_app, status: sent|failed|skipped
+)
+
+
 # ── Application info ──────────────────────────────────────────────────────────
 
 APP_INFO = Info(
