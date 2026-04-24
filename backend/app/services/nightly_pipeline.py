@@ -140,20 +140,24 @@ def run_nightly(
                     error=f"no adapter registered for step '{step_name}'",
                 )
             )
+            _observe_step_duration(step_name, "failed", 0.0)
             continue
 
         t0 = time.perf_counter()
         try:
             payload = fn() or {}
+            elapsed = time.perf_counter() - t0
             step_results.append(
                 StepResult(
                     step=step_name,
                     status="ok",
-                    duration_ms=int((time.perf_counter() - t0) * 1000),
+                    duration_ms=int(elapsed * 1000),
                     payload=payload,
                 )
             )
+            _observe_step_duration(step_name, "ok", elapsed)
         except Exception as exc:
+            elapsed = time.perf_counter() - t0
             logger.error(
                 "nightly_pipeline run_id=%s step=%s failed: %s",
                 run_id,
@@ -165,10 +169,11 @@ def run_nightly(
                 StepResult(
                     step=step_name,
                     status="failed",
-                    duration_ms=int((time.perf_counter() - t0) * 1000),
+                    duration_ms=int(elapsed * 1000),
                     error=f"{type(exc).__name__}: {exc}",
                 )
             )
+            _observe_step_duration(step_name, "failed", elapsed)
             # DO NOT break — subsequent steps still run. This is what
             # "per-step isolation" means in this PR; follow-up PRs extend
             # isolation to per-org within each step.
@@ -181,6 +186,8 @@ def run_nightly(
         steps=step_results,
     )
 
+    _increment_run_total(step_results)
+
     logger.info(
         "nightly_pipeline run_id=%s done ok=%s duration_ms=%d steps_ok=%d/%d",
         run_id,
@@ -190,6 +197,43 @@ def run_nightly(
         len(step_results),
     )
     return report
+
+
+def _observe_step_duration(step: StepName, status: str, seconds: float) -> None:
+    """Prometheus histogram emission. Failures are swallowed — metrics
+    must never break the pipeline itself."""
+    try:
+        from app.services.metrics import NIGHTLY_STEP_DURATION_SECONDS
+
+        NIGHTLY_STEP_DURATION_SECONDS.labels(step=step, status=status).observe(seconds)
+    except Exception:  # pragma: no cover — best-effort telemetry
+        logger.warning("Could not record step duration metric", exc_info=True)
+
+
+def _increment_run_total(step_results: list[StepResult]) -> None:
+    """Increment the pipeline run counter with the aggregate status:
+    - all steps ok → ok
+    - mix of ok + failed → partial
+    - all failed → failed
+    - no steps at all (empty only_steps) → failed (treated as a no-op run)
+    """
+    try:
+        from app.services.metrics import NIGHTLY_PIPELINE_RUN_TOTAL
+
+        if not step_results:
+            status = "failed"
+        else:
+            ok_count = sum(1 for s in step_results if s.status == "ok")
+            if ok_count == len(step_results):
+                status = "ok"
+            elif ok_count == 0:
+                status = "failed"
+            else:
+                status = "partial"
+
+        NIGHTLY_PIPELINE_RUN_TOTAL.labels(status=status).inc()
+    except Exception:  # pragma: no cover — best-effort telemetry
+        logger.warning("Could not record pipeline run metric", exc_info=True)
 
 
 def run_step(
