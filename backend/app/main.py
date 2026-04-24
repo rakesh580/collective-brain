@@ -369,17 +369,16 @@ for _h in logging.root.handlers:
 
 from starlette.middleware.gzip import GZipMiddleware
 
-from app.middleware.access_log import AccessLogMiddleware
-
-# Middleware order (outermost first — Starlette applies in LIFO):
-# GZip -> SecurityHeaders -> Deprecation -> RequestID -> AccessLog
-# AccessLog wraps innermost so the latency measurement is closest to the
-# actual handler time (excludes GZip compression of large responses).
+# NOTE: AccessLogMiddleware (backend/app/middleware/access_log.py) is
+# intentionally NOT wired here yet — it introduced a KeyError that 500'd
+# every request on HF Spaces. Likely cause under investigation: interaction
+# between the `extra=` kwarg and the JSON formatter's required field list
+# for records not already carrying org_id / trace_id. Re-enable once the
+# repro + fix land.
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(DeprecationMiddleware)
 app.add_middleware(RequestIDMiddleware)
-app.add_middleware(AccessLogMiddleware)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────
