@@ -93,6 +93,38 @@ def _alembic_current_revision(db) -> str | None:
         return None
 
 
+# Known stale revision IDs that previous deployments wrote to alembic_version
+# but no longer exist in the migration script chain. Keys are the stale IDs,
+# values are the current short-form IDs that match the script files.
+#
+# Add entries here (never remove) as you discover drift from old deployments.
+_STALE_REVISION_MAP: dict[str, str] = {
+    "008_decision_outcomes_notifications": "008_outcomes_notifs",
+}
+
+
+def _heal_stale_alembic_revision(db) -> tuple[str | None, str | None]:
+    """If alembic_version holds a revision ID that no longer exists in the
+    script dir, rewrite it to the current short-form ID so ``upgrade head``
+    can walk the history forward.
+
+    Returns ``(old_id, new_id)`` if a rewrite happened, else ``(None, None)``.
+    Safe no-op when the current revision is already a valid script ID.
+    """
+    current = _alembic_current_revision(db)
+    if current is None or current not in _STALE_REVISION_MAP:
+        return None, None
+
+    new_id = _STALE_REVISION_MAP[current]
+    db.execute(
+        text("UPDATE alembic_version SET version_num = :new WHERE version_num = :old"),
+        {"new": new_id, "old": current},
+    )
+    db.commit()
+    logger.warning("Healed stale Alembic revision in alembic_version: %r -> %r", current, new_id)
+    return current, new_id
+
+
 def _alembic_head_revision() -> str | None:
     """Read the head revision from the local migrations dir without touching the DB."""
     try:
@@ -154,6 +186,8 @@ async def apply_migrations(request: Request):
     db = create_session()
     try:
         before = _alembic_current_revision(db)
+        # Heal stale revision IDs before upgrade (see _heal_stale_alembic_revision docstring).
+        healed_from, healed_to = _heal_stale_alembic_revision(db)
     finally:
         db.close()
 
@@ -178,6 +212,7 @@ async def apply_migrations(request: Request):
         "after": after,
         "head": head,
         "at_head": after is not None and after == head,
+        "healed": {"from": healed_from, "to": healed_to} if healed_from else None,
         "error": error,
     }
 
@@ -237,6 +272,11 @@ async def bootstrap_migrations(
     db = create_session()
     try:
         before = _alembic_current_revision(db)
+        # Auto-heal any known-stale revision IDs before attempting upgrade.
+        # Without this, an old deployment that wrote a long-form ID to
+        # alembic_version would make `upgrade head` fail with
+        # "Can't locate revision identified by '...'".
+        healed_from, healed_to = _heal_stale_alembic_revision(db)
     finally:
         db.close()
 
@@ -261,5 +301,6 @@ async def bootstrap_migrations(
         "after": after,
         "head": head,
         "at_head": after is not None and after == head,
+        "healed": {"from": healed_from, "to": healed_to} if healed_from else None,
         "error": error,
     }
