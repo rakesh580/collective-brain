@@ -1,8 +1,15 @@
 """Phase 7b: Decision Outcomes & Notifications — outcome tracking, webhook notifications.
 
-Revision ID: 008_outcomes_notifs
+Revision ID: 008_decision_outcomes_notifications
 Revises: 007_decision_intelligence
 Create Date: 2026-04-16
+
+Note: the revision ID matches the filename explicitly. An earlier
+version of this file used the shortened "008_outcomes_notifs" ID but
+some deployments' alembic_version table was stamped with the full
+filename-style ID, causing "Can't locate revision" errors on
+subsequent upgrades. Using the full ID keeps the file and every
+existing deployment's alembic_version row in sync.
 """
 
 from collections.abc import Sequence
@@ -12,7 +19,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "008_outcomes_notifs"
+revision: str = "008_decision_outcomes_notifications"
 down_revision: str | None = "007_decision_intelligence"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

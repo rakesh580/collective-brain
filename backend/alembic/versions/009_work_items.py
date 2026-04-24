@@ -1,7 +1,7 @@
 """Phase 9: Work Items — unified PR/issue/task model for cycle-time analysis.
 
 Revision ID: 009_work_items
-Revises: 008_outcomes_notifs
+Revises: 008_decision_outcomes_notifications
 Create Date: 2026-04-22
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "009_work_items"
-down_revision: str | None = "008_outcomes_notifs"
+down_revision: str | None = "008_decision_outcomes_notifications"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
