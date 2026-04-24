@@ -74,8 +74,38 @@ async def list_jobs(request: Request):
 
 @router.post("/trigger-job/{job_name}")
 async def trigger_job(request: Request, job_name: str):
-    """Manually run a registered job. Blocks until completion."""
+    """Manually run a registered scheduler job or a single nightly pipeline step.
+
+    Accepts:
+    - Scheduler-registered job names (e.g. ``nightly_pipeline``,
+      ``weekly_digest_dispatcher``) — delegates to the scheduler.
+    - Individual nightly step names (``contribution_rollup``,
+      ``health_snapshot``, ``strengths_weaknesses``, ``pattern_detection``)
+      — invokes ``nightly_pipeline.run_step(name)`` directly so callers
+      can still re-run one step without triggering the whole chain.
+    """
     _require_admin(request)
+
+    # Step names are routed to the pipeline directly so admins can re-run
+    # a single step without touching the scheduler registration list.
+    from app.services.nightly_pipeline import STEPS_IN_ORDER, run_step
+
+    if job_name in STEPS_IN_ORDER:
+        import asyncio
+
+        report = await asyncio.to_thread(run_step, job_name)
+        return {
+            "status": "ok",
+            "pipeline_step": job_name,
+            "run_id": report.run_id,
+            "step": {
+                "status": report.steps[0].status,
+                "duration_ms": report.steps[0].duration_ms,
+                "payload": report.steps[0].payload,
+                "error": report.steps[0].error,
+            },
+        }
+
     scheduler = request.app.state.scheduler
     try:
         run = await scheduler.run_now(job_name)
