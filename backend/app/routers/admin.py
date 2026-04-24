@@ -159,9 +159,9 @@ async def apply_migrations(request: Request):
 
     error: str | None = None
     try:
-        _run_alembic_migrations(settings)
+        _run_alembic_migrations(settings, raise_errors=True)
     except Exception as exc:
-        error = str(exc)
+        error = f"{type(exc).__name__}: {exc}"
         logger.error("apply-migrations failed: %s", exc, exc_info=True)
 
     db = create_session()
@@ -242,9 +242,9 @@ async def bootstrap_migrations(
 
     error: str | None = None
     try:
-        _run_alembic_migrations(get_settings())
+        _run_alembic_migrations(get_settings(), raise_errors=True)
     except Exception as exc:
-        error = str(exc)
+        error = f"{type(exc).__name__}: {exc}"
         logger.error("bootstrap-migrations upgrade failed: %s", exc, exc_info=True)
 
     db = create_session()
