@@ -294,14 +294,12 @@ app.add_middleware(
 )
 
 # ── Middleware ────────────────────────────────────────────────────────────────
-import contextvars
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
 
-_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
-_org_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("org_id", default="-")
+from app.request_context import org_id_var as _org_id_var
+from app.request_context import request_id_var as _request_id_var
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -369,16 +367,17 @@ for _h in logging.root.handlers:
 
 from starlette.middleware.gzip import GZipMiddleware
 
-# NOTE: AccessLogMiddleware (backend/app/middleware/access_log.py) is
-# intentionally NOT wired here yet — it introduced a KeyError that 500'd
-# every request on HF Spaces. Likely cause under investigation: interaction
-# between the `extra=` kwarg and the JSON formatter's required field list
-# for records not already carrying org_id / trace_id. Re-enable once the
-# repro + fix land.
+from app.middleware.access_log import AccessLogMiddleware
+
+# Middleware order (outermost first — Starlette applies in LIFO):
+# GZip -> SecurityHeaders -> Deprecation -> RequestID -> AccessLog
+# AccessLog is innermost so its latency measurement is closest to handler
+# time (excludes GZip compression on large responses).
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(DeprecationMiddleware)
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(AccessLogMiddleware)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────
