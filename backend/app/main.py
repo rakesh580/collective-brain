@@ -188,69 +188,39 @@ def _register_scheduled_jobs(scheduler: Scheduler) -> None:
 
     Keep this list short and intentional — every job is a moving part that can
     fail in production. Each job must be idempotent and safe to re-run.
+
+    Week 15: the 4 previously-separate nightly steps (contribution_rollup,
+    nightly_health_snapshot, strengths_weaknesses_analyzer, pattern_detection)
+    are now one ``nightly_pipeline`` job at 02:30 UTC. Admins can still
+    re-run a single step via ``POST /admin/trigger-job/{step_name}`` — that
+    route dispatches to ``nightly_pipeline.run_step(name)`` when the name
+    matches a pipeline step.
     """
     from apscheduler.triggers.cron import CronTrigger
 
-    def _nightly_health_snapshot() -> dict:
-        from app.db.database import create_session
-        from app.services.team_health_service import save_health_snapshot
+    from app.services.nightly_pipeline import run_nightly
 
-        db = create_session()
-        try:
-            return save_health_snapshot(db)
-        finally:
-            db.close()
-
-    from app.services.contribution_rollup_service import run_contribution_rollup_job
-
-    # ContributionRollup is the "first job" per the roadmap — per-member 7d/30d
-    # stats feed deltas, strengths/weaknesses, and silent-area signals.
+    # Single nightly job orchestrates the whole chain. See RFC #17.
     scheduler.register(
-        name="contribution_rollup",
-        func=run_contribution_rollup_job,
-        trigger=CronTrigger(hour=2, minute=30),  # 02:30 UTC — runs before health snapshot
-        description="Per-member 7d/30d activity rollups (contributions, artifacts, topics).",
-    )
-
-    scheduler.register(
-        name="nightly_health_snapshot",
-        func=_nightly_health_snapshot,
-        trigger=CronTrigger(hour=3, minute=15),  # 03:15 UTC daily
-        description="Compute and persist org health snapshot (bus factor, coverage, collab).",
+        name="nightly_pipeline",
+        func=run_nightly,
+        trigger=CronTrigger(hour=2, minute=30),  # 02:30 UTC
+        description=(
+            "Orchestrates: contribution_rollup → health_snapshot → "
+            "strengths_weaknesses → pattern_detection. Per-step isolated; "
+            "a failure in one step logs + continues."
+        ),
     )
 
     from app.services.digest_dispatcher import run_due_digests_job
 
+    # Digest is NOT part of the nightly pipeline — it runs hourly because
+    # each SlackDigestConfig row carries its own (weekday, hour) schedule.
     scheduler.register(
         name="weekly_digest_dispatcher",
         func=run_due_digests_job,
-        # Runs every hour on the hour (UTC). Each SlackDigestConfig row
-        # specifies its own weekday+hour; the dispatcher picks the matches.
         trigger=CronTrigger(minute=0),
         description="Fire weekly Slack digests for every due SlackDigestConfig.",
-    )
-
-    from app.services.strengths_weaknesses_service import run_strengths_weaknesses_job
-
-    scheduler.register(
-        name="strengths_weaknesses_analyzer",
-        func=run_strengths_weaknesses_job,
-        # 03:30 UTC — after contribution_rollup (02:30) and health_snapshot (03:15)
-        # but before pattern_detection (04:00) so downstream signals can read
-        # member.strengths / .weaknesses if needed.
-        trigger=CronTrigger(hour=3, minute=30),
-        description="Per-member strengths/weaknesses + per-org aggregate snapshot.",
-    )
-
-    from app.services.pattern_detection import run_pattern_detection_job
-
-    scheduler.register(
-        name="pattern_detection",
-        func=run_pattern_detection_job,
-        # 04:00 UTC — after contribution_rollup (02:30) and health_snapshot (03:15)
-        # so the rollup data is fresh for silent-area / load-skew detection.
-        trigger=CronTrigger(hour=4, minute=0),
-        description="Detect slow lanes, silent areas, load skew, Friday-land, and review bottlenecks.",
     )
 
 
