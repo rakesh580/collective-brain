@@ -16,6 +16,7 @@ import pytest
 
 from app.routers.admin import (
     _alembic_current_revision,
+    _heal_stale_alembic_revision,
     _verify_bootstrap_token,
     alembic_version,
     apply_migrations,
@@ -103,6 +104,7 @@ async def test_apply_migrations_runs_upgrade_and_reports_success(monkeypatch):
 
     monkeypatch.setattr("app.routers.admin._alembic_current_revision", fake_current)
     monkeypatch.setattr("app.routers.admin._alembic_head_revision", lambda: "013_org_strengths_weaknesses")
+    monkeypatch.setattr("app.routers.admin._heal_stale_alembic_revision", lambda db: (None, None))
     monkeypatch.setattr("app.routers.admin.create_session", lambda: MagicMock())
 
     # Mock out the real Alembic runner so the test is isolated.
@@ -141,6 +143,62 @@ async def test_apply_migrations_reports_error_without_crashing(monkeypatch):
     assert "connection timeout" in result["error"]
     assert "RuntimeError" in result["error"]
     assert result["before"] == "011_digest_log"
+
+
+# ── Stale revision healer ─────────────────────────────────────────────────
+
+
+def test_heal_stale_revision_rewrites_long_form_id():
+    """When alembic_version holds '008_decision_outcomes_notifications' (an ID
+    that doesn't exist in the script dir), it must be rewritten to
+    '008_outcomes_notifs' so upgrade head can walk forward."""
+    captured = {"sql": None, "params": None}
+
+    db = MagicMock()
+    db.execute.return_value.fetchone.return_value = ("008_decision_outcomes_notifications",)
+
+    def capture(stmt, params=None):
+        result = MagicMock()
+        result.fetchone.return_value = ("008_decision_outcomes_notifications",)
+        if params and "new" in params:
+            captured["sql"] = str(stmt)
+            captured["params"] = params
+        return result
+
+    db.execute.side_effect = capture
+
+    old, new = _heal_stale_alembic_revision(db)
+
+    assert old == "008_decision_outcomes_notifications"
+    assert new == "008_outcomes_notifs"
+    assert "UPDATE alembic_version" in captured["sql"]
+    assert captured["params"]["old"] == "008_decision_outcomes_notifications"
+    assert captured["params"]["new"] == "008_outcomes_notifs"
+    db.commit.assert_called_once()
+
+
+def test_heal_stale_revision_noop_when_already_valid():
+    """Current revision is a known-good short ID → no UPDATE, no commit."""
+    db = MagicMock()
+    db.execute.return_value.fetchone.return_value = ("010_contribution_rollups",)
+
+    old, new = _heal_stale_alembic_revision(db)
+
+    assert old is None
+    assert new is None
+    db.commit.assert_not_called()
+
+
+def test_heal_stale_revision_noop_when_table_missing():
+    """Pristine DB (no alembic_version table) → None/None, no crash."""
+    db = MagicMock()
+    db.execute.side_effect = Exception("relation alembic_version does not exist")
+
+    old, new = _heal_stale_alembic_revision(db)
+
+    assert old is None
+    assert new is None
+    db.commit.assert_not_called()
 
 
 # ── Bootstrap endpoint (token-gated) ──────────────────────────────────────
@@ -194,6 +252,11 @@ async def test_bootstrap_migrations_runs_upgrade_when_token_valid(monkeypatch):
     revisions = iter(["008_decision_outcomes_notifications", "013_org_strengths_weaknesses"])
     monkeypatch.setattr("app.routers.admin._alembic_current_revision", lambda db: next(revisions))
     monkeypatch.setattr("app.routers.admin._alembic_head_revision", lambda: "013_org_strengths_weaknesses")
+    # Simulate the stale-revision heal firing (before → after rewrite).
+    monkeypatch.setattr(
+        "app.routers.admin._heal_stale_alembic_revision",
+        lambda db: ("008_decision_outcomes_notifications", "008_outcomes_notifs"),
+    )
     monkeypatch.setattr("app.routers.admin.create_session", lambda: MagicMock())
 
     with patch("app.db.database._run_alembic_migrations") as runner:
@@ -204,6 +267,10 @@ async def test_bootstrap_migrations_runs_upgrade_when_token_valid(monkeypatch):
     assert result["before"] == "008_decision_outcomes_notifications"
     assert result["after"] == "013_org_strengths_weaknesses"
     assert result["at_head"] is True
+    assert result["healed"] == {
+        "from": "008_decision_outcomes_notifications",
+        "to": "008_outcomes_notifs",
+    }
 
 
 @pytest.mark.asyncio
