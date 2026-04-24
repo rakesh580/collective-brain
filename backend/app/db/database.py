@@ -83,11 +83,20 @@ def init_db(settings=None):
         logger.info("Database initialized (SQLite fallback: %s)", sqlite_path)
 
 
-def _run_alembic_migrations(settings):
+def _run_alembic_migrations(settings, raise_errors: bool = False):
     """Run `alembic upgrade head` programmatically at startup.
 
     Uses CB_MIGRATION_DATABASE_URL (direct port-5432 connection) because
     Alembic needs a session-mode connection, not the transaction pooler.
+
+    ``raise_errors`` controls failure handling:
+    - ``False`` (default, used at app startup): swallow exceptions so a
+      transient DB error doesn't crashloop the container. Errors are still
+      logged at ERROR level with full traceback.
+    - ``True`` (used by /admin/bootstrap-migrations and /admin/apply-migrations):
+      re-raise so the caller can surface the real failure in its response
+      body. The endpoints were previously reporting ``error: null`` on a
+      swallowed failure, which made drift debugging impossible.
     """
     try:
         import os
@@ -109,12 +118,10 @@ def _run_alembic_migrations(settings):
         command.upgrade(alembic_cfg, "head")
         logger.info("Alembic migrations applied (head)")
     except Exception as e:
-        # Log but don't crash — the DB may already be at head, or the
-        # connection may be transiently unreachable. Promoted from warning
-        # to error with full traceback so production logs surface broken
-        # migrations (they manifest later as 500s on endpoints that expect
-        # missing tables/columns).
+        # Always log; optionally propagate.
         logger.error("Alembic migration step raised: %s", e, exc_info=True)
+        if raise_errors:
+            raise
 
 
 # ---------------------------------------------------------------------------

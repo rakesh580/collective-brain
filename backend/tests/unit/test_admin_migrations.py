@@ -131,7 +131,7 @@ async def test_apply_migrations_reports_error_without_crashing(monkeypatch):
     monkeypatch.setattr("app.routers.admin._alembic_head_revision", lambda: "013_org_strengths_weaknesses")
     monkeypatch.setattr("app.routers.admin.create_session", lambda: MagicMock())
 
-    def boom(settings):
+    def boom(settings, raise_errors=False):
         raise RuntimeError("connection timeout")
 
     with patch("app.db.database._run_alembic_migrations", side_effect=boom):
@@ -139,6 +139,7 @@ async def test_apply_migrations_reports_error_without_crashing(monkeypatch):
 
     assert result["status"] == "error"
     assert "connection timeout" in result["error"]
+    assert "RuntimeError" in result["error"]
     assert result["before"] == "011_digest_log"
 
 
