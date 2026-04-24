@@ -6,15 +6,20 @@ Exposes:
 - POST /admin/trigger-job/{job_name} — manually run a registered job.
 - GET /admin/alembic-version — current DB revision + expected head.
 - POST /admin/apply-migrations — run ``alembic upgrade head`` from inside
-  the container (works around the Supabase-IPv6 issue that prevents
-  GitHub Actions runners from reaching the DB for migrations).
+  the container (requires admin/owner JWT).
+- POST /admin/bootstrap-migrations — token-gated alternate to the above for
+  first-run deployments where no admin user exists in the DB yet. Requires
+  the ``CB_BOOTSTRAP_TOKEN`` env var to be set AND the matching value sent
+  via the ``X-Bootstrap-Token`` header (constant-time comparison).
 """
 
 from __future__ import annotations
 
+import hmac
 import logging
+import os
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlalchemy import text
 
 from app.db.database import create_session
@@ -158,6 +163,89 @@ async def apply_migrations(request: Request):
     except Exception as exc:
         error = str(exc)
         logger.error("apply-migrations failed: %s", exc, exc_info=True)
+
+    db = create_session()
+    try:
+        after = _alembic_current_revision(db)
+    finally:
+        db.close()
+
+    head = _alembic_head_revision()
+
+    return {
+        "status": "ok" if error is None else "error",
+        "before": before,
+        "after": after,
+        "head": head,
+        "at_head": after is not None and after == head,
+        "error": error,
+    }
+
+
+def _verify_bootstrap_token(provided: str | None) -> None:
+    """Authenticate the bootstrap endpoint via a pre-shared secret.
+
+    Distinct from the JWT-based ``_require_admin``: this is the one-time
+    escape hatch for first-run deployments where no admin-role user exists
+    in the DB yet (chicken-and-egg). The operator sets
+    ``CB_BOOTSTRAP_TOKEN`` as an HF Space secret, calls the endpoint with
+    the matching header, then unsets the secret. No JWT required because
+    the shared secret IS the authentication factor.
+
+    Fails with 503 if the env var is unset, so the endpoint is a no-op on
+    deployments that haven't opted in.
+    """
+    expected = os.environ.get("CB_BOOTSTRAP_TOKEN", "")
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="Bootstrap endpoint not enabled. Set CB_BOOTSTRAP_TOKEN env var to enable.",
+        )
+    if not provided or not hmac.compare_digest(provided, expected):
+        raise HTTPException(status_code=401, detail="Invalid bootstrap token")
+
+
+@router.post("/bootstrap-migrations", include_in_schema=False)
+async def bootstrap_migrations(
+    request: Request,
+    x_bootstrap_token: str | None = Header(default=None, alias="X-Bootstrap-Token"),
+):
+    """Token-gated ``alembic upgrade head`` for first-run / no-admin deployments.
+
+    Authentication: shared secret via ``X-Bootstrap-Token`` header, matched
+    against ``CB_BOOTSTRAP_TOKEN`` env var with ``hmac.compare_digest`` to
+    defeat timing attacks. When the env var is unset the endpoint returns
+    503 (disabled by default).
+
+    Behavior matches ``/apply-migrations``: returns ``{before, after, head,
+    at_head, error}``. Every call is logged at ERROR with the source IP so
+    authorized use leaves an audit trail.
+
+    Remove or disable this endpoint (unset ``CB_BOOTSTRAP_TOKEN``) once an
+    admin user exists in the DB.
+    """
+    _verify_bootstrap_token(x_bootstrap_token)
+
+    logger.error(
+        "bootstrap-migrations invoked from %s (token match)",
+        request.client.host if request.client else "?",
+    )
+
+    from app.config import get_settings
+    from app.db.database import _run_alembic_migrations
+
+    db = create_session()
+    try:
+        before = _alembic_current_revision(db)
+    finally:
+        db.close()
+
+    error: str | None = None
+    try:
+        _run_alembic_migrations(get_settings())
+    except Exception as exc:
+        error = str(exc)
+        logger.error("bootstrap-migrations upgrade failed: %s", exc, exc_info=True)
 
     db = create_session()
     try:
