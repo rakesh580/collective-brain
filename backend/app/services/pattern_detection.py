@@ -482,6 +482,7 @@ def _upsert_signal(db: Session, pending: PendingSignal) -> Signal:
             detected_at=pending.detected_at,
         )
         db.add(row)
+        _record_signal_metric(pending, outcome="created")
         return row
 
     # Refresh fields — severity / evidence / title may have shifted since last run.
@@ -491,7 +492,23 @@ def _upsert_signal(db: Session, pending: PendingSignal) -> Signal:
     existing.evidence = pending.evidence
     existing.suggested_action = pending.suggested_action
     existing.detected_at = pending.detected_at
+    _record_signal_metric(pending, outcome="updated")
     return existing
+
+
+def _record_signal_metric(pending: PendingSignal, outcome: str) -> None:
+    """Increment the signals-detected counter. Failure is logged but never
+    propagates — a metrics outage must not break the nightly job."""
+    try:
+        from app.services.metrics import SIGNALS_DETECTED_TOTAL
+
+        SIGNALS_DETECTED_TOTAL.labels(
+            signal_type=pending.signal_type,
+            severity=pending.severity,
+            outcome=outcome,
+        ).inc()
+    except Exception:  # pragma: no cover — metrics must never break detection
+        logger.warning("Could not record signal detection metric", exc_info=True)
 
 
 def run_pattern_detection(db: Session, now: datetime | None = None) -> dict[str, Any]:

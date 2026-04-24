@@ -470,3 +470,74 @@ Set the log level with:
 ```dotenv
 CB_LOG_LEVEL=INFO   # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
+
+## Observability runbook (Week 14)
+
+Starting at v0.6.x, every HTTP request emits one structured access-log record and a small set of business-outcome metrics are available on `/metrics`. Use these instead of hunting container logs when investigating outages or building alerts.
+
+### Access log shape
+
+Every handled request is logged at `collective_brain.access_log`. In prod (JSON formatter) each record has:
+
+```json
+{
+  "level": "INFO",
+  "timestamp": "...",
+  "request_id": "a1b2c3d4",
+  "trace_id": "...",
+  "org_id": "org-7",
+  "method": "POST",
+  "path": "/api/v1/signals",
+  "status_code": 200,
+  "latency_ms": 42.1,
+  "user_id": "user-42",
+  "message": "POST /api/v1/signals -> 200 in 42.1ms"
+}
+```
+
+5xx responses are logged at **WARNING**; everything else at **INFO**. That makes `grep '"level":"WARNING"'` the fast path to every server error.
+
+Pair `request_id` (or `error_ref` from the 500 response body) with the access log line to jump straight to the failing request's traceback.
+
+### Business metrics worth alerting on
+
+Scrape `/metrics` with Prometheus and define alerts against these counters:
+
+| Metric | Labels | Alert example |
+|---|---|---|
+| `cb_digests_sent_total` | `delivery_channel`, `status` | `rate(cb_digests_sent_total{status="failed"}[1h]) > rate(cb_digests_sent_total{status="sent"}[1h])` — more failures than successes |
+| `cb_signals_detected_total` | `signal_type`, `severity`, `outcome` | `sum(increase(cb_signals_detected_total[24h])) == 0` — nightly job silently broken |
+| `cb_http_request_duration_seconds` | `method`, `path_template`, `status_code` | p95 > 2s over 5 min |
+| `cb_job_errors_total` | `job_name` | any increase indicates a scheduled job failure |
+| `cb_llm_requests_total` | `provider`, `model`, `status="error"` | error rate > 5% of total |
+
+### Useful PromQL starters
+
+```promql
+# Digest delivery success rate, 1 hour window
+sum(rate(cb_digests_sent_total{status="sent"}[1h]))
+  / sum(rate(cb_digests_sent_total[1h]))
+
+# HTTP error rate per route
+sum by (path_template) (rate(cb_http_request_duration_seconds_count{status_code=~"5.."}[5m]))
+  / sum by (path_template) (rate(cb_http_request_duration_seconds_count[5m]))
+
+# New signals per severity in the last 24h
+sum by (severity) (increase(cb_signals_detected_total{outcome="created"}[24h]))
+```
+
+### Grepping HF Space logs
+
+HF Spaces doesn't expose Prometheus, but the access log JSON is in the container logs:
+
+```bash
+# Every 5xx in the last hour (from Space logs panel, filter by level=WARNING)
+# or locally:
+docker logs <container> 2>&1 | jq 'select(.level=="WARNING" and .status_code>=500)'
+
+# Slowest 10 requests in the last N lines:
+tail -n 1000 /var/log/cb.log | jq 'select(.latency_ms) | [.latency_ms, .path, .request_id] | @tsv' | sort -rn | head
+
+# Every request an org made today:
+jq 'select(.org_id=="org-7")' /var/log/cb.log | head
+```
