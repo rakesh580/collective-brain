@@ -115,18 +115,15 @@ def _upsert_rollup(
     return existing
 
 
-def compute_and_save_rollups(
+def _process_member_rollups(
     db: Session,
-    windows: tuple[int, ...] = DEFAULT_WINDOWS,
-    now: datetime | None = None,
-) -> dict[str, Any]:
-    """Iterate every member and persist rollups for each configured window.
-
-    Returns a summary dict so the scheduled run has a usable result payload.
-    """
-    current = now or datetime.now(UTC)
-    members = db.query(MemberRecord).all()
-
+    members: list[MemberRecord],
+    *,
+    windows: tuple[int, ...],
+    current: datetime,
+) -> int:
+    """Compute + upsert rollups for the given member list. Caller owns
+    commit. Returns rows_written."""
     rows_written = 0
     for member in members:
         for window in windows:
@@ -143,7 +140,55 @@ def compute_and_save_rollups(
                 stats=stats,
             )
             rows_written += 1
+    return rows_written
 
+
+def compute_and_save_rollups_for_org(
+    db: Session,
+    organization_id: str | None,
+    *,
+    windows: tuple[int, ...] = DEFAULT_WINDOWS,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Per-org runner. Restricts the member scan to one org.
+
+    ``organization_id=None`` matches members with no org assigned (legacy
+    rows from before multi-tenant). The orchestrator's per-org loop calls
+    this once per distinct org_id so a poison-pill member in org A cannot
+    abort the rollup for org B.
+    """
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    current = now or current_pipeline_as_of()
+    members = db.query(MemberRecord).filter(MemberRecord.organization_id == organization_id).all()
+
+    rows_written = _process_member_rollups(db, members, windows=windows, current=current)
+    db.commit()
+
+    return {
+        "organization_id": organization_id,
+        "members_processed": len(members),
+        "windows": list(windows),
+        "rows_written": rows_written,
+        "computed_at": current.isoformat(),
+    }
+
+
+def compute_and_save_rollups(
+    db: Session,
+    windows: tuple[int, ...] = DEFAULT_WINDOWS,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Iterate every member and persist rollups for each configured window.
+
+    Returns a summary dict so the scheduled run has a usable result payload.
+    """
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    current = now or current_pipeline_as_of()
+    members = db.query(MemberRecord).all()
+
+    rows_written = _process_member_rollups(db, members, windows=windows, current=current)
     db.commit()
 
     summary = {
@@ -159,6 +204,23 @@ def compute_and_save_rollups(
         rows_written,
     )
     return summary
+
+
+def run_contribution_rollup_for_org(
+    organization_id: str | None,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Per-org session-owning entrypoint — used by the orchestrator's
+    per-org loop in follow-up work. Mirrors ``run_contribution_rollup_job``
+    but scoped to a single tenant."""
+    from app.db.database import create_session
+
+    db = create_session()
+    try:
+        return compute_and_save_rollups_for_org(db, organization_id, now=now)
+    finally:
+        db.close()
 
 
 def run_contribution_rollup_job() -> dict[str, Any]:

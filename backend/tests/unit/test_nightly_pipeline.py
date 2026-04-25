@@ -254,3 +254,88 @@ def test_admin_trigger_job_unknown_name_returns_404(monkeypatch):
         raise AssertionError("should have raised HTTPException")
     except HTTPException as exc:
         assert exc.status_code == 404
+
+
+# ── PIPELINE_AS_OF contextvar (RFC #17 sequencing step 5) ────────────────────
+
+
+def test_current_pipeline_as_of_falls_back_to_real_now_when_unset():
+    """Outside ``run_nightly`` the contextvar is unset; the helper must
+    return real wallclock so service code paths called from the API
+    layer aren't accidentally frozen."""
+    from datetime import UTC, datetime
+
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    before = datetime.now(UTC)
+    val = current_pipeline_as_of()
+    after = datetime.now(UTC)
+
+    assert before <= val <= after
+    assert val.tzinfo is not None
+
+
+def test_run_nightly_as_of_propagates_into_step_adapters():
+    """``run_nightly(as_of=date(...))`` must set the contextvar so each
+    step adapter sees the backfill date, not real now."""
+    from datetime import UTC, date, datetime
+
+    from app.services.nightly_pipeline import current_pipeline_as_of, run_nightly
+
+    seen: dict[str, datetime] = {}
+
+    def capture(name: str):
+        def _fn():
+            seen[name] = current_pipeline_as_of()
+            return {}
+
+        return _fn
+
+    adapters = {s: capture(s) for s in STEPS_IN_ORDER}
+
+    target = date(2026, 4, 20)
+    expected = datetime(2026, 4, 20, tzinfo=UTC)
+
+    run_nightly(as_of=target, _adapters=adapters)
+
+    assert len(seen) == len(STEPS_IN_ORDER)
+    for step, observed in seen.items():
+        assert observed == expected, f"{step} saw {observed}, expected {expected}"
+
+
+def test_run_nightly_resets_contextvar_after_run():
+    """The contextvar must be reset so a backfill run doesn't leak its
+    as_of into a subsequent normal cron tick on the same event loop."""
+    from datetime import UTC, date, datetime
+
+    from app.services.nightly_pipeline import (
+        PIPELINE_AS_OF,
+        current_pipeline_as_of,
+        run_nightly,
+    )
+
+    assert PIPELINE_AS_OF.get() is None
+    run_nightly(as_of=date(2026, 4, 20), _adapters={s: lambda: {} for s in STEPS_IN_ORDER})
+    # Contextvar restored.
+    assert PIPELINE_AS_OF.get() is None
+    # Subsequent call without as_of sees real now, not the previous backfill.
+    before = datetime.now(UTC)
+    val = current_pipeline_as_of()
+    assert val >= before
+
+
+def test_run_nightly_naive_datetime_treated_as_utc():
+    """A naive ``datetime`` passed as ``as_of`` is treated as UTC, not
+    silently converted to the local timezone of whatever box runs the job."""
+    from datetime import UTC, datetime
+
+    from app.services.nightly_pipeline import current_pipeline_as_of, run_nightly
+
+    seen: list[datetime] = []
+    adapters = {s: (lambda: seen.append(current_pipeline_as_of()) or {}) for s in STEPS_IN_ORDER}
+
+    naive = datetime(2026, 4, 20, 12, 0, 0)
+    run_nightly(as_of=naive, _adapters=adapters)
+
+    expected = datetime(2026, 4, 20, 12, 0, 0, tzinfo=UTC)
+    assert all(t == expected for t in seen)

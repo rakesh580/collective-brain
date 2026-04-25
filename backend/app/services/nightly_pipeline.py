@@ -11,10 +11,14 @@ surface is just two functions:
 
 The existing per-step service functions (``run_contribution_rollup_job``,
 ``save_health_snapshot``, ``run_strengths_weaknesses_job``,
-``run_pattern_detection_job``) stay unchanged in this PR — the pipeline
-dispatches to them via an adapter table. Follow-up PRs will extract
-``run_*_for_org`` helpers from each so per-org isolation + ``as_of``
-backfill become real.
+``run_pattern_detection_job``) are reused here via an adapter table —
+each one is a thin wrapper that opens a session and dispatches to a
+per-org runner exposed by the same module (``*_for_org`` functions).
+
+Backfill works via the ``PIPELINE_AS_OF`` contextvar: callers pass
+``run_nightly(as_of=date(2026, 4, 20))`` and every service that reads
+through ``current_pipeline_as_of()`` sees that value instead of
+``datetime.now(UTC)``.
 
 Digest dispatcher is NOT part of the nightly pipeline — it runs hourly
 on its own cron because individual orgs have different weekly schedules.
@@ -28,11 +32,30 @@ import logging
 import time
 import uuid
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 logger = logging.getLogger("collective_brain.nightly_pipeline")
+
+# ── Pipeline-as-of contextvar ────────────────────────────────────────────────
+#
+# Services running inside ``run_nightly`` should read the pipeline's "as-of"
+# wallclock through ``current_pipeline_as_of()`` instead of ``datetime.now(UTC)``
+# directly. ``run_nightly(as_of=date(...))`` sets this contextvar for the
+# duration of the run so a backfill can re-execute with yesterday's window.
+
+PIPELINE_AS_OF: ContextVar[datetime | None] = ContextVar("PIPELINE_AS_OF", default=None)
+
+
+def current_pipeline_as_of() -> datetime:
+    """Return the pipeline's effective "now" — the contextvar if set inside
+    ``run_nightly``, else real wallclock UTC. Services use this to make
+    ``run_nightly(as_of=...)`` backfills observable end-to-end."""
+    val = PIPELINE_AS_OF.get()
+    return val if val is not None else datetime.now(UTC)
+
 
 # ── Public types ─────────────────────────────────────────────────────────────
 
@@ -112,10 +135,16 @@ def _default_adapters() -> dict[StepName, StepFn]:
 
 def run_nightly(
     *,
+    as_of: date | datetime | None = None,
     only_steps: list[StepName] | None = None,
     _adapters: dict[StepName, StepFn] | None = None,
 ) -> RunReport:
     """Run the nightly pipeline. Zero required args — this is the cron path.
+
+    ``as_of`` overrides the wallclock for backfill: services that read through
+    ``current_pipeline_as_of()`` will see this value instead of ``now()``.
+    A ``date`` is interpreted as midnight UTC; a ``datetime`` is used as-is
+    (a naive datetime is assumed to be UTC).
 
     ``only_steps`` filters to a subset (admin + backfill). ``_adapters`` is a
     test seam; production callers should never pass it.
@@ -123,7 +152,35 @@ def run_nightly(
     adapters = _adapters if _adapters is not None else _default_adapters()
     steps_to_run = [s for s in STEPS_IN_ORDER if only_steps is None or s in only_steps]
 
-    run_id = uuid.uuid4().hex[:12]
+    as_of_dt = _coerce_as_of(as_of)
+    token = PIPELINE_AS_OF.set(as_of_dt)
+    try:
+        return _run_nightly_inner(
+            run_id=uuid.uuid4().hex[:12],
+            steps_to_run=steps_to_run,
+            adapters=adapters,
+        )
+    finally:
+        PIPELINE_AS_OF.reset(token)
+
+
+def _coerce_as_of(as_of: date | datetime | None) -> datetime | None:
+    """Normalize the public ``as_of`` arg to an aware UTC datetime (or None).
+    A bare ``date`` becomes midnight UTC of that day."""
+    if as_of is None:
+        return None
+    if isinstance(as_of, datetime):
+        return as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=UTC)
+    # date (but not datetime — datetime is a subclass of date so order matters)
+    return datetime(as_of.year, as_of.month, as_of.day, tzinfo=UTC)
+
+
+def _run_nightly_inner(
+    *,
+    run_id: str,
+    steps_to_run: list[StepName],
+    adapters: dict[StepName, StepFn],
+) -> RunReport:
     started_at = datetime.now(UTC)
     step_results: list[StepResult] = []
 
@@ -239,9 +296,10 @@ def _increment_run_total(step_results: list[StepResult]) -> None:
 def run_step(
     step: StepName,
     *,
+    as_of: date | datetime | None = None,
     _adapters: dict[StepName, StepFn] | None = None,
 ) -> RunReport:
     """Admin path — run exactly one step. Kept separate from ``run_nightly``
     so the callsite reads clearly and so we can add step-specific args here
     later (e.g. ``org_id`` filtering) without bloating ``run_nightly``."""
-    return run_nightly(only_steps=[step], _adapters=_adapters)
+    return run_nightly(as_of=as_of, only_steps=[step], _adapters=_adapters)

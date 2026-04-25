@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter, defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -151,6 +151,86 @@ def _org_summary(
     }
 
 
+def compute_and_save_strengths_weaknesses_for_org(
+    db: Session,
+    organization_id: str | None,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Per-org runner. Restricts the member scan + org-summary write to one
+    tenant. ``organization_id=None`` matches members with no org assigned;
+    no org-summary row is written in that case (no OrganizationRecord
+    parent to attach it to)."""
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    current = now or current_pipeline_as_of()
+    current_cutoff = current - timedelta(days=CURRENT_WINDOW_DAYS)
+    prior_cutoff = current - timedelta(days=PRIOR_WINDOW_DAYS)
+
+    members = db.query(MemberRecord).filter(MemberRecord.organization_id == organization_id).all()
+    member_ids = [m.id for m in members]
+    member_names_by_id = {m.id: m.name for m in members}
+
+    current_rows_by_member: dict[str, list[ContributionRecord]] = defaultdict(list)
+    prior_rows_by_member: dict[str, list[ContributionRecord]] = defaultdict(list)
+
+    if member_ids:
+        window_rows = (
+            db.query(ContributionRecord)
+            .filter(
+                ContributionRecord.timestamp >= prior_cutoff,
+                ContributionRecord.member_id.in_(member_ids),
+            )
+            .all()
+        )
+        for r in window_rows:
+            if not r.member_id or r.timestamp is None:
+                continue
+            if r.timestamp >= current_cutoff:
+                current_rows_by_member[r.member_id].append(r)
+            else:
+                prior_rows_by_member[r.member_id].append(r)
+
+    members_updated = 0
+    for member in members:
+        strengths, weaknesses = _member_strengths_and_weaknesses(
+            current_rows_by_member.get(member.id, []),
+            prior_rows_by_member.get(member.id, []),
+        )
+        prev_strengths = member.strengths or []
+        prev_weaknesses = member.weaknesses or []
+        if strengths != prev_strengths or weaknesses != prev_weaknesses:
+            member.strengths = strengths
+            member.weaknesses = weaknesses
+            members_updated += 1
+
+    org_summary: dict[str, Any] | None = None
+    if organization_id is not None:
+        current_rows = [r for mid in member_ids for r in current_rows_by_member.get(mid, [])]
+        prior_rows = [r for mid in member_ids for r in prior_rows_by_member.get(mid, [])]
+        org_summary = _org_summary(
+            org_id=organization_id,
+            member_ids=member_ids,
+            current_rows=current_rows,
+            prior_rows=prior_rows,
+            member_names_by_id=member_names_by_id,
+            computed_at=current,
+        )
+        org = db.query(OrganizationRecord).filter(OrganizationRecord.id == organization_id).first()
+        if org is not None:
+            org.strengths_weaknesses_json = org_summary
+
+    db.commit()
+
+    return {
+        "computed_at": current.isoformat(),
+        "organization_id": organization_id,
+        "members_processed": len(members),
+        "members_updated": members_updated,
+        "org_summary": org_summary,
+    }
+
+
 def compute_and_save_strengths_weaknesses(
     db: Session,
     now: datetime | None = None,
@@ -159,7 +239,9 @@ def compute_and_save_strengths_weaknesses(
 
     Returns a summary payload so the scheduler run has a usable result.
     """
-    current = now or datetime.now(UTC)
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    current = now or current_pipeline_as_of()
     current_cutoff = current - timedelta(days=CURRENT_WINDOW_DAYS)
     prior_cutoff = current - timedelta(days=PRIOR_WINDOW_DAYS)
 
@@ -239,6 +321,22 @@ def compute_and_save_strengths_weaknesses(
         orgs_updated,
     )
     return result
+
+
+def run_strengths_weaknesses_for_org(
+    organization_id: str | None,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Per-org session-owning entrypoint. Mirrors
+    ``run_strengths_weaknesses_job`` but scoped to a single tenant."""
+    from app.db.database import create_session
+
+    db = create_session()
+    try:
+        return compute_and_save_strengths_weaknesses_for_org(db, organization_id, now=now)
+    finally:
+        db.close()
 
 
 def run_strengths_weaknesses_job() -> dict[str, Any]:
