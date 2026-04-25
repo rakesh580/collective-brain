@@ -42,7 +42,7 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => setIsMounted(true), 100);
+    const mountedTimer = setTimeout(() => setIsMounted(true), 100);
     // Mark page as "ready" after 3 seconds — any Google error after this is likely real
     const readyTimer = setTimeout(() => { pageReadyRef.current = true; }, 3000);
     // Track first user interaction
@@ -50,6 +50,7 @@ export default function LoginPage() {
     document.addEventListener("click", markInteracted, { once: true });
     document.addEventListener("keydown", markInteracted, { once: true });
     return () => {
+      clearTimeout(mountedTimer);
       clearTimeout(readyTimer);
       document.removeEventListener("click", markInteracted);
       document.removeEventListener("keydown", markInteracted);

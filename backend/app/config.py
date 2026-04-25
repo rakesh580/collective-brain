@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_requests: int = 60
     rate_limit_ai_requests: int = 10
+    # Window for rate_limit_requests (per-IP global limiter). 60 = 60 req/min.
+    rate_limit_window_seconds: int = 60
+    # Master kill-switch for the per-IP middleware. Off in tests by default
+    # (set via CB_RATE_LIMIT_ENABLED=true in prod settings).
+    rate_limit_enabled: bool = True
 
     # Slack Bot Integration
     slack_client_id: str = ""

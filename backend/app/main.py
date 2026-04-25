@@ -338,16 +338,25 @@ for _h in logging.root.handlers:
 from starlette.middleware.gzip import GZipMiddleware
 
 from app.middleware.access_log import AccessLogMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 
 # Middleware order (outermost first — Starlette applies in LIFO):
-# GZip -> SecurityHeaders -> Deprecation -> RequestID -> AccessLog
-# AccessLog is innermost so its latency measurement is closest to handler
-# time (excludes GZip compression on large responses).
+# GZip -> SecurityHeaders -> Deprecation -> RequestID -> AccessLog -> RateLimit
+# RateLimit is innermost so 429s still flow back through AccessLog and
+# get logged. AccessLog's latency measurement now includes the (sub-ms)
+# rate-limit check — acceptable in exchange for visibility on blocks.
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(DeprecationMiddleware)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(AccessLogMiddleware)
+_rl_settings = get_settings()
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=_rl_settings.rate_limit_requests,
+    window_seconds=_rl_settings.rate_limit_window_seconds,
+    enabled=_rl_settings.rate_limit_enabled,
+)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────

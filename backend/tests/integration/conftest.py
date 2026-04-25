@@ -86,16 +86,31 @@ def app_client(app_settings):
     with patch("app.db.database._run_alembic_migrations"):
         init_db(settings=app_settings)
 
+    # Disable the global per-IP rate limiter for the entire integration
+    # session. TestClient uses a single host ("testclient") so all tests
+    # share one bucket — without this they'd start 429ing after request
+    # 60. The per-route auth limiter (auth.py) is cleared per-test below.
+    app.state.rate_limit_enabled = False
+
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
 
 @pytest.fixture(autouse=True)
 def _clear_rate_limits():
-    """Clear in-memory rate limiter before each test to prevent 429 errors."""
+    """Clear in-memory rate limiters before each test to prevent 429 errors.
+
+    Two separate in-memory buckets exist: one in ``app.routers.auth`` for
+    login/password endpoints (per-route, IP-keyed), and one in
+    ``app.services.redis_service`` for the global RateLimitMiddleware
+    fallback path. Both must be reset so a noisy test doesn't poison the
+    next one when Redis isn't running in CI."""
     from app.routers.auth import _memory_rate_limits
+    from app.services import redis_service
 
     _memory_rate_limits.clear()
+    if hasattr(redis_service, "_memory_rate"):
+        redis_service._memory_rate.clear()
     yield
     _memory_rate_limits.clear()
 
