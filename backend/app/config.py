@@ -76,6 +76,20 @@ class Settings(BaseSettings):
     # (set via CB_RATE_LIMIT_ENABLED=true in prod settings).
     rate_limit_enabled: bool = True
 
+    # ── Per-org quotas (Week 18 — fairness across tenants) ──────────────
+    # Two cost classes stacked on top of the per-IP limiter:
+    #   * "llm"      — anything that hits the LLM (RAG /query, decision
+    #                  recommender). One LLM call ≈ 100× a list-fetch in
+    #                  $$ and latency, so the budget is small.
+    #   * "standard" — heavy non-LLM endpoints (data ingestion). Generous
+    #                  budget but still bounded so a runaway script can't
+    #                  drown the worker pool.
+    # Window is shared between both classes.
+    quota_llm_per_window: int = 30
+    quota_standard_per_window: int = 300
+    quota_window_seconds: int = 60
+    quota_enabled: bool = True
+
     # Slack Bot Integration
     slack_client_id: str = ""
     slack_client_secret: str = ""

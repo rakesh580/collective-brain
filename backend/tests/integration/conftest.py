@@ -91,6 +91,12 @@ def app_client(app_settings):
     # share one bucket — without this they'd start 429ing after request
     # 60. The per-route auth limiter (auth.py) is cleared per-test below.
     app.state.rate_limit_enabled = False
+    # W18 per-org quota: same problem at finer granularity. Tests
+    # repeatedly hit /query and /ingest as the same org, which would
+    # trip the LLM (30/min) or standard (300/min) budget partway through
+    # the suite. Tests that specifically exercise the quota gate flip
+    # this back on locally.
+    app.state.quota_enabled = False
 
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client

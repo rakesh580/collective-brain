@@ -175,6 +175,17 @@ RATE_LIMIT_HITS_TOTAL = Counter(
 )
 
 
+# ── Per-org quotas (Week 18 — fairness across tenants) ───────────────────────
+# Counted per (cost_class, outcome). Org id is intentionally NOT a label —
+# Prometheus cardinality stays bounded as the customer count grows; ad-hoc
+# per-org investigation goes through structured logs instead.
+QUOTA_DECISIONS_TOTAL = Counter(
+    "cb_quota_decisions_total",
+    "Per-org quota gate decisions",
+    ["cost_class", "outcome"],  # cost_class: llm | standard, outcome: allowed | blocked
+)
+
+
 # ── Application info ──────────────────────────────────────────────────────────
 
 APP_INFO = Info(

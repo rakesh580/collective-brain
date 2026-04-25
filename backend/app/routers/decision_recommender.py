@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.db.database import create_session
 from app.dependencies import get_current_user
+from app.quota import org_quota
 
 router = APIRouter()
 
@@ -23,6 +24,7 @@ class RecommendRequest(BaseModel):
 async def recommend_decision_makers(
     body: RecommendRequest,
     user=Depends(get_current_user),
+    _quota=Depends(org_quota("llm")),
 ):
     """Returns recommended decision makers with scores and reasons."""
     from app.services.decision_recommender import DecisionRecommenderService
