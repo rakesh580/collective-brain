@@ -9,6 +9,7 @@ from app.dependencies import require_role
 from app.models.artifact import ArtifactRecord
 from app.models.contribution import ContributionRecord
 from app.models.member import MemberRecord
+from app.quota import org_quota
 from app.schemas.requests import (
     ConfluenceIngestRequest,
     GitIngestRequest,
@@ -329,7 +330,12 @@ async def get_task_status(task_id: str, request: Request):
 
 
 @router.post("/markdown", response_model=IngestionResponse)
-async def ingest_markdown(body: MarkdownIngestRequest, request: Request, user=Depends(require_role("admin", "member"))):
+async def ingest_markdown(
+    body: MarkdownIngestRequest,
+    request: Request,
+    user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
+):
 
     resolved_path = _validate_local_path(body.directory_path)
     if not os.path.isdir(resolved_path):
@@ -342,7 +348,12 @@ async def ingest_markdown(body: MarkdownIngestRequest, request: Request, user=De
 
 
 @router.post("/git", response_model=IngestionResponse)
-async def ingest_git(body: GitIngestRequest, request: Request, user=Depends(require_role("admin", "member"))):
+async def ingest_git(
+    body: GitIngestRequest,
+    request: Request,
+    user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
+):
 
     import tempfile
 
@@ -411,6 +422,7 @@ async def ingest_markdown_upload(
     files: list[UploadFile] = File(...),
     room_id: str | None = None,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
     """Upload .md, .txt, or .zip files to ingest as markdown docs."""
 
@@ -465,6 +477,7 @@ async def ingest_slack(
     file: UploadFile = File(...),
     room_id: str | None = None,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
 
     import os
@@ -503,6 +516,7 @@ async def ingest_discord(
     file: UploadFile = File(...),
     room_id: str | None = None,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
 
     import os
@@ -530,6 +544,7 @@ async def ingest_tasks(
     file: UploadFile = File(...),
     room_id: str | None = None,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
 
     import os
@@ -555,6 +570,7 @@ async def ingest_documents(
     files: list[UploadFile] = File(...),
     room_id: str | None = None,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
     """Upload PDF, DOCX, or TXT files to ingest as documents."""
 
@@ -670,6 +686,7 @@ async def ingest_notion(
     body: NotionIngestRequest,
     request: Request,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
     """Ingest pages from a Notion database or page tree.
 
@@ -703,6 +720,7 @@ async def ingest_google_docs(
     body: GoogleDocsIngestRequest,
     request: Request,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
     """Ingest Google Docs from a list of document IDs or a Drive folder.
 
@@ -739,6 +757,7 @@ async def ingest_confluence(
     body: ConfluenceIngestRequest,
     request: Request,
     user=Depends(require_role("admin", "member")),
+    _quota=Depends(org_quota("standard")),
 ):
     """Ingest pages from a Confluence space or specific page IDs.
 
