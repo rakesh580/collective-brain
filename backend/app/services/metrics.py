@@ -161,6 +161,20 @@ NIGHTLY_STEP_DURATION_SECONDS = Histogram(
 )
 
 
+# ── Rate limiting (Week 17 — abuse protection) ───────────────────────────────
+# One increment per request that passes through RateLimitMiddleware.
+# Outcome distinguishes the request being allowed under the budget vs.
+# blocked with a 429. Path label uses the matched FastAPI route template
+# (e.g. "/api/v1/query") rather than the raw path so high-cardinality
+# query strings don't blow up the metric.
+
+RATE_LIMIT_HITS_TOTAL = Counter(
+    "cb_rate_limit_hits_total",
+    "Per-IP rate limit decisions",
+    ["path", "outcome"],  # outcome: allowed | blocked
+)
+
+
 # ── Application info ──────────────────────────────────────────────────────────
 
 APP_INFO = Info(
