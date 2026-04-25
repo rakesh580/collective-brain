@@ -83,7 +83,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._enabled = enabled
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if not self._enabled or _should_bypass(request.url.path):
+        # ``request.app.state.rate_limit_enabled`` overrides the
+        # construct-time flag at runtime — tests flip this to False so a
+        # session-scoped TestClient (one host = "testclient") doesn't trip
+        # the limiter after 60 requests. Production never sets this attr,
+        # falling back to ``self._enabled`` from settings.
+        runtime_enabled = getattr(request.app.state, "rate_limit_enabled", self._enabled)
+        if not runtime_enabled or _should_bypass(request.url.path):
             return await call_next(request)
 
         redis = getattr(request.app.state, "redis", None)

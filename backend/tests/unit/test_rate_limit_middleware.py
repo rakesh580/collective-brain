@@ -164,6 +164,23 @@ def test_disabled_kill_switch_passes_everything_through():
     assert redis.calls == []
 
 
+def test_runtime_state_override_wins_over_construct_time_flag():
+    """Integration tests flip ``app.state.rate_limit_enabled = False``
+    so a session-scoped TestClient (one host) doesn't burn through the
+    budget across tests. The middleware must honor that runtime flag
+    even when constructed with enabled=True."""
+    redis = _FakeRedis(lambda key, max_, win: (False, 0))  # would block
+    app = _build_app(redis=redis, max_requests=1, enabled=True)
+    app.state.rate_limit_enabled = False  # runtime kill — what tests do
+
+    with TestClient(app) as client:
+        for _ in range(5):
+            resp = client.get("/api/v1/ping")
+            assert resp.status_code == 200
+
+    assert redis.calls == [], "limiter must be skipped when state flag is False"
+
+
 def test_no_redis_on_app_state_fails_open():
     """During early lifespan or in unit-test apps, ``app.state.redis``
     may be missing entirely. The limiter must fail OPEN — better to let
