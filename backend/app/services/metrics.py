@@ -141,6 +141,26 @@ DIGESTS_SENT_TOTAL = Counter(
 )
 
 
+# ── Nightly pipeline (Week 16 — RFC #17 follow-up) ───────────────────────────
+# Emitted by app/services/nightly_pipeline.py on every run_nightly() call.
+# Pairs with cb_digests_sent_total to cover the full "did the night succeed?"
+# SLO surface.
+
+NIGHTLY_PIPELINE_RUN_TOTAL = Counter(
+    "cb_nightly_pipeline_run_total",
+    "Nightly pipeline run outcomes",
+    ["status"],  # ok | partial | failed
+)
+
+NIGHTLY_STEP_DURATION_SECONDS = Histogram(
+    "cb_nightly_step_duration_seconds",
+    "Per-step wall-clock duration within the nightly pipeline",
+    ["step", "status"],  # step name × ok|failed
+    # Buckets chosen for steps that run 50ms to ~10 min.
+    buckets=[0.05, 0.25, 1, 5, 15, 60, 180, 600],
+)
+
+
 # ── Application info ──────────────────────────────────────────────────────────
 
 APP_INFO = Info(
