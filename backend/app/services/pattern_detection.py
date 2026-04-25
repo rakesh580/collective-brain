@@ -511,9 +511,59 @@ def _record_signal_metric(pending: PendingSignal, outcome: str) -> None:
         logger.warning("Could not record signal detection metric", exc_info=True)
 
 
+def run_pattern_detection_for_org(
+    db: Session,
+    organization_id: str | None,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Per-org runner. Runs every detector against one tenant and upserts
+    signals. The orchestrator's per-org loop calls this so a detector
+    raising for org A cannot block detection for org B."""
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    current = now or current_pipeline_as_of()
+
+    created = 0
+    updated = 0
+    for detector in DETECTORS:
+        try:
+            pending_list = detector(db, organization_id, current)
+        except Exception:
+            logger.exception("Detector %s failed for org=%s", detector.__name__, organization_id)
+            continue
+        for pending in pending_list:
+            existed_before = (
+                db.query(Signal.id)
+                .filter(
+                    Signal.organization_id == organization_id,
+                    Signal.dedup_key == pending.dedup_key,
+                    Signal.resolved_at.is_(None),
+                )
+                .first()
+            )
+            _upsert_signal(db, pending)
+            if existed_before is None:
+                created += 1
+            else:
+                updated += 1
+
+    db.commit()
+    return {
+        "organization_id": organization_id,
+        "detectors_run": len(DETECTORS),
+        "signals_created": created,
+        "signals_updated": updated,
+        "ran_at": current.isoformat(),
+    }
+
+
 def run_pattern_detection(db: Session, now: datetime | None = None) -> dict[str, Any]:
-    """Run every detector across every active org and upsert signals."""
-    current = now or datetime.now(UTC)
+    """Run every detector across every active org and upsert signals.
+    Thin wrapper that fans out to ``run_pattern_detection_for_org``."""
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
+    current = now or current_pipeline_as_of()
 
     orgs = db.query(OrganizationRecord).filter(OrganizationRecord.is_active == True).all()  # noqa: E712
     # Always run at least once for the "no org" case (self-hosted single-org).
@@ -522,29 +572,10 @@ def run_pattern_detection(db: Session, now: datetime | None = None) -> dict[str,
     created = 0
     updated = 0
     for org_id in org_ids:
-        for detector in DETECTORS:
-            try:
-                pending_list = detector(db, org_id, current)
-            except Exception:
-                logger.exception("Detector %s failed for org=%s", detector.__name__, org_id)
-                continue
-            for pending in pending_list:
-                existed_before = (
-                    db.query(Signal.id)
-                    .filter(
-                        Signal.organization_id == org_id,
-                        Signal.dedup_key == pending.dedup_key,
-                        Signal.resolved_at.is_(None),
-                    )
-                    .first()
-                )
-                _upsert_signal(db, pending)
-                if existed_before is None:
-                    created += 1
-                else:
-                    updated += 1
+        per = run_pattern_detection_for_org(db, org_id, now=current)
+        created += per["signals_created"]
+        updated += per["signals_updated"]
 
-    db.commit()
     summary = {
         "orgs_scanned": len(org_ids),
         "detectors_run": len(DETECTORS),

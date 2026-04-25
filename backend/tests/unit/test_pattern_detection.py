@@ -361,6 +361,28 @@ class TestOrchestrator:
         run_pattern_detection(db, now=NOW)
         assert calls == ["org-a", "org-b"]
 
+    def test_run_pattern_detection_for_org_runs_only_target_org(self, monkeypatch):
+        """Per-org runner introduced in RFC #17 sequencing step 2. The
+        orchestrator's per-org loop (follow-up work) calls this so a
+        detector raising for org A cannot block detection for org B."""
+        from app.services import pattern_detection as pd
+
+        calls: list[str | None] = []
+
+        def fake_detector(db, org_id, now, **kwargs):
+            calls.append(org_id)
+            return []
+
+        monkeypatch.setattr(pd, "DETECTORS", [fake_detector])
+        db = _db_with(Signal=[])
+
+        summary = pd.run_pattern_detection_for_org(db, "org-a", now=NOW)
+
+        assert calls == ["org-a"]
+        assert summary["organization_id"] == "org-a"
+        assert summary["signals_created"] == 0
+        assert summary["signals_updated"] == 0
+
 
 @pytest.mark.parametrize(
     "detector",

@@ -22,12 +22,14 @@ def compute_health_snapshot(db: Session) -> dict:
     or a transient graph-build error. The caller can still detect the
     degraded state via ``health_score == 0`` and empty metrics.
     """
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
     try:
         mg = MemoryGraph(db)
         G = mg._get_or_build_nx_graph()
     except Exception:
         logger.exception("compute_health_snapshot: graph build failed; returning empty snapshot")
-        now = datetime.now(UTC)
+        now = current_pipeline_as_of()
         return {
             "bus_factor_count": 0,
             "coverage_pct": 0.0,
@@ -76,7 +78,7 @@ def compute_health_snapshot(db: Session) -> dict:
 
     # ── 4. Active member % (last 30 days) ──
     contribs = mg._query_contributions()
-    now = datetime.now(UTC)
+    now = current_pipeline_as_of()
     cutoff_30d = now - timedelta(days=30)
     member_last_active: dict[str, datetime] = {}
     for c in contribs:
@@ -134,6 +136,20 @@ def compute_health_snapshot(db: Session) -> dict:
     }
 
 
+def save_health_snapshot_for_org(
+    db: Session,
+    organization_id: str | None,
+    *,
+    now: datetime | None = None,  # noqa: ARG001 — accepted for orchestrator parity
+) -> dict:
+    """Per-org runner for the nightly pipeline. Today the underlying
+    ``compute_health_snapshot`` is org-wide (it walks the full graph), so
+    only the persisted row is org-scoped. Splitting compute by org is a
+    separate piece of work — until then this is a thin pass-through that
+    matches the orchestrator's per-org adapter shape."""
+    return save_health_snapshot(db, organization_id=organization_id)
+
+
 def save_health_snapshot(db: Session, organization_id: str | None = None) -> dict:
     """Persist a health snapshot with timestamp.
 
@@ -142,9 +158,11 @@ def save_health_snapshot(db: Session, organization_id: str | None = None) -> dic
     runs pass ``None`` (org-wide snapshot); manual triggers pass the caller's
     org so the tenant sees their own timeline.
     """
+    from app.services.nightly_pipeline import current_pipeline_as_of
+
     snapshot = compute_health_snapshot(db)
     snapshot_id = str(uuid.uuid4())
-    now = datetime.now(UTC)
+    now = current_pipeline_as_of()
 
     risk_summary = json.dumps(snapshot.get("top_risk") or {})
 

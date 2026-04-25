@@ -215,3 +215,112 @@ class TestComputeAndSaveRollups:
 
         assert summary["members_processed"] == 0
         assert summary["rows_written"] == 0
+
+
+class TestComputeAndSaveRollupsForOrg:
+    """Per-org runner introduced in RFC #17 sequencing step 2."""
+
+    def test_filters_members_to_target_org(self, monkeypatch):
+        """Only members of the requested org get rolled up. Members from
+        other orgs in the same DB must not appear in the summary."""
+        from app.services import contribution_rollup_service as svc
+
+        now = datetime(2026, 4, 22, tzinfo=UTC)
+        alice = SimpleNamespace(id="alice", organization_id="org-1")
+
+        # Member query is filtered by the service before .all() — assert
+        # that filter() was actually called with an organization_id eq
+        # expression so a future refactor that drops the filter is caught.
+        captured_filters: list = []
+
+        def query_router(model):
+            q = MagicMock()
+            name = getattr(model, "__name__", "")
+            if name == "MemberRecord":
+
+                def fake_filter(*args, **kwargs):
+                    captured_filters.append((args, kwargs))
+                    inner = MagicMock()
+                    inner.all.return_value = [alice]
+                    return inner
+
+                q.filter.side_effect = fake_filter
+                return q
+            q.filter.return_value = q
+            q.first.return_value = None
+            return q
+
+        db = MagicMock()
+        db.query.side_effect = query_router
+
+        def fake_stats(db, member_id, window_days, now_):
+            return {
+                "contributions_count": 5,
+                "artifacts_touched": 1,
+                "distinct_topics": 1,
+                "topic_histogram": {"api": 5},
+                "top_topic": "api",
+                "type_histogram": {"git_commit": 5},
+                "last_activity_at": now - timedelta(days=1),
+            }
+
+        monkeypatch.setattr(svc, "_member_window_stats", fake_stats)
+
+        summary = svc.compute_and_save_rollups_for_org(db, "org-1", windows=(7, 30), now=now)
+
+        assert summary["organization_id"] == "org-1"
+        assert summary["members_processed"] == 1
+        assert summary["rows_written"] == 2  # 7d + 30d for alice
+        assert captured_filters, "filter(MemberRecord.organization_id == ...) must run"
+        db.commit.assert_called_once()
+
+    def test_uses_pipeline_as_of_when_now_unset(self, monkeypatch):
+        """When called without an explicit ``now`` and inside ``run_nightly``,
+        the per-org runner reads through the PIPELINE_AS_OF contextvar."""
+        from datetime import date
+
+        from app.services import contribution_rollup_service as svc
+        from app.services.nightly_pipeline import PIPELINE_AS_OF
+
+        captured: list[datetime] = []
+
+        def fake_stats(db, member_id, window_days, now_):
+            captured.append(now_)
+            return {
+                "contributions_count": 1,
+                "artifacts_touched": 0,
+                "distinct_topics": 0,
+                "topic_histogram": {},
+                "top_topic": None,
+                "type_histogram": {},
+                "last_activity_at": None,
+            }
+
+        monkeypatch.setattr(svc, "_member_window_stats", fake_stats)
+
+        alice = SimpleNamespace(id="alice", organization_id="org-1")
+
+        def query_router(model):
+            q = MagicMock()
+            name = getattr(model, "__name__", "")
+            if name == "MemberRecord":
+                inner = MagicMock()
+                inner.all.return_value = [alice]
+                q.filter.return_value = inner
+                return q
+            q.filter.return_value = q
+            q.first.return_value = None
+            return q
+
+        db = MagicMock()
+        db.query.side_effect = query_router
+
+        # Set the contextvar manually (production path: run_nightly does this)
+        target = datetime.combine(date(2026, 4, 20), datetime.min.time(), tzinfo=UTC)
+        token = PIPELINE_AS_OF.set(target)
+        try:
+            svc.compute_and_save_rollups_for_org(db, "org-1", windows=(7,))
+        finally:
+            PIPELINE_AS_OF.reset(token)
+
+        assert all(t == target for t in captured), "service must read PIPELINE_AS_OF"

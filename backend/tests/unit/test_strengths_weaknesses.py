@@ -195,3 +195,97 @@ class TestComputeAndSaveStrengthsWeaknesses:
         result = compute_and_save_strengths_weaknesses(db, now=datetime.now(UTC))
         assert result["members_updated"] == 0
         assert result["orgs_updated"] == 0
+
+
+class TestComputeAndSaveStrengthsWeaknessesForOrg:
+    """Per-org runner introduced in RFC #17 sequencing step 2."""
+
+    def test_filters_to_one_org_and_writes_summary(self):
+        from app.services.strengths_weaknesses_service import (
+            compute_and_save_strengths_weaknesses_for_org,
+        )
+
+        now = datetime(2026, 4, 23, tzinfo=UTC)
+        recent = now - timedelta(days=CURRENT_WINDOW_DAYS - 5)
+
+        alice = SimpleNamespace(
+            id="alice",
+            name="Alice",
+            organization_id="org-1",
+            strengths=[],
+            weaknesses=[],
+        )
+        org = SimpleNamespace(id="org-1", strengths_weaknesses_json={})
+
+        contribs = [_contrib(recent - timedelta(days=i), member_id="alice", topics=["api"]) for i in range(1, 6)]
+
+        # Capture filter calls so we can assert the org/member-id filters
+        # were applied.
+        member_filter_calls: list = []
+        contrib_filter_calls: list = []
+
+        def query_router(model):
+            q = MagicMock()
+            name = getattr(model, "__name__", "")
+            if name == "MemberRecord":
+
+                def member_filter(*args, **kwargs):
+                    member_filter_calls.append((args, kwargs))
+                    inner = MagicMock()
+                    inner.all.return_value = [alice]
+                    return inner
+
+                q.filter.side_effect = member_filter
+                return q
+            if name == "ContributionRecord":
+
+                def contrib_filter(*args, **kwargs):
+                    contrib_filter_calls.append((args, kwargs))
+                    inner = MagicMock()
+                    inner.all.return_value = contribs
+                    return inner
+
+                q.filter.side_effect = contrib_filter
+                return q
+            if name == "OrganizationRecord":
+                q.filter.return_value = q
+                q.first.return_value = org
+                return q
+            q.filter.return_value = q
+            return q
+
+        db = MagicMock()
+        db.query.side_effect = query_router
+
+        result = compute_and_save_strengths_weaknesses_for_org(db, "org-1", now=now)
+
+        assert result["organization_id"] == "org-1"
+        assert result["members_processed"] == 1
+        assert alice.strengths == [{"topic": "api", "count": 5}]
+        assert org.strengths_weaknesses_json["organization_id"] == "org-1"
+        assert member_filter_calls, "MemberRecord query must filter by org"
+        assert contrib_filter_calls, "ContributionRecord query must filter by member ids"
+        db.commit.assert_called_once()
+
+    def test_skips_org_summary_when_org_id_is_none(self):
+        """Members without an org assignment have no parent OrganizationRecord
+        to attach a summary to. Per-org runner must short-circuit cleanly
+        rather than 500-ing on a NULL filter mismatch."""
+        from app.services.strengths_weaknesses_service import (
+            compute_and_save_strengths_weaknesses_for_org,
+        )
+
+        def query_router(model):
+            q = MagicMock()
+            q.filter.return_value = MagicMock(all=MagicMock(return_value=[]))
+            return q
+
+        db = MagicMock()
+        db.query.side_effect = query_router
+
+        result = compute_and_save_strengths_weaknesses_for_org(db, None)
+
+        assert result["organization_id"] is None
+        assert result["members_processed"] == 0
+        assert result["org_summary"] is None
+        db.commit.assert_called_once()
