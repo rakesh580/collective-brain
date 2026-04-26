@@ -18,9 +18,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for psycopg2 and git ingestion
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev git \
+# System deps for psycopg2 + git ingestion + Debian security patches.
+# `apt-get upgrade -y` pulls latest CVE-patched versions of base-image
+# packages — substantially reduces Trivy HIGH/CRITICAL count without
+# changing the base tag (which would be a riskier upgrade).
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+        build-essential libpq-dev git \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CPU-only PyTorch first (saves ~1.5GB vs CUDA version)
@@ -56,6 +61,13 @@ ENV CB_DEV_MODE="0"
 # These MUST be set at deployment time (e.g. HF Space secrets, Render env,
 # docker run -e, or docker-compose .env file).  Do NOT hardcode real values here.
 ENV CB_GOOGLE_CLIENT_ID=""
+
+# Run as non-root. Mitigates container-escape blast radius and satisfies
+# CIS Docker Benchmark 4.1 / Semgrep dockerfile.security.missing-user.
+# HF Spaces persistent volume at /data must remain writable by app uid.
+RUN useradd --create-home --shell /usr/sbin/nologin --uid 1001 app \
+    && chown -R app:app /app /data
+USER app
 
 # HF Spaces uses port 7860, Render uses 8000
 EXPOSE 7860 8000
