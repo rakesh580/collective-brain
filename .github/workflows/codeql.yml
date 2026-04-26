@@ -1,0 +1,58 @@
+# GitHub-native SAST. Free for public repos and required for SOC 2 /
+# ISO 27001 reviews. Runs on every push to main, every PR, and weekly
+# so newly-disclosed vulnerability patterns are caught even when the
+# code itself is unchanged.
+#
+# Findings appear in the repo's "Code scanning alerts" tab and (when
+# enabled in branch protection) block merges that introduce new alerts.
+name: CodeQL
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly (Monday 03:30 UTC) — catches new rules and new CVEs even
+    # when nobody has pushed code.
+    - cron: "30 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write   # SARIF upload to Code Scanning
+      packages: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # `security-extended` adds rules tuned for production code
+          # (taint flow, deserialization, SSRF, etc.) on top of the
+          # default `security-and-quality` set.
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
