@@ -586,8 +586,12 @@ jobs:
       - frontend-build
       - docker-build
       - security-audit
+      - dependency-review   # PR-only; `skipped` is a passing state below
     steps:
       - name: Verify all required jobs passed
+        # Treats `skipped` as a passing state — required so the PR-only
+        # `dependency-review` job doesn't fail this gate on push events.
+        # `failure` and `cancelled` are the only blocking results.
         run: |
           if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] \
              || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
