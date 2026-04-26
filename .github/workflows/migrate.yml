@@ -75,19 +75,20 @@ jobs:
 
       - name: Run migrations (or dry-run)
         working-directory: backend
+        # Inputs flow through env vars, not direct interpolation —
+        # defeats Semgrep yaml.github-actions.security.run-shell-injection.
         env:
           CB_MIGRATION_DATABASE_URL: ${{ secrets.CB_MIGRATION_DATABASE_URL }}
           CB_DATABASE_URL: ${{ secrets.CB_DATABASE_URL }}
+          INPUT_TARGET: ${{ github.event.inputs.target }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
-          TARGET="${{ github.event.inputs.target }}"
-          DRY_RUN="${{ github.event.inputs.dry_run }}"
-
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "DRY RUN — showing SQL that would run for target: $TARGET"
-            python -m alembic upgrade "$TARGET" --sql
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
+            echo "DRY RUN — showing SQL that would run for target: $INPUT_TARGET"
+            python -m alembic upgrade "$INPUT_TARGET" --sql
           else
-            echo "Upgrading to: $TARGET"
-            python -m alembic upgrade "$TARGET"
+            echo "Upgrading to: $INPUT_TARGET"
+            python -m alembic upgrade "$INPUT_TARGET"
             echo ""
             echo "New revision:"
             python -m alembic current

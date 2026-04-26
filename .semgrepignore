@@ -1,0 +1,20 @@
+# Semgrep allowlist — every entry must include a written justification.
+# Format:
+#   # <reason>
+#   <path-or-glob>
+#
+# This file ignores PATHS. To suppress a single rule, use inline
+# `# nosemgrep: <rule_id>` in the source instead.
+
+# Vendored third-party data we don't own and don't ship in our build.
+data/repos/
+
+# Security tests intentionally use hardcoded JWT secrets to exercise
+# the auth-failure paths (jwt-python-hardcoded-secret findings here are
+# the WHOLE POINT of the test). Production code is scanned normally.
+backend/tests/security/
+
+# Load/stress tests intentionally make raw HTTP requests with
+# variable URLs and disable SSL verification to push the server hard.
+# Real prod code paths are not in this directory.
+backend/tests/load/

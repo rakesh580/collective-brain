@@ -114,19 +114,29 @@ jobs:
     container:
       image: semgrep/semgrep:latest
     if: github.actor != 'dependabot[bot]'
-    # Non-blocking for now while the baseline of findings is triaged.
-    # TODO(security-ratchet): flip to required and drop continue-on-error
-    # once the OWASP findings list is either fixed or in .semgrepignore.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep scan --config=p/security-audit --config=p/owasp-top-ten --error --metrics=off
+      # Excluded rules — every entry MUST have a written justification
+      # next to it. Add new exclusions ONLY with security review sign-off.
+      #
+      # generic.nginx.security.possible-h2c-smuggling — h2c smuggling
+      # requires the upstream to (a) speak HTTP/2 cleartext and (b) trust
+      # arbitrary Upgrade headers on non-WS endpoints. Our upstream
+      # (uvicorn/FastAPI) does neither. The Upgrade pattern is required
+      # for /rooms/ws/ and /discussions/ws/ WebSocket routes. Risk
+      # accepted; multi-line nginx matches don't honour inline nosemgrep.
+      - run: |
+          semgrep scan \
+            --config=p/security-audit \
+            --config=p/owasp-top-ten \
+            --exclude-rule generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling \
+            --error --metrics=off
 
   # Trivy filesystem scan: catches vulnerable deps + IaC misconfigs +
-  # leaked secrets in one pass. Currently non-blocking while the
-  # vite/postcss baseline is being patched in PRs.
-  # TODO(security-ratchet): drop continue-on-error after baseline
-  # findings are addressed; SARIF still publishes to Code Scanning.
+  # leaked secrets in one pass. Non-blocking until the Python dep
+  # baseline (torch, transformers, etc.) is audited.
+  # TODO(security-ratchet): drop continue-on-error once SARIF triage
+  # confirms zero unfixed HIGH/CRITICAL Python deps.
   trivy-fs:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
@@ -490,9 +500,10 @@ jobs:
           push-to-registry: true
 
   # Trivy scan of the BUILT image (not just deps). Must run after
-  # docker-build. Non-blocking until the deps in the image are clean
-  # (will inherit any unfixed-yet npm/pip findings).
-  # TODO(security-ratchet): drop continue-on-error after baseline.
+  # docker-build. Non-blocking until Debian + Python baselines are
+  # confirmed clean post-`apt-get upgrade -y` and torch/transformers
+  # CVE triage. SARIF still publishes to Code Scanning for visibility.
+  # TODO(security-ratchet): drop continue-on-error once SARIF clean.
   trivy-image:
     name: Trivy Image Scan
     runs-on: ubuntu-latest
@@ -525,13 +536,12 @@ jobs:
   # Tier 5 — Dependency vulnerability scan (npm + pip)
   # ──────────────────────────────────────────────────────────────────────────
 
-  # npm audit + pip-audit. Non-blocking while the baseline is patched.
-  # TODO(security-ratchet): drop continue-on-error after baseline.
+  # npm audit + pip-audit. Blocking on HIGH+. To accept a finding,
+  # add a documented allowlist entry — never weaken this gate.
   security-audit:
     name: Dependency Audit (npm + pip)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

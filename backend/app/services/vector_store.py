@@ -162,7 +162,16 @@ class VectorStoreService:
 
             db = self._factory()
             try:
-                rows = db.execute(text(sql), params).fetchall()
+                # text() is required for the pgvector `<=>` operator which
+                # SQLAlchemy doesn't model natively. All user-controlled
+                # values (organization_id, room_id, where dict) are passed
+                # via :param placeholders in `params` — never interpolated
+                # into the SQL string. The `where_sql` fragment is built
+                # from constant column names + numeric param indices only.
+                # fmt: off
+                stmt = text(sql)  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                # fmt: on
+                rows = db.execute(stmt, params).fetchall()
             except Exception as e:
                 logger.error("VectorStore query failed: %s", e)
                 span.record_exception(e)

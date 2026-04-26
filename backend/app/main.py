@@ -141,20 +141,24 @@ async def lifespan(app: FastAPI):
         import secrets as _secrets
 
         _jwt_path = Path("/data/.cb_jwt_secret")
+        # The 3 logger calls below intentionally log only the file PATH
+        # of the JWT secret store, never the secret value itself.
+        # Variable name `_jwt_path` tripped Semgrep's credential-leak
+        # heuristic — verified false positive.
+        # fmt: off
         if _jwt_path.exists():
             settings.jwt_secret = _jwt_path.read_text().strip()
-            logger.info("Loaded JWT secret from %s", _jwt_path)
+            logger.info("Loaded JWT secret from %s", _jwt_path)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         else:
             settings.jwt_secret = _secrets.token_urlsafe(64)
             try:
                 _jwt_path.write_text(settings.jwt_secret)
                 _jwt_path.chmod(0o600)
-                logger.info("Generated and persisted JWT secret to %s", _jwt_path)
+                logger.info("Generated and persisted JWT secret to %s", _jwt_path)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
             except OSError:
-                logger.warning(
-                    "CB_JWT_SECRET is not set and could not persist to %s — JWTs will be invalidated on restart.",
-                    _jwt_path,
-                )
+                _msg = "CB_JWT_SECRET is not set and could not persist to %s — JWTs will be invalidated on restart."
+                logger.warning(_msg, _jwt_path)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+        # fmt: on
 
     if settings.jwt_secret and len(settings.jwt_secret) < 32:
         logger.warning("CB_JWT_SECRET is shorter than 32 characters — use a stronger secret")

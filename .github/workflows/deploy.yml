@@ -128,14 +128,20 @@ jobs:
 
       - name: Resolve image tag and ref
         id: resolve
+        # Inputs go through env vars, never expanded directly into the
+        # shell command — defeats the script-injection class of finding
+        # (Semgrep yaml.github-actions.security.run-shell-injection).
+        env:
+          INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
-            TAG="${{ github.event.inputs.image_tag }}"
+          if [ -n "$INPUT_IMAGE_TAG" ]; then
+            TAG="$INPUT_IMAGE_TAG"
           else
-            TAG="sha-$(echo '${{ github.sha }}' | cut -c1-7)"
+            TAG="sha-$(echo "$GITHUB_SHA" | cut -c1-7)"
           fi
-          REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}"
-          echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          REF="${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "image_ref=${REF}" >> "$GITHUB_OUTPUT"
           echo "Will deploy: $REF"
@@ -550,7 +556,8 @@ jobs:
       url: ${{ vars.BACKEND_URL }}
     steps:
       - name: Placeholder
-        run: echo "Wire SSH/Railway/Fly here. Image: ${{ needs.gate.outputs.image_ref }}"
+        run: |
+          echo "Wire SSH/Railway/Fly here. Image: ${{ needs.gate.outputs.image_ref }}"
 
   deploy-frontend:
     name: Deploy Frontend (placeholder)
