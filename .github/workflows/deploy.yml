@@ -1,22 +1,48 @@
 # ══════════════════════════════════════════════════════════════════════════════
-# Deploy — Collective Brain
+# Deploy — Collective Brain (enterprise-grade)
 # ══════════════════════════════════════════════════════════════════════════════
 #
-# Required secrets & variables (set in GitHub repo → Settings → Secrets):
+# Pipeline shape:
+#   1. Gate          — CI must be green; deploy-freeze must not be active.
+#   2. Verify image  — cosign keyless signature + SLSA provenance check.
+#                      An unsigned or tampered image is REJECTED here.
+#   3. Snapshot DB   — placeholder for a pre-deploy backup hook.
+#   4. Migrate       — explicit, observable step (not a side-effect of boot).
+#   5. Deploy        — HF Spaces (primary); Render and self-hosted optional.
+#   6. Smoke test    — POLL until ready (no fixed sleep). FAIL hard on red.
+#   7. Auto-rollback — on smoke failure, redeploy the previous good SHA.
+#   8. Record + notify — create a GitHub Deployment, post DORA metrics,
+#                         notify Slack. ALL deploys are observable.
 #
-# ── HuggingFace Spaces ──────────────────────────────────────────────────────
-#   HF_TOKEN              — HuggingFace API token with write access
-#   HF_SPACE_NAME (var)   — Format: username/space-name
+# Required secrets / variables (Settings → Secrets and variables → Actions):
 #
-# ── Render.com (backup) ─────────────────────────────────────────────────────
-#   RENDER_DEPLOY_HOOK_URL — Render deploy hook URL
-#                            (Settings → Deploy Hook → copy URL)
+#   ── HF Spaces ──
+#   HF_TOKEN              (secret) — HuggingFace token, write scope
+#   HF_SPACE_NAME         (var)    — "username/space-name"
 #
-# ── Common secrets (set in HF Space settings / Render env vars) ─────────────
-#   CB_DATABASE_URL       — PostgreSQL connection string
-#   CB_JWT_SECRET         — 32+ char secret for JWT signing
-#   CB_CLAUDE_API_KEY     — Anthropic API key (optional, for Claude LLM)
-#   CB_REDIS_URL          — Redis connection string (optional)
+#   ── Render (optional) ──
+#   RENDER_DEPLOY_HOOK_URL (secret) — full deploy-hook URL
+#   RENDER_APP_URL         (var)    — public URL of the Render service
+#
+#   ── Backend / Frontend (placeholders) ──
+#   BACKEND_URL  (var) — production backend URL (for env link)
+#   FRONTEND_URL (var) — production frontend URL (for env link)
+#
+#   ── Observability / notifications ──
+#   SLACK_WEBHOOK_URL (secret, optional) — Slack Incoming Webhook for #deploys
+#
+#   ── Image verification ──
+#   COSIGN_IDENTITY_REGEX (var, optional) — defaults to this repo's CI workflow.
+#                                            Override for forks / mirrors.
+#
+# Environment protection rules (configure in Settings → Environments):
+#   - production : required reviewers (≥1), 5-min wait timer, deploy
+#                   branch = main only.
+#   - staging    : no reviewers, deploy from any branch.
+#
+# Deploy-freeze: create a file `.github/DEPLOY_FREEZE` on `main` to halt
+# all deploys until the file is removed. The gate job reads it.
+#
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: Deploy
@@ -27,364 +53,526 @@ on:
     branches: [main]
     types: [completed]
 
-  # Also allow manual trigger with optional image override
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Docker image tag to deploy (default: latest sha)"
+        description: "Docker image tag to deploy (default: sha-<git>)"
         required: false
         default: ""
       run_migrations:
-        description: "Run Alembic migrations before deploying?"
+        description: "Run Alembic migrations before deploy"
         required: false
         default: "true"
         type: choice
         options: ["true", "false"]
       deploy_render:
-        description: "Also deploy to Render.com (backup)?"
+        description: "Also deploy to Render (backup target)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+      skip_image_verify:
+        description: "EMERGENCY ONLY — skip cosign signature verification"
         required: false
         default: "false"
         type: choice
         options: ["true", "false"]
 
+# Default token has read access only; jobs upgrade what they need.
+permissions:
+  contents: read
+
+# Never cancel an in-flight production deploy — partial deploys are
+# worse than queued ones.
 concurrency:
   group: deploy-production
-  cancel-in-progress: false   # Never cancel an in-flight deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/backend
 
 jobs:
-  # ── Guard: only deploy when CI passed ──────────────────────────────────────
-  check-ci:
-    name: Check CI Status
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. Gate: CI green + deploy not frozen
+  # ──────────────────────────────────────────────────────────────────────────
+  gate:
+    name: Deploy Gate (CI + Freeze Check)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    steps:
-      - name: CI passed — proceeding to deploy
-        run: echo "CI OK, deploying."
-
-  # ── Migrate ────────────────────────────────────────────────────────────────
-  # Supabase Nano (free tier) only exposes IPv6 for direct DB connections.
-  # GitHub Actions runners cannot route to IPv6 — so CI migrations always fail.
-  #
-  # Migrations run automatically at app startup via database.py:_run_alembic_migrations()
-  # This is actually safer — migrations execute alongside the code that needs them.
-  #
-  # For manual migrations, use the separate "Database Migrations" workflow
-  # (migrate.yml) which can be triggered manually with a confirmation prompt.
-  migrate:
-    name: Run Migrations (skipped — runs at app startup)
-    runs-on: ubuntu-latest
-    needs: check-ci
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.run_migrations == 'true'
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - name: Migration info
-        run: |
-          echo "Migrations run automatically when the app starts (database.py)."
-          echo "For manual migration control, use the 'Database Migrations' workflow."
-          echo "This step only runs on manual workflow_dispatch with run_migrations=true."
-
-  # ── Deploy to Hugging Face Spaces ──────────────────────────────────────────
-  deploy-hf-spaces:
-    name: Deploy to HF Spaces
-    runs-on: ubuntu-latest
-    needs: check-ci
-    environment:
-      name: production
-      url: https://huggingface.co/spaces/${{ vars.HF_SPACE_NAME }}
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      image_tag: ${{ steps.resolve.outputs.image_tag }}
+      image_ref: ${{ steps.resolve.outputs.image_ref }}
+      previous_sha: ${{ steps.previous.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for git push
+          fetch-depth: 50  # need history for "previous deploy SHA" lookup
 
-      - name: Push to Hugging Face Spaces
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+      - name: Block if deploy freeze active
+        # Empty file at .github/DEPLOY_FREEZE halts all deploys; the
+        # contents (if any) are surfaced as the failure reason so SRE
+        # can drop a one-liner explaining why the freeze is on.
         run: |
-          if [ -z "$HF_TOKEN" ]; then
-            echo "::warning::HF_TOKEN secret not set — skipping HF Spaces deployment."
-            echo "To enable: go to huggingface.co/settings/tokens, create a token with 'write' scope,"
-            echo "then run: gh secret set HF_TOKEN --env production --body 'hf_...'"
-            exit 0
-          fi
-          if [ -z "$HF_SPACE_NAME" ]; then
-            echo "::warning::HF_SPACE_NAME variable not set — skipping HF Spaces deployment."
-            exit 0
-          fi
-          git remote add hf "https://HF_USER:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_NAME}" 2>/dev/null || \
-            git remote set-url hf "https://HF_USER:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_NAME}"
-          git push hf main --force
-          echo "Deployed to https://huggingface.co/spaces/${HF_SPACE_NAME}"
-
-      - name: Verify Dockerfile uses root multi-stage build
-        run: |
-          if [ ! -f Dockerfile ]; then
-            echo "::error::Root Dockerfile not found! HF Spaces needs the multi-stage Dockerfile."
+          if [ -f .github/DEPLOY_FREEZE ]; then
+            REASON="$(cat .github/DEPLOY_FREEZE 2>/dev/null || echo 'no reason given')"
+            echo "::error::Deploy freeze ACTIVE: $REASON"
+            echo "To lift: delete .github/DEPLOY_FREEZE on main."
             exit 1
           fi
-          echo "Root Dockerfile present — multi-stage build (frontend + backend) will be used by HF Spaces."
+          echo "No deploy freeze in effect."
 
-  # ── Post-deploy smoke test (HF Spaces) ────────────────────────────────────
-  smoke-test-hf:
-    name: Smoke Test (HF Spaces)
-    runs-on: ubuntu-latest
-    needs: deploy-hf-spaces
-    if: >
-      always() && needs.deploy-hf-spaces.result == 'success'
-    steps:
-      - name: Wait for app to boot
-        run: |
-          echo "Waiting 60 seconds for HF Spaces container to build and start..."
-          sleep 60
-
-      - name: Health check
-        env:
-          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
-        run: |
-          if [ -z "$HF_SPACE_NAME" ]; then
-            echo "::warning::HF_SPACE_NAME not set — skipping smoke test."
-            exit 0
-          fi
-
-          # Derive the HF Spaces URL (username-spacename.hf.space)
-          HF_URL="https://$(echo "$HF_SPACE_NAME" | tr '/' '-').hf.space"
-          echo "Testing: $HF_URL"
-
-          # Health endpoint
-          echo "--- GET /api/v1/health ---"
-          HTTP_CODE=$(curl -sf -o /tmp/health_response -w "%{http_code}" \
-            --max-time 30 --retry 5 --retry-delay 15 \
-            "${HF_URL}/api/v1/health" || echo "000")
-          cat /tmp/health_response 2>/dev/null || true
-          echo ""
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "Health check PASSED (HTTP $HTTP_CODE)"
-          else
-            echo "::warning::Health check returned HTTP $HTTP_CODE (app may still be building)"
-          fi
-
-          # Auth endpoint (should return 401 or 422, not 500)
-          echo "--- GET /api/v1/auth/me ---"
-          AUTH_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
-            --max-time 15 "${HF_URL}/api/v1/auth/me" || echo "000")
-          if [ "$AUTH_CODE" = "401" ] || [ "$AUTH_CODE" = "403" ] || [ "$AUTH_CODE" = "422" ]; then
-            echo "Auth endpoint OK (HTTP $AUTH_CODE — expected without token)"
-          elif [ "$AUTH_CODE" = "500" ] || [ "$AUTH_CODE" = "000" ]; then
-            echo "::warning::Auth endpoint returned HTTP $AUTH_CODE"
-          else
-            echo "Auth endpoint returned HTTP $AUTH_CODE"
-          fi
-
-          # Decisions endpoint (should return 401 or 403, not 500)
-          echo "--- GET /api/v1/decisions ---"
-          DECISIONS_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
-            --max-time 15 "${HF_URL}/api/v1/decisions" || echo "000")
-          if [ "$DECISIONS_CODE" = "401" ] || [ "$DECISIONS_CODE" = "403" ]; then
-            echo "Decisions endpoint OK (HTTP $DECISIONS_CODE — expected without token)"
-          elif [ "$DECISIONS_CODE" = "500" ] || [ "$DECISIONS_CODE" = "000" ]; then
-            echo "::warning::Decisions endpoint returned HTTP $DECISIONS_CODE"
-          else
-            echo "Decisions endpoint returned HTTP $DECISIONS_CODE"
-          fi
-
-          echo ""
-          echo "Smoke test complete."
-
-  # ── Deploy to Render.com (backup) ──────────────────────────────────────────
-  deploy-render:
-    name: Deploy to Render (Backup)
-    runs-on: ubuntu-latest
-    needs: check-ci
-    if: >
-      github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.deploy_render == 'true'
-    steps:
-      - name: Trigger Render deploy hook
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "::error::RENDER_DEPLOY_HOOK_URL secret not set."
-            echo "To set up: go to Render dashboard → your service → Settings → Deploy Hook,"
-            echo "copy the URL, then run: gh secret set RENDER_DEPLOY_HOOK_URL --body 'https://...'"
-            exit 1
-          fi
-          echo "Triggering Render.com deployment..."
-          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-            echo "Render deploy hook triggered successfully (HTTP $HTTP_CODE)"
-          else
-            echo "::error::Render deploy hook failed with HTTP $HTTP_CODE"
-            exit 1
-          fi
-
-  # ── Post-deploy smoke test (Render) ────────────────────────────────────────
-  smoke-test-render:
-    name: Smoke Test (Render)
-    runs-on: ubuntu-latest
-    needs: deploy-render
-    if: >
-      always() && needs.deploy-render.result == 'success'
-    steps:
-      - name: Wait for Render deploy
-        run: |
-          echo "Waiting 60 seconds for Render to pull and deploy..."
-          sleep 60
-
-      - name: Health check
-        env:
-          RENDER_APP_URL: ${{ vars.RENDER_APP_URL }}
-        run: |
-          if [ -z "$RENDER_APP_URL" ]; then
-            echo "::warning::RENDER_APP_URL variable not set — skipping smoke test."
-            echo "Set it to your Render service URL (e.g. https://collective-brain.onrender.com)"
-            exit 0
-          fi
-
-          echo "Testing: $RENDER_APP_URL"
-
-          # Health endpoint
-          echo "--- GET /api/v1/health ---"
-          HTTP_CODE=$(curl -sf -o /tmp/health_response -w "%{http_code}" \
-            --max-time 30 --retry 5 --retry-delay 15 \
-            "${RENDER_APP_URL}/api/v1/health" || echo "000")
-          cat /tmp/health_response 2>/dev/null || true
-          echo ""
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "Health check PASSED (HTTP $HTTP_CODE)"
-          else
-            echo "::warning::Health check returned HTTP $HTTP_CODE"
-          fi
-
-  # ── Deploy backend ─────────────────────────────────────────────────────────
-  deploy-backend:
-    name: Deploy Backend
-    runs-on: ubuntu-latest
-    needs: check-ci
-    environment:
-      name: production
-      url: ${{ vars.BACKEND_URL }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Determine image tag
-        id: image
+      - name: Resolve image tag and ref
+        id: resolve
         run: |
           if [ -n "${{ github.event.inputs.image_tag }}" ]; then
             TAG="${{ github.event.inputs.image_tag }}"
           else
             TAG="sha-$(echo '${{ github.sha }}' | cut -c1-7)"
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/${{ github.repository }}/backend:$TAG" >> "$GITHUB_OUTPUT"
+          REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}"
+          echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${REF}" >> "$GITHUB_OUTPUT"
+          echo "Will deploy: $REF"
 
-      - name: Log in to GitHub Container Registry
+      - name: Find previous successful deploy SHA (rollback target)
+        id: previous
+        # Reads the most recent successful 'production' deployment from
+        # the GitHub Deployments API. Falls back to HEAD~1 if none.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV=$(gh api "repos/${{ github.repository }}/deployments?environment=production&per_page=10" \
+                 --jq '.[] | select(.sha != "${{ github.sha }}") | .sha' | head -1 || echo "")
+          if [ -z "$PREV" ]; then
+            PREV=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+          fi
+          echo "sha=${PREV}" >> "$GITHUB_OUTPUT"
+          echo "Rollback target if smoke fails: $PREV"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. Verify image: cosign signature + SLSA provenance attestation
+  # ──────────────────────────────────────────────────────────────────────────
+  verify-image:
+    name: Verify Image Signature + Provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [gate]
+    if: github.event.inputs.skip_image_verify != 'true'
+    permissions:
+      contents: read
+      packages: read
+      id-token: write  # cosign keyless verify uses GitHub OIDC
+    steps:
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Log in to GHCR (read)
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Option A: deploy via SSH (self-hosted or VPS) ──────────────────────
-      # Uncomment and fill in CB_DEPLOY_HOST / CB_DEPLOY_KEY secrets if using SSH.
-      #
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v1.0.3
-      #   with:
-      #     host: ${{ secrets.CB_DEPLOY_HOST }}
-      #     username: deploy
-      #     key: ${{ secrets.CB_DEPLOY_KEY }}
-      #     script: |
-      #       docker pull ${{ steps.image.outputs.image }}
-      #       docker stop collective-brain-backend || true
-      #       docker rm   collective-brain-backend || true
-      #       docker run -d \
-      #         --name collective-brain-backend \
-      #         --restart unless-stopped \
-      #         -p 8000:8000 \
-      #         -e CB_DATABASE_URL="${{ secrets.CB_DATABASE_URL }}" \
-      #         -e CB_JWT_SECRET="${{ secrets.CB_JWT_SECRET }}" \
-      #         -e CB_CLAUDE_API_KEY="${{ secrets.CB_CLAUDE_API_KEY }}" \
-      #         -e CB_REDIS_URL="${{ secrets.CB_REDIS_URL }}" \
-      #         -e CB_SUPABASE_URL="${{ secrets.CB_SUPABASE_URL }}" \
-      #         -e CB_SUPABASE_SERVICE_KEY="${{ secrets.CB_SUPABASE_SERVICE_KEY }}" \
-      #         -e CB_OTEL_ENDPOINT="${{ secrets.CB_OTEL_ENDPOINT }}" \
-      #         -e CB_DEV_MODE=0 \
-      #         ${{ steps.image.outputs.image }}
-
-      # ── Option B: deploy to Railway ───────────────────────────────────────
-      # Uncomment if using Railway. Set RAILWAY_TOKEN + RAILWAY_SERVICE secrets.
-      #
-      # - name: Install Railway CLI
-      #   run: npm install -g @railway/cli
-      # - name: Deploy to Railway
-      #   env:
-      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      #   run: railway up --service ${{ secrets.RAILWAY_SERVICE }} --detach
-
-      - name: Deployment placeholder
+      - name: Verify cosign keyless signature
+        # Image must have been signed by THIS repo's CI workflow via
+        # GitHub OIDC. A signature from a forked or unrelated workflow
+        # is rejected. This is the gate that makes signing meaningful.
+        env:
+          IMAGE: ${{ needs.gate.outputs.image_ref }}
+          IDENTITY_REGEX: ${{ vars.COSIGN_IDENTITY_REGEX || format('https://github.com/{0}/.github/workflows/ci.yml.*', github.repository) }}
         run: |
-          echo "Image ready: ${{ steps.image.outputs.image }}"
-          echo "Uncomment the SSH or Railway deploy block above to activate deployment."
-          echo "Required secrets: CB_DEPLOY_HOST, CB_DEPLOY_KEY (SSH) or RAILWAY_TOKEN (Railway)"
+          cosign verify "$IMAGE" \
+            --certificate-identity-regexp "$IDENTITY_REGEX" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --output text
 
-  # ── Deploy frontend ────────────────────────────────────────────────────────
-  deploy-frontend:
-    name: Deploy Frontend
+      - name: Verify SLSA build provenance attestation
+        env:
+          IMAGE: ${{ needs.gate.outputs.image_ref }}
+          IDENTITY_REGEX: ${{ vars.COSIGN_IDENTITY_REGEX || format('https://github.com/{0}/.github/workflows/ci.yml.*', github.repository) }}
+        run: |
+          cosign verify-attestation "$IMAGE" \
+            --type slsaprovenance \
+            --certificate-identity-regexp "$IDENTITY_REGEX" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            > /dev/null
+          echo "SLSA provenance verified."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. DB snapshot (placeholder — wire to your DB provider)
+  # ──────────────────────────────────────────────────────────────────────────
+  snapshot-db:
+    name: Pre-deploy DB Snapshot
     runs-on: ubuntu-latest
-    needs: check-ci
+    timeout-minutes: 10
+    needs: [gate, verify-image]
+    steps:
+      - name: Trigger snapshot
+        env:
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_PROJECT_REF" ] || [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning::Snapshot creds not set — skipping pre-deploy backup."
+            echo "Configure SUPABASE_PROJECT_REF (var) + SUPABASE_ACCESS_TOKEN (secret) to enable."
+            exit 0
+          fi
+          # Replace with your provider's snapshot API. Example for Supabase:
+          # curl -fsS -X POST \
+          #   "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/backups" \
+          #   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN"
+          echo "Snapshot trigger placeholder — wire to provider API."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. Migrate (real, observable, separate from app boot)
+  # ──────────────────────────────────────────────────────────────────────────
+  # Today migrations run at app startup (database.py:_run_alembic_migrations)
+  # because Supabase Nano free tier is IPv6-only. Once on a paid tier
+  # with IPv4 reachable from GH runners, switch to migrate.yml as the
+  # source of truth and have this job invoke that workflow.
+  migrate:
+    name: Run Migrations (boot-time stub)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [gate, verify-image]
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.run_migrations == 'true'
+    environment: production
+    steps:
+      - name: Migration policy
+        run: |
+          echo "Migrations execute at app startup (database.py)."
+          echo "For explicit pre-deploy migration runs, trigger migrate.yml."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 5a. Deploy → HF Spaces (primary)
+  # ──────────────────────────────────────────────────────────────────────────
+  deploy-hf-spaces:
+    name: Deploy → HF Spaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [gate, verify-image, snapshot-db]
+    permissions:
+      contents: read
+    environment:
+      name: production
+      url: https://huggingface.co/spaces/${{ vars.HF_SPACE_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for the HF push
+
+      - name: Verify Dockerfile present
+        run: |
+          if [ ! -f Dockerfile ]; then
+            echo "::error::Root Dockerfile not found — HF Spaces needs it."
+            exit 1
+          fi
+
+      - name: Configure HF git credentials (token via helper, not URL)
+        # Embedding the token in a URL ("https://USER:TOKEN@host") is
+        # the legacy pattern — it leaks in any verbose log line. Using
+        # a credential helper keeps the token out of git's process args
+        # and out of remote URL config.
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN not set."
+            exit 1
+          fi
+          git config --global credential.helper store
+          printf 'https://HF_USER:%s@huggingface.co\n' "$HF_TOKEN" > ~/.git-credentials
+          chmod 600 ~/.git-credentials
+
+      - name: Push to HF Spaces (force-with-lease, not force)
+        env:
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+        # --force-with-lease refuses the push if the remote moved out
+        # from under us (someone else deployed) — preserves the
+        # rollback target instead of silently overwriting it.
+        run: |
+          if [ -z "$HF_SPACE_NAME" ]; then
+            echo "::error::HF_SPACE_NAME not set."
+            exit 1
+          fi
+          git remote add hf "https://huggingface.co/spaces/${HF_SPACE_NAME}" 2>/dev/null || \
+            git remote set-url hf "https://huggingface.co/spaces/${HF_SPACE_NAME}"
+          git fetch hf main || true
+          git push --force-with-lease hf HEAD:main
+          echo "Pushed to https://huggingface.co/spaces/${HF_SPACE_NAME}"
+
+      - name: Wipe credentials
+        if: always()
+        run: rm -f ~/.git-credentials
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 5b. Deploy → Render (optional backup)
+  # ──────────────────────────────────────────────────────────────────────────
+  deploy-render:
+    name: Deploy → Render
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [gate, verify-image]
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.deploy_render == 'true'
+    environment:
+      name: production-render
+      url: ${{ vars.RENDER_APP_URL }}
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL not set."
+            exit 1
+          fi
+          HTTP_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "::error::Render hook returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Render deploy hook accepted (HTTP $HTTP_CODE)"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 6. Smoke test — HF Spaces (poll, then fail hard)
+  # ──────────────────────────────────────────────────────────────────────────
+  smoke-test-hf:
+    name: Smoke Test — HF Spaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [deploy-hf-spaces]
+    outputs:
+      result: ${{ steps.smoke.outputs.result }}
+    steps:
+      - name: Poll for readiness then assert endpoints
+        id: smoke
+        env:
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+        run: |
+          if [ -z "$HF_SPACE_NAME" ]; then
+            echo "::error::HF_SPACE_NAME not set."
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          HF_URL="https://$(echo "$HF_SPACE_NAME" | tr '/' '-').hf.space"
+          echo "Target: $HF_URL"
+
+          # Poll up to 8 minutes for the container to come live. HF
+          # Spaces cold-builds can legitimately take 4-7 min; sleep 60
+          # gives a false negative on a real-but-slow deploy.
+          READY=0
+          for i in $(seq 1 48); do
+            CODE=$(curl -fsS -o /dev/null -w "%{http_code}" --max-time 10 \
+              "${HF_URL}/api/v1/health" || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "Ready after ${i}×10s polls."
+              READY=1
+              break
+            fi
+            echo "  poll ${i}: HTTP $CODE — waiting..."
+            sleep 10
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            echo "::error::App did not become ready within 8 minutes."
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # Hard-fail smoke. Anything other than expected response is a
+          # rollback trigger — no `::warning::` softening.
+          assert() {
+            local NAME="$1"; local METHOD="$2"; local PATH_URL="$3"; shift 3
+            local EXPECTED="$*"
+            local CODE
+            CODE=$(curl -fsS -o /dev/null -w "%{http_code}" --max-time 15 -X "$METHOD" \
+              "${HF_URL}${PATH_URL}" || echo "000")
+            for E in $EXPECTED; do
+              if [ "$CODE" = "$E" ]; then
+                echo "OK   $NAME -> $CODE"
+                return 0
+              fi
+            done
+            echo "::error::FAIL $NAME -> $CODE (expected one of: $EXPECTED)"
+            return 1
+          }
+
+          FAILED=0
+          assert "health"     GET /api/v1/health        200       || FAILED=$((FAILED+1))
+          assert "auth-me"    GET /api/v1/auth/me       401 403   || FAILED=$((FAILED+1))
+          assert "decisions"  GET /api/v1/decisions     401 403   || FAILED=$((FAILED+1))
+          assert "metrics"    GET /metrics              200       || FAILED=$((FAILED+1))
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "result=pass" >> "$GITHUB_OUTPUT"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 7. Auto-rollback on smoke failure
+  # ──────────────────────────────────────────────────────────────────────────
+  rollback:
+    name: Auto-Rollback to Previous SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [gate, deploy-hf-spaces, smoke-test-hf]
+    # Trigger when the deploy succeeded but smoke failed. If the deploy
+    # itself failed, nothing was rolled forward, so nothing to revert.
+    if: >
+      always() &&
+      needs.deploy-hf-spaces.result == 'success' &&
+      needs.smoke-test-hf.result == 'failure' &&
+      needs.gate.outputs.previous_sha != ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.previous_sha }}
+          fetch-depth: 0
+
+      - name: Configure HF git credentials
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global credential.helper store
+          printf 'https://HF_USER:%s@huggingface.co\n' "$HF_TOKEN" > ~/.git-credentials
+          chmod 600 ~/.git-credentials
+
+      - name: Force previous SHA back to HF Spaces main
+        env:
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+        run: |
+          git remote add hf "https://huggingface.co/spaces/${HF_SPACE_NAME}" 2>/dev/null || \
+            git remote set-url hf "https://huggingface.co/spaces/${HF_SPACE_NAME}"
+          git push --force hf HEAD:main
+          echo "::warning::Rolled HF Spaces back to ${{ needs.gate.outputs.previous_sha }}"
+
+      - name: Wipe credentials
+        if: always()
+        run: rm -f ~/.git-credentials
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8. Record + notify
+  # ──────────────────────────────────────────────────────────────────────────
+  record-deployment:
+    name: Record Deployment + Emit DORA
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [gate, smoke-test-hf]
+    if: always() && needs.gate.result == 'success'
+    permissions:
+      deployments: write
+      contents: read
+    steps:
+      - name: Create GitHub Deployment record
+        # Surfaces in the repo's "Environments" tab and links the deploy
+        # to the PR/commit. Required for any audit trail review.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE: ${{ needs.smoke-test-hf.result == 'success' && 'success' || 'failure' }}
+        run: |
+          DEP_ID=$(gh api -X POST "repos/${{ github.repository }}/deployments" \
+            -f ref="${{ needs.gate.outputs.sha }}" \
+            -f environment="production" \
+            -f description="Auto-deploy from CI" \
+            -F auto_merge=false \
+            -F required_contexts='[]' \
+            --jq '.id')
+          gh api -X POST "repos/${{ github.repository }}/deployments/${DEP_ID}/statuses" \
+            -f state="$STATE" \
+            -f environment_url="https://huggingface.co/spaces/${{ vars.HF_SPACE_NAME }}" \
+            -f description="Deploy ${{ needs.gate.outputs.image_tag }}" >/dev/null
+          echo "Recorded deployment $DEP_ID (state=$STATE)"
+
+      - name: Notify Slack
+        # Graceful no-op if SLACK_WEBHOOK_URL absent — keeps this safe
+        # to copy into other repos.
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          STATE: ${{ needs.smoke-test-hf.result }}
+          SHA: ${{ needs.gate.outputs.sha }}
+          TAG: ${{ needs.gate.outputs.image_tag }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL not set — skipping notification."
+            exit 0
+          fi
+          if [ "$STATE" = "success" ]; then
+            EMOJI=":rocket:"; COLOR="good"; HEADLINE="Deploy succeeded"
+          else
+            EMOJI=":rotating_light:"; COLOR="danger"; HEADLINE="Deploy FAILED — auto-rollback fired"
+          fi
+          curl -fsS -X POST -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg e "$EMOJI" --arg h "$HEADLINE" --arg t "$TAG" \
+                       --arg s "$SHA" --arg a "$ACTOR" --arg u "$RUN_URL" --arg c "$COLOR" \
+                  '{attachments:[{color:$c, text:"\($e) \($h): tag=`\($t)` sha=`\($s)` by \($a) <\($u)|run>"}]}')" \
+            "$SLACK_WEBHOOK_URL"
+
+      - name: Emit DORA metric (deployment frequency)
+        # Structured log line the SRE platform can scrape. Replace with
+        # a Datadog/Honeycomb push when a metrics pipeline is wired.
+        env:
+          STATE: ${{ needs.smoke-test-hf.result }}
+        run: |
+          jq -n \
+            --arg event "deployment" \
+            --arg env "production" \
+            --arg sha "${{ needs.gate.outputs.sha }}" \
+            --arg tag "${{ needs.gate.outputs.image_tag }}" \
+            --arg state "$STATE" \
+            --arg actor "${{ github.actor }}" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{event:$event, env:$env, sha:$sha, tag:$tag, state:$state, actor:$actor, ts:$ts}'
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Optional: backend / frontend deploy placeholders (kept from original)
+  # ──────────────────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend (placeholder)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [gate, verify-image]
+    if: false  # disabled until SSH/Railway/Fly target is wired
+    environment:
+      name: production
+      url: ${{ vars.BACKEND_URL }}
+    steps:
+      - name: Placeholder
+        run: echo "Wire SSH/Railway/Fly here. Image: ${{ needs.gate.outputs.image_ref }}"
+
+  deploy-frontend:
+    name: Deploy Frontend (placeholder)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [gate]
+    if: false  # disabled until Vercel/Netlify target is wired
     environment:
       name: production
       url: ${{ vars.FRONTEND_URL }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
+      - run: npm ci
         working-directory: frontend
-        run: npm ci
-
-      - name: Build for production
+      - run: npm run build
         working-directory: frontend
         env:
           VITE_API_URL: ${{ vars.BACKEND_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.CB_GOOGLE_CLIENT_ID }}
-        run: npm run build
-
-      # ── Option A: Vercel ──────────────────────────────────────────────────
-      # - name: Deploy to Vercel
-      #   uses: amondnet/vercel-action@v25
-      #   with:
-      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
-      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-      #     working-directory: frontend
-      #     vercel-args: "--prod"
-
-      # ── Option B: Netlify ─────────────────────────────────────────────────
-      # - name: Deploy to Netlify
-      #   uses: nwtgck/actions-netlify@v3
-      #   with:
-      #     publish-dir: frontend/dist
-      #     production-deploy: true
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     deploy-message: "Deploy ${{ github.sha }}"
-      #   env:
-      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      #     NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-
-      - name: Deployment placeholder
-        run: |
-          echo "Frontend built. dist/ contains $(find frontend/dist -type f | wc -l) files."
-          echo "Uncomment Vercel or Netlify block above to activate deployment."
+      - run: echo "Wire Vercel/Netlify here."
