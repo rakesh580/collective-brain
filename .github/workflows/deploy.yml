@@ -198,20 +198,24 @@ jobs:
             --output text
 
       - name: Verify SLSA build provenance attestation
-        # `--type slsaprovenance` is cosign's shorthand for SLSA v0.2.
-        # `actions/attest-build-provenance@v1` (used in ci.yml) emits
-        # SLSA v1, which cosign aliases as `slsaprovenance1`. Using the
-        # wrong shorthand silently filters out every attestation and
-        # produces "no matching attestations".
+        # `actions/attest-build-provenance@v1` (used in ci.yml) writes
+        # attestations as Sigstore Bundle v0.3 — pushed to OCI 1.1
+        # referrers when `push-to-registry: true`. `cosign verify-attestation`
+        # was built for the legacy `tag.att` artifact convention and
+        # silently returns "no matching attestations" against bundle-format
+        # attestations even with `--type slsaprovenance1`.
+        #
+        # `gh attestation verify` is the canonical GitHub tool for this
+        # combo: it resolves tag → digest, fetches the Sigstore bundle
+        # from GitHub's attestation store (or the OCI 1.1 referrer),
+        # validates against the GitHub OIDC issuer, and verifies the
+        # SLSA v1 predicate — all in one call.
         env:
           IMAGE: ${{ needs.gate.outputs.image_ref }}
-          IDENTITY_REGEX: ${{ vars.COSIGN_IDENTITY_REGEX || format('https://github.com/{0}/.github/workflows/ci.yml.*', github.repository) }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
         run: |
-          cosign verify-attestation "$IMAGE" \
-            --type slsaprovenance1 \
-            --certificate-identity-regexp "$IDENTITY_REGEX" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            > /dev/null
+          gh attestation verify "oci://${IMAGE}" --owner "${OWNER}"
           echo "SLSA provenance verified."
 
   # ──────────────────────────────────────────────────────────────────────────
