@@ -53,23 +53,45 @@ jobs:
   # with copyleft licenses incompatible with our distribution model.
   #
   # NOTE: `actions/dependency-review-action` calls the GitHub Dependency
-  # Graph API. Private repos require GitHub Advanced Security ($) or the
-  # repo owner must explicitly enable Dependency Graph under Settings →
-  # Code security and analysis. While that's pending, we run the action
-  # but mark the JOB as `continue-on-error` so a 403 from the API
-  # doesn't fail CI. SARIF audit trail is preserved in the job log.
+  # Graph API, which requires GitHub Advanced Security ($) on private
+  # repos OR the owner enabling Dependency Graph under Settings → Code
+  # security and analysis. The probe step below checks API availability
+  # before invoking the action; if the API is unavailable, the action
+  # is skipped (not failed), so the job badge stays green while the
+  # repo setting is pending.
   #
-  # TODO(security-ratchet): drop `continue-on-error: true` once the repo
-  # has Dependency Graph enabled and a clean baseline run on main.
+  # TODO(security-ratchet): once Dependency Graph is enabled, the probe
+  # always returns true and the action runs as a hard gate.
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: github.event_name == 'pull_request'
-    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write  # for comment-summary-in-pr
     steps:
       - uses: actions/checkout@v4
+      - name: Probe Dependency Graph API availability
+        id: probe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # If Dependency Graph is enabled, the compare endpoint returns
+          # 200 with a JSON array. Without GHAS / Dep-Graph, it returns
+          # 403 / 404. We use this to decide whether to invoke the
+          # action — failing soft when the feature is unavailable.
+          if gh api "repos/${{ github.repository }}/dependency-graph/compare/${BASE}...${HEAD}" >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Dependency Graph API is available — running review."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Dependency Graph API unavailable — skipping dependency review. Enable in Settings → Code security and analysis (or pay for GHAS on private repos)."
+          fi
       - uses: actions/dependency-review-action@v4
+        if: steps.probe.outputs.available == 'true'
         with:
           fail-on-severity: high
           deny-licenses: AGPL-1.0-or-later, AGPL-3.0-or-later, GPL-2.0-only, GPL-3.0-only
