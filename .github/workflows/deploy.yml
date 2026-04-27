@@ -198,12 +198,17 @@ jobs:
             --output text
 
       - name: Verify SLSA build provenance attestation
+        # `--type slsaprovenance` is cosign's shorthand for SLSA v0.2.
+        # `actions/attest-build-provenance@v1` (used in ci.yml) emits
+        # SLSA v1, which cosign aliases as `slsaprovenance1`. Using the
+        # wrong shorthand silently filters out every attestation and
+        # produces "no matching attestations".
         env:
           IMAGE: ${{ needs.gate.outputs.image_ref }}
           IDENTITY_REGEX: ${{ vars.COSIGN_IDENTITY_REGEX || format('https://github.com/{0}/.github/workflows/ci.yml.*', github.repository) }}
         run: |
           cosign verify-attestation "$IMAGE" \
-            --type slsaprovenance \
+            --type slsaprovenance1 \
             --certificate-identity-regexp "$IDENTITY_REGEX" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             > /dev/null
@@ -482,21 +487,30 @@ jobs:
       - name: Create GitHub Deployment record
         # Surfaces in the repo's "Environments" tab and links the deploy
         # to the PR/commit. Required for any audit trail review.
+        #
+        # Build the request body via `jq -n` and pipe to `gh api --input -`.
+        # Doing it this way is the only reliable way to send a JSON
+        # array (`required_contexts: []`) — `gh api -F` would send the
+        # literal string "[]" which the GH API rejects with HTTP 422.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ needs.smoke-test-hf.result == 'success' && 'success' || 'failure' }}
+          SHA: ${{ needs.gate.outputs.sha }}
+          TAG: ${{ needs.gate.outputs.image_tag }}
+          REPO: ${{ github.repository }}
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
         run: |
-          DEP_ID=$(gh api -X POST "repos/${{ github.repository }}/deployments" \
-            -f ref="${{ needs.gate.outputs.sha }}" \
-            -f environment="production" \
-            -f description="Auto-deploy from CI" \
-            -F auto_merge=false \
-            -F required_contexts='[]' \
-            --jq '.id')
-          gh api -X POST "repos/${{ github.repository }}/deployments/${DEP_ID}/statuses" \
-            -f state="$STATE" \
-            -f environment_url="https://huggingface.co/spaces/${{ vars.HF_SPACE_NAME }}" \
-            -f description="Deploy ${{ needs.gate.outputs.image_tag }}" >/dev/null
+          DEP_ID=$(jq -n --arg ref "$SHA" \
+                          --arg env "production" \
+                          --arg desc "Auto-deploy from CI" \
+              '{ref: $ref, environment: $env, description: $desc, auto_merge: false, required_contexts: []}' \
+            | gh api -X POST "repos/${REPO}/deployments" --input - --jq '.id')
+          jq -n --arg state "$STATE" \
+                --arg url "https://huggingface.co/spaces/${HF_SPACE_NAME}" \
+                --arg desc "Deploy ${TAG}" \
+              '{state: $state, environment_url: $url, description: $desc}' \
+            | gh api -X POST "repos/${REPO}/deployments/${DEP_ID}/statuses" \
+              --input - >/dev/null
           echo "Recorded deployment $DEP_ID (state=$STATE)"
 
       - name: Notify Slack
