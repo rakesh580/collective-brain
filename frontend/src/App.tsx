@@ -20,6 +20,7 @@ const GraphPage = lazy(() => import("./pages/GraphPage"));
 const PulsePage = lazy(() => import("./pages/PulsePage"));
 const DecisionsHubPage = lazy(() => import("./pages/DecisionsHubPage"));
 const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage"));
+const AdminQuotasPage = lazy(() => import("./pages/AdminQuotasPage"));
 
 function PageFallback() {
   return (
@@ -93,6 +94,8 @@ export default function App() {
         <Route path="/members/:id" element={guarded(<MemberDetailView />, "Member Detail")} />
         <Route path="/settings" element={guarded(<SettingsPage />, "Settings")} />
         <Route path="/organizations" element={guarded(<OrganizationsPage />, "Organizations")} />
+        {/* W19 — admin-only quota dashboard. The page itself redirects non-admins. */}
+        <Route path="/admin/quotas" element={guarded(<AdminQuotasPage />, "Quota Dashboard")} />
       </Route>
     </Routes>
   );

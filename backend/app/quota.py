@@ -39,7 +39,9 @@ every expensive call when the cache wobbles.
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from typing import Literal
 
 from fastapi import Depends, HTTPException, Request, Response, status
@@ -49,6 +51,19 @@ from app.dependencies import get_current_user
 logger = logging.getLogger("collective_brain.quota")
 
 CostClass = Literal["llm", "standard"]
+
+# Redis key prefix for runtime quota overrides written by the admin
+# `/admin/quotas/{org_id}/override` endpoint (W19). The value is a JSON
+# document `{"limit": int, "expires_at": float}` and the TTL is set to
+# match `expires_at - now()` so a stale key cannot outlive the human
+# intent that put it there.
+OVERRIDE_KEY_PREFIX = "quota:override"
+
+
+def override_key(org_id: str, cost_class: str) -> str:
+    """Stable key shape for override lookups. Used by both the gate and
+    the admin endpoint so they cannot drift apart."""
+    return f"{OVERRIDE_KEY_PREFIX}:{org_id}:{cost_class}"
 
 
 def org_quota(cost_class: CostClass):
@@ -78,8 +93,17 @@ def org_quota(cost_class: CostClass):
 
         org_id = _resolve_org_id(user)
         max_requests, window_seconds = _budget_for(settings, cost_class)
-        key = f"org:{org_id}:{cost_class}"
 
+        # Admin override (W19) — if an active override exists in Redis,
+        # use its limit instead of the configured baseline. Window is
+        # not overridden because rolling windows narrower than 1s are
+        # nonsensical, and ones wider than the baseline lose the
+        # "burst protection" property of a sliding window.
+        override_limit = await _read_override(request, org_id=org_id, cost_class=cost_class)
+        if override_limit is not None:
+            max_requests = override_limit
+
+        key = f"org:{org_id}:{cost_class}"
         allowed, remaining = await _check(request, key=key, max_requests=max_requests, window_seconds=window_seconds)
 
         if not allowed:
@@ -132,6 +156,49 @@ def _budget_for(settings, cost_class: CostClass) -> tuple[int, int]:
     else:
         max_requests = int(getattr(settings, "quota_standard_per_window", 300) or 300)
     return max_requests, window
+
+
+async def _read_override(request: Request, *, org_id: str, cost_class: str) -> int | None:
+    """Look up a live quota override in Redis. Returns the override
+    limit (an int) when one is active, or None when there is none.
+
+    Fail-open posture: on any Redis error we return None so the gate
+    falls back to the configured baseline. This matches the rest of
+    this module — losing an override is strictly safer than failing
+    the request because we couldn't read it.
+    """
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None or getattr(redis, "_redis", None) is None:
+        return None
+    try:
+        raw = await redis._redis.get(override_key(org_id, cost_class))
+    except Exception:
+        logger.warning(
+            "quota: override read failed for org=%s class=%s, falling back to baseline",
+            org_id,
+            cost_class,
+            exc_info=True,
+        )
+        return None
+    if raw is None:
+        return None
+    try:
+        payload = json.loads(raw)
+        # Defensive expiry check — Redis TTL is the authoritative
+        # boundary, but a clock-skew or a manually-written key could
+        # leave a stale value behind. We re-check expires_at here to
+        # be tolerant of either failure mode.
+        expires_at = float(payload.get("expires_at", 0))
+        if expires_at and expires_at <= time.time():
+            return None
+        return int(payload["limit"])
+    except (ValueError, KeyError, TypeError):
+        logger.warning(
+            "quota: malformed override payload for org=%s class=%s — ignoring",
+            org_id,
+            cost_class,
+        )
+        return None
 
 
 async def _check(request: Request, *, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:

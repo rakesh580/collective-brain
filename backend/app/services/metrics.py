@@ -185,6 +185,16 @@ QUOTA_DECISIONS_TOTAL = Counter(
     ["cost_class", "outcome"],  # cost_class: llm | standard, outcome: allowed | blocked
 )
 
+# Active quota overrides — gauge so on-call can see at a glance how many
+# tenants are running with a temporarily-lifted budget. Set by the admin
+# override endpoint; decremented when the TTL expires or the override is
+# revoked. Cardinality is bounded by simultaneous live overrides (rare).
+QUOTA_OVERRIDES_ACTIVE = Gauge(
+    "cb_quota_overrides_active",
+    "Number of org/cost-class combinations currently running under a quota override",
+    ["cost_class"],
+)
+
 
 # ── Application info ──────────────────────────────────────────────────────────
 

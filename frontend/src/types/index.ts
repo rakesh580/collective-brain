@@ -55,6 +55,9 @@ export interface User {
   is_active: boolean;
   created_at: string;
   auth_provider?: string | null;
+  // Server returns "member" by default; "admin" / "owner" unlock the
+  // admin surface (admin.py + admin_quotas.py routers).
+  role?: "member" | "admin" | "owner";
   skills: string[];
   role_title: string | null;
   bio: string | null;
@@ -460,6 +463,42 @@ export interface FreshnessReport {
   summary: { fresh: number; aging: number; stale: number; total: number };
   alerts: FreshnessAlert[];
   worst_offenders: FreshnessAlert[];
+}
+
+// W19 — Admin quota dashboard + override
+export type QuotaCostClass = "llm" | "standard";
+
+export interface QuotaOverride {
+  limit: number;
+  expires_at: number;
+  remaining_seconds: number;
+  reason: string | null;
+}
+
+export interface QuotaRow {
+  org_id: string;
+  org_name: string;
+  org_slug: string | null;
+  cost_class: QuotaCostClass;
+  baseline_limit: number;
+  effective_limit: number;
+  used: number;
+  remaining: number;
+  window_seconds: number;
+  override: QuotaOverride | null;
+}
+
+export interface QuotaListResponse {
+  rows: QuotaRow[];
+  generated_at: number;
+  max_override_minutes: number;
+}
+
+export interface SetQuotaOverridePayload {
+  cost_class: QuotaCostClass;
+  new_limit: number;
+  duration_minutes: number;
+  reason?: string;
 }
 
 // Team Health

@@ -1,7 +1,10 @@
+import logging
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+logger = logging.getLogger("collective_brain.insights")
 
 from app.db.database import create_session
 from app.dependencies import get_current_user
@@ -223,12 +226,29 @@ async def generate_insights(request: Request, room_id: str | None = None, user=D
         db.close()
 
 
+_EMPTY_FRESHNESS_REPORT = {
+    "summary": {"fresh": 0, "aging": 0, "stale": 0, "total": 0},
+    "alerts": [],
+    "worst_offenders": [],
+}
+
+
 @router.get("/freshness")
 async def freshness_report(request: Request, user=Depends(get_current_user)):
-    """Return full freshness report for all artifacts."""
+    """Return full freshness report for all artifacts.
+
+    Graceful-degradation: if `compute_artifact_freshness` raises (stale
+    deployment with missing migration, NULL coercion on a partly-loaded
+    table, or zero artifacts hitting an unguarded sort path), we log
+    and return the typed empty-state body so the Pulse "Continuity"
+    tab renders cleanly instead of crashing.
+    """
     db = _get_db()
     try:
         return get_freshness_report(db)
+    except Exception:
+        logger.exception("freshness_report failed — returning empty-state body")
+        return _EMPTY_FRESHNESS_REPORT
     finally:
         db.close()
 
@@ -239,10 +259,12 @@ async def freshness_alerts(request: Request, user=Depends(get_current_user)):
     db = _get_db()
     try:
         report = get_freshness_report(db)
-        # Return stale and aging alerts, prioritized by staleness score
-        all_alerts = report["alerts"]
+        all_alerts = report.get("alerts", [])
         critical_alerts = [a for a in all_alerts if a["status"] in ("stale", "aging")]
         return {"alerts": critical_alerts[:10]}
+    except Exception:
+        logger.exception("freshness_alerts failed — returning empty-state body")
+        return {"alerts": []}
     finally:
         db.close()
 
