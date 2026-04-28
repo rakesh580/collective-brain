@@ -384,9 +384,17 @@ jobs:
           # Poll up to 8 minutes for the container to come live. HF
           # Spaces cold-builds can legitimately take 4-7 min; sleep 60
           # gives a false negative on a real-but-slow deploy.
+          #
+          # IMPORTANT: do NOT pass `-f` to curl here. With `-f`, curl
+          # exits non-zero on HTTP 4xx/5xx but `-w "%{http_code}"`
+          # still writes the code to stdout, then the `|| echo "000"`
+          # fallback appends "000" — yielding a bogus concatenation
+          # like "401000" that the assert below cannot match against.
+          # Without `-f`, curl exits 0 on any HTTP response and only
+          # the `||` fallback fires for actual connection failures.
           READY=0
           for i in $(seq 1 48); do
-            CODE=$(curl -fsS -o /dev/null -w "%{http_code}" --max-time 10 \
+            CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
               "${HF_URL}/api/v1/health" || echo "000")
             if [ "$CODE" = "200" ]; then
               echo "Ready after ${i}×10s polls."
@@ -409,7 +417,8 @@ jobs:
             local NAME="$1"; local METHOD="$2"; local PATH_URL="$3"; shift 3
             local EXPECTED="$*"
             local CODE
-            CODE=$(curl -fsS -o /dev/null -w "%{http_code}" --max-time 15 -X "$METHOD" \
+            # See note above re: `-f` and the "401000" bug.
+            CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 -X "$METHOD" \
               "${HF_URL}${PATH_URL}" || echo "000")
             for E in $EXPECTED; do
               if [ "$CODE" = "$E" ]; then
