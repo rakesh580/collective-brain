@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import type { QuotaCostClass, QuotaListResponse, QuotaRow } from "../types";
+import type { QuotaListResponse, QuotaRow } from "../types";
 
 const POLL_INTERVAL_MS = 10_000;
 
