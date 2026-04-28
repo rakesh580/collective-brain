@@ -36,6 +36,7 @@ from app.routers import notifications as notifications_mod
 from app.routers import risk_radar as risk_radar_router_mod
 from app.routers import signals as signals_router_mod
 from app.routers.admin import router as admin_router
+from app.routers.admin_quotas import router as admin_quotas_router
 from app.routers.offboarding import router as offboarding_router
 from app.routers.organizations import router as organizations_router
 from app.routers.saml import router as saml_router
@@ -436,6 +437,10 @@ api_v1.include_router(scim_router, tags=["scim"])
 # Phase 6 — Offboarding (backend kept: Continuity depends on offboarding reports)
 api_v1.include_router(offboarding_router, tags=["offboarding"])
 api_v1.include_router(admin_router, prefix="/admin", tags=["admin"])
+# W19 — admin quota dashboard + override (mounted under the same /admin
+# prefix so the auth posture stays consistent with the rest of the
+# admin surface).
+api_v1.include_router(admin_quotas_router, prefix="/admin", tags=["admin-quotas"])
 app.include_router(api_v1)
 
 # ── Frontend SPA fallback ─────────────────────────────────────────────────────
