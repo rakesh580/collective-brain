@@ -68,6 +68,9 @@ import type {
   DecisionInfluenceMap,
   OnboardingBriefing,
   OrgXrayReport,
+  QuotaCostClass,
+  QuotaListResponse,
+  SetQuotaOverridePayload,
 } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
@@ -765,4 +768,24 @@ export const api = {
     request<{ id: string }>("/notifications/webhooks", { method: "POST", body: JSON.stringify({ url, event_types: eventTypes }) }),
   getWebhooks: () => request<{ webhooks: any[] }>("/notifications/webhooks"),
   deleteWebhook: (id: string) => request<{ status: string }>(`/notifications/webhooks/${id}`, { method: "DELETE" }),
+
+  // ── W19: Admin Quota Dashboard + Override ──
+  getAdminQuotas: () => request<QuotaListResponse>("/admin/quotas"),
+  setQuotaOverride: (orgId: string, payload: SetQuotaOverridePayload) =>
+    request<{
+      status: string;
+      org_id: string;
+      cost_class: QuotaCostClass;
+      limit: number;
+      expires_at: number;
+      remaining_seconds: number;
+    }>(`/admin/quotas/${encodeURIComponent(orgId)}/override`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  clearQuotaOverride: (orgId: string, costClass: QuotaCostClass) =>
+    request<{ status: string; deleted: boolean }>(
+      `/admin/quotas/${encodeURIComponent(orgId)}/override?cost_class=${costClass}`,
+      { method: "DELETE" },
+    ),
 };
